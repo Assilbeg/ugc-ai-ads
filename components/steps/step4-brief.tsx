@@ -32,8 +32,9 @@ export function Step4Brief({ brief, onChange, onNext, onBack }: Step4BriefProps)
   }
 
   const handleBenefitsChange = (value: string) => {
-    const benefits = value.split(',').map(b => b.trim()).filter(Boolean)
-    onChange({ ...brief, key_benefits: benefits })
+    // Stocke comme array avec un seul élément pour garder le texte brut
+    // Le split par virgule sera fait côté API si besoin
+    onChange({ ...brief, key_benefits: value ? [value] : [] })
   }
 
   const handleDurationChange = (duration: 15 | 30 | 45 | 60) => {
@@ -85,14 +86,11 @@ export function Step4Brief({ brief, onChange, onNext, onBack }: Step4BriefProps)
         <div className="space-y-2">
           <Label className="text-zinc-300">Bénéfices clés (optionnel)</Label>
           <Input
-            placeholder="Ex: Gain de temps, économies, simplicité..."
-            value={brief.key_benefits?.join(', ') || ''}
+            placeholder="Ex: Gain de temps, plus de clients, simplicité d'utilisation..."
+            value={brief.key_benefits?.[0] || ''}
             onChange={(e) => handleBenefitsChange(e.target.value)}
             className="bg-zinc-800/50 border-zinc-700 text-white placeholder:text-zinc-500"
           />
-          <p className="text-xs text-zinc-500">
-            Sépare les bénéfices par des virgules
-          </p>
         </div>
 
         {/* Duration selection */}

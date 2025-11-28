@@ -1,12 +1,12 @@
 // Fal.ai API Client
-// Handles: NanoBanana (first frames), Veo 3.1, Sora 2, Chatterbox, ElevenLabs
+// Handles: NanoBanana Pro (first frames), Veo 3.1, Kling, Chatterbox, ElevenLabs
 
 const FAL_API_URL = 'https://queue.fal.run'
-const FAL_KEY = process.env.FAL_KEY!
 
 interface FalRequestOptions {
   path: string
-  input: Record<string, unknown>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: any
 }
 
 interface FalQueueResponse {
@@ -23,6 +23,14 @@ interface FalStatusResponse {
 
 // Helper to make Fal.ai requests
 async function falRequest<T>({ path, input }: FalRequestOptions): Promise<T> {
+  const FAL_KEY = process.env.FAL_KEY
+  
+  if (!FAL_KEY) {
+    throw new Error('FAL_KEY non configurée dans .env.local')
+  }
+
+  console.log(`[Fal.ai] POST ${FAL_API_URL}/${path}`)
+  
   const response = await fetch(`${FAL_API_URL}/${path}`, {
     method: 'POST',
     headers: {
@@ -34,37 +42,56 @@ async function falRequest<T>({ path, input }: FalRequestOptions): Promise<T> {
 
   if (!response.ok) {
     const error = await response.text()
-    throw new Error(`Fal.ai error: ${error}`)
+    console.error(`[Fal.ai] Error ${response.status}:`, error)
+    throw new Error(`Fal.ai error (${response.status}): ${error}`)
   }
 
-  return response.json()
+  const result = await response.json()
+  console.log(`[Fal.ai] Queue response:`, result)
+  return result
 }
 
 // Check status of a queued request
 async function checkStatus(requestId: string, path: string): Promise<FalStatusResponse> {
-  const response = await fetch(`${FAL_API_URL}/${path}/requests/${requestId}/status`, {
+  const FAL_KEY = process.env.FAL_KEY!
+  
+  const statusUrl = `${FAL_API_URL}/${path}/requests/${requestId}/status`
+  console.log(`[Fal.ai] Checking status: ${statusUrl}`)
+  
+  const response = await fetch(statusUrl, {
     headers: {
       'Authorization': `Key ${FAL_KEY}`,
     },
   })
 
   if (!response.ok) {
-    throw new Error('Failed to check status')
+    const error = await response.text()
+    console.error(`[Fal.ai] Status check failed (${response.status}):`, error)
+    throw new Error(`Failed to check status (${response.status}): ${error}`)
   }
 
-  return response.json()
+  const result = await response.json()
+  console.log(`[Fal.ai] Status:`, result.status)
+  return result
 }
 
 // Get result of a completed request
 async function getResult<T>(requestId: string, path: string): Promise<T> {
-  const response = await fetch(`${FAL_API_URL}/${path}/requests/${requestId}`, {
+  const FAL_KEY = process.env.FAL_KEY!
+  
+  const resultUrl = `${FAL_API_URL}/${path}/requests/${requestId}`
+  console.log(`[Fal.ai] Getting result: ${resultUrl}`)
+  
+  const response = await fetch(resultUrl, {
     headers: {
       'Authorization': `Key ${FAL_KEY}`,
     },
   })
 
   if (!response.ok) {
-    throw new Error('Failed to get result')
+    const error = await response.text()
+    console.error(`[Fal.ai] Get result failed (${response.status}):`, error)
+    throw new Error(`Failed to get result (${response.status}): ${error}`)
   }
 
   return response.json()
@@ -95,54 +122,78 @@ async function pollUntilComplete<T>(
 }
 
 // ─────────────────────────────────────────────────────────────────
-// NANO BANANA PRO - First Frame Generation
+// NANO BANANA PRO - Image-to-Image with Character Consistency
+// Docs: https://fal.ai/models/fal-ai/nano-banana-pro/edit
 // ─────────────────────────────────────────────────────────────────
-interface NanoBananaInput {
-  prompt: string
-  image_url: string // SOUL actor reference image
-  num_images?: number
-  guidance_scale?: number
-  num_inference_steps?: number
-  seed?: number
-}
-
-interface NanoBananaOutput {
-  images: Array<{ url: string }>
-}
 
 export async function generateFirstFrame(
   soulImageUrl: string,
-  prompt: string,
-  options?: Partial<NanoBananaInput>
+  prompt: string // Full prompt (template already applied by API route)
 ): Promise<string> {
-  const path = 'fal-ai/flux-pulid' // NanoBanana Pro model path
+  const FAL_KEY = process.env.FAL_KEY
   
-  const input: NanoBananaInput = {
-    prompt: `UGC selfie video first frame. ${prompt}. Vertical 9:16 format, smartphone front camera, natural lighting, authentic look.`,
-    image_url: soulImageUrl,
-    num_images: 1,
-    guidance_scale: 4,
-    num_inference_steps: 30,
-    ...options,
+  if (!FAL_KEY) {
+    throw new Error('FAL_KEY non configurée dans .env.local')
   }
 
-  const queue = await falRequest<FalQueueResponse>({ path, input })
-  const result = await pollUntilComplete<NanoBananaOutput>(queue.request_id, path)
+  console.log('[NanoBanana Pro] Generating first frame:', { 
+    soulImageUrl: soulImageUrl.slice(0, 80),
+    prompt: prompt.slice(0, 150) + '...' 
+  })
+
+  // Using Nano Banana Pro edit endpoint (synchronous)
+  // Docs: https://fal.ai/models/fal-ai/nano-banana-pro/edit
+  const response = await fetch('https://fal.run/fal-ai/nano-banana-pro/edit', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Key ${FAL_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      prompt: prompt, // Full prompt from API route (template already applied)
+      image_urls: [soulImageUrl], // Array of image URLs
+      aspect_ratio: '9:16', // Vertical portrait
+      num_images: 1,
+      output_format: 'jpeg',
+      resolution: '1K',
+    }),
+  })
+
+  if (!response.ok) {
+    const error = await response.text()
+    console.error('[NanoBanana Pro] Error:', response.status, error)
+    throw new Error(`Génération image échouée (${response.status}): ${error}`)
+  }
+
+  const result = await response.json() as { 
+    images: Array<{ url: string; file_name: string; content_type: string }> 
+    description?: string
+  }
+  
+  console.log('[NanoBanana Pro] Result:', {
+    imagesCount: result.images?.length,
+    firstUrl: result.images?.[0]?.url?.slice(0, 80),
+    description: result.description
+  })
+  
+  if (!result.images?.[0]?.url) {
+    throw new Error('Pas d\'image générée par NanoBanana Pro')
+  }
   
   return result.images[0].url
 }
 
 // ─────────────────────────────────────────────────────────────────
-// VEO 3.1 - Video Generation (for clips > 12s or multi-clip packs)
+// VEO 3 - Video Generation
 // ─────────────────────────────────────────────────────────────────
-interface Veo31Input {
+interface Veo3Input {
   prompt: string
-  image_url?: string // First frame reference
-  duration?: number // 4, 6, or 8 seconds
+  image_url?: string
+  duration?: string
   aspect_ratio?: string
 }
 
-interface Veo31Output {
+interface Veo3Output {
   video: { url: string }
 }
 
@@ -151,92 +202,130 @@ export async function generateVideoVeo31(
   firstFrameUrl: string,
   duration: 4 | 6 | 8 = 6
 ): Promise<string> {
-  const path = 'fal-ai/veo3' // Veo 3.1 model path on Fal.ai
+  const path = 'fal-ai/veo3'
   
-  const input: Veo31Input = {
+  const input: Veo3Input = {
     prompt,
     image_url: firstFrameUrl,
-    duration,
+    duration: `${duration}s`,
     aspect_ratio: '9:16',
   }
 
+  console.log('Generating video with Veo3:', { duration, prompt: prompt.slice(0, 100) + '...' })
+
   const queue = await falRequest<FalQueueResponse>({ path, input })
-  const result = await pollUntilComplete<Veo31Output>(queue.request_id, path, 180, 10000) // 30 min timeout for video
+  const result = await pollUntilComplete<Veo3Output>(queue.request_id, path, 180, 10000)
   
   return result.video.url
 }
 
 // ─────────────────────────────────────────────────────────────────
-// SORA 2 - Video Generation (for single clips ≤ 12s)
+// KLING - Video Generation 
 // ─────────────────────────────────────────────────────────────────
-interface Sora2Input {
+interface KlingInput {
   prompt: string
   image_url?: string
-  duration?: number // 4, 8, or 12 seconds
+  duration?: string
   aspect_ratio?: string
 }
 
-interface Sora2Output {
+interface KlingOutput {
   video: { url: string }
 }
 
-export async function generateVideoSora2(
+export async function generateVideoKling(
   prompt: string,
   firstFrameUrl: string,
-  duration: 4 | 8 | 12 = 8
+  duration: 5 | 10 = 5
 ): Promise<string> {
-  const path = 'fal-ai/sora' // Sora 2 model path on Fal.ai
+  const path = 'fal-ai/kling-video/v1.5/pro/image-to-video'
   
-  const input: Sora2Input = {
+  const input: KlingInput = {
     prompt,
     image_url: firstFrameUrl,
-    duration,
+    duration: `${duration}`,
     aspect_ratio: '9:16',
   }
 
+  console.log('Generating video with Kling:', { duration, prompt: prompt.slice(0, 100) + '...' })
+
   const queue = await falRequest<FalQueueResponse>({ path, input })
-  const result = await pollUntilComplete<Sora2Output>(queue.request_id, path, 180, 10000)
+  const result = await pollUntilComplete<KlingOutput>(queue.request_id, path, 180, 10000)
   
   return result.video.url
 }
 
 // ─────────────────────────────────────────────────────────────────
-// CHATTERBOX - Voice Cloning
+// MINIMAX - Video Generation
+// ─────────────────────────────────────────────────────────────────
+interface MinimaxInput {
+  prompt: string
+  first_frame_image?: string
+}
+
+interface MinimaxOutput {
+  video: { url: string }
+}
+
+export async function generateVideoMinimax(
+  prompt: string,
+  firstFrameUrl: string
+): Promise<string> {
+  const path = 'fal-ai/minimax/video-01-live/image-to-video'
+  
+  const input: MinimaxInput = {
+    prompt,
+    first_frame_image: firstFrameUrl,
+  }
+
+  console.log('Generating video with Minimax:', { prompt: prompt.slice(0, 100) + '...' })
+
+  const queue = await falRequest<FalQueueResponse>({ path, input })
+  const result = await pollUntilComplete<MinimaxOutput>(queue.request_id, path, 180, 10000)
+  
+  return result.video.url
+}
+
+// ─────────────────────────────────────────────────────────────────
+// CHATTERBOX - Voice Cloning / TTS
 // ─────────────────────────────────────────────────────────────────
 interface ChatterboxInput {
-  audio_url: string // Video audio to transform
-  reference_audio_url: string // Voice reference sample
-  text?: string // Optional: text for better sync
+  text: string
+  audio_url: string
+  exaggeration?: number
+  cfg_weight?: number
 }
 
 interface ChatterboxOutput {
-  audio: { url: string }
+  audio_url: string
 }
 
 export async function cloneVoice(
-  videoAudioUrl: string,
-  referenceVoiceUrl: string,
-  text?: string
+  text: string,
+  referenceVoiceUrl: string
 ): Promise<string> {
-  const path = 'fal-ai/chatterbox' // Chatterbox model path
+  const path = 'fal-ai/chatterbox/tts'
   
   const input: ChatterboxInput = {
-    audio_url: videoAudioUrl,
-    reference_audio_url: referenceVoiceUrl,
     text,
+    audio_url: referenceVoiceUrl,
+    exaggeration: 0.5,
+    cfg_weight: 0.5,
   }
 
+  console.log('Cloning voice with Chatterbox:', { text: text.slice(0, 50) + '...' })
+
   const queue = await falRequest<FalQueueResponse>({ path, input })
-  const result = await pollUntilComplete<ChatterboxOutput>(queue.request_id, path)
+  const result = await pollUntilComplete<ChatterboxOutput>(queue.request_id, path, 60, 3000)
   
-  return result.audio.url
+  return result.audio_url
 }
 
 // ─────────────────────────────────────────────────────────────────
 // ELEVENLABS - Sound Effects / Ambient Audio
 // ─────────────────────────────────────────────────────────────────
 interface ElevenLabsSFXInput {
-  text: string // Description of the sound effect
+  text: string
   duration_seconds?: number
 }
 
@@ -248,15 +337,17 @@ export async function generateAmbientAudio(
   description: string,
   durationSeconds: number = 10
 ): Promise<string> {
-  const path = 'fal-ai/elevenlabs/sound-effects' // ElevenLabs SFX path
+  const path = 'fal-ai/elevenlabs/sound-effects'
   
   const input: ElevenLabsSFXInput = {
     text: description,
     duration_seconds: durationSeconds,
   }
 
+  console.log('Generating ambient audio:', { description: description.slice(0, 50) + '...' })
+
   const queue = await falRequest<FalQueueResponse>({ path, input })
-  const result = await pollUntilComplete<ElevenLabsSFXOutput>(queue.request_id, path)
+  const result = await pollUntilComplete<ElevenLabsSFXOutput>(queue.request_id, path, 60, 3000)
   
   return result.audio.url
 }
@@ -267,13 +358,18 @@ export async function generateAmbientAudio(
 export async function generateVideo(
   prompt: string,
   firstFrameUrl: string,
-  engine: 'veo3.1' | 'sora2',
+  engine: 'veo3.1' | 'sora2' | 'kling' | 'minimax',
   duration: number
 ): Promise<string> {
-  if (engine === 'veo3.1') {
-    return generateVideoVeo31(prompt, firstFrameUrl, duration as 4 | 6 | 8)
-  } else {
-    return generateVideoSora2(prompt, firstFrameUrl, duration as 4 | 8 | 12)
+  switch (engine) {
+    case 'veo3.1':
+      return generateVideoVeo31(prompt, firstFrameUrl, duration as 4 | 6 | 8)
+    case 'kling':
+      return generateVideoKling(prompt, firstFrameUrl, duration <= 5 ? 5 : 10)
+    case 'minimax':
+      return generateVideoMinimax(prompt, firstFrameUrl)
+    default:
+      // Fallback to Kling
+      return generateVideoKling(prompt, firstFrameUrl, duration <= 5 ? 5 : 10)
   }
 }
-

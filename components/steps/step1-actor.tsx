@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Actor } from '@/types'
-import { PRESET_ACTORS } from '@/lib/api/higgsfield'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 
@@ -25,29 +24,18 @@ export function Step1Actor({ selectedActorId, onSelect, onNext }: Step1ActorProp
   const loadActors = async () => {
     setLoading(true)
     
-    // Load custom actors from database
-    const { data: customActors } = await supabase
+    // Load all actors from database
+    const { data, error } = await supabase
       .from('actors')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('is_custom', { ascending: true }) // Preset actors first, then custom
+      .order('name', { ascending: true })
 
-    // Combine preset actors with custom actors
-    const presetActorsFormatted: Actor[] = PRESET_ACTORS.map(pa => ({
-      id: pa.id,
-      user_id: 'system',
-      name: pa.name,
-      thumbnail_video_url: pa.thumbnail_video_url,
-      soul_image_url: pa.soul_image_url,
-      voice: {
-        reference_audio_url: pa.voice_reference_url,
-        voice_style: 'natural',
-      },
-      appearance: pa.appearance,
-      is_custom: false,
-      created_at: new Date().toISOString(),
-    }))
+    if (error) {
+      console.error('Error loading actors:', error)
+    }
 
-    setActors([...presetActorsFormatted, ...(customActors || [])])
+    setActors((data || []) as Actor[])
     setLoading(false)
   }
 
