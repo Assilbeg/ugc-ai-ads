@@ -54,7 +54,7 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
   // Calcul de la durée totale (utiliser celle de l'assemblage si disponible)
   const totalDuration = latestAssembly?.duration_seconds 
     ? Math.round(latestAssembly.duration_seconds)
-    : clips?.reduce((sum, c) => {
+    : clips?.reduce((sum: number, c: any) => {
         const video = c.video as { duration?: number }
         return sum + (video?.duration || 0)
       }, 0) || 0
