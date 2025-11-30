@@ -177,24 +177,31 @@ export async function POST(request: NextRequest) {
       let finalUrl = rawUrl
       
       if (hasAdjustments) {
+        console.log(`[Assemble] Clip ${i + 1} - Uploading to Cloudinary...`)
         // Upload vers Cloudinary si pas encore fait
         const cloudinaryId = await uploadToCloudinaryIfNeeded(rawUrl, clip.cloudinaryId)
+        
+        console.log(`[Assemble] Clip ${i + 1} - Cloudinary ID:`, cloudinaryId)
         
         if (cloudinaryId) {
           // Construire l'URL avec transformations
           const cloudinaryUrl = `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/video/upload/${cloudinaryId}.mp4`
+          console.log(`[Assemble] Clip ${i + 1} - Base Cloudinary URL:`, cloudinaryUrl)
+          
           finalUrl = buildPreviewUrl(cloudinaryUrl, {
             trimStart,
             trimEnd,
             speed
           })
-          console.log(`[Assemble] Clip ${i + 1} transformed URL:`, finalUrl.slice(0, 100))
+          console.log(`[Assemble] Clip ${i + 1} - FINAL URL WITH TRANSFORMS:`, finalUrl)
         } else {
-          console.warn('[Assemble] Cloudinary upload failed, using raw video')
+          console.error(`[Assemble] Clip ${i + 1} - Cloudinary upload FAILED, using raw video WITHOUT transforms!`)
         }
       } else {
         console.log(`[Assemble] Clip ${i + 1} no adjustments, using raw URL`)
       }
+      
+      console.log(`[Assemble] Clip ${i + 1} - URL being sent to FAL:`, finalUrl.slice(0, 120))
       
       processedClips.push({
         url: finalUrl,
@@ -216,8 +223,14 @@ export async function POST(request: NextRequest) {
     })
 
     const totalDuration = currentTimestamp
-    console.log('[Assemble] Keyframes:', keyframes.map(k => ({ timestamp: k.timestamp, duration: k.duration })))
+    console.log('[Assemble] ═══════════════════════════════════════')
+    console.log('[Assemble] FINAL KEYFRAMES FOR FAL.AI:')
+    keyframes.forEach((k, i) => {
+      console.log(`[Assemble]   Clip ${i + 1}: ${k.url.slice(0, 80)}...`)
+      console.log(`[Assemble]            timestamp: ${k.timestamp}s, duration: ${k.duration}s`)
+    })
     console.log('[Assemble] Total duration:', totalDuration, 'seconds')
+    console.log('[Assemble] ═══════════════════════════════════════')
 
     const videoTrack: Track = {
       id: 'video-track',
@@ -312,7 +325,15 @@ export async function POST(request: NextRequest) {
       videoUrl: result.video_url,
       thumbnailUrl: result.thumbnail_url,
       duration: totalDuration,
-      clipCount: clipsToProcess.length
+      clipCount: clipsToProcess.length,
+      // Debug: URLs utilisées pour l'assemblage
+      debug: {
+        processedClips: processedClips.map((c, i) => ({
+          clipOrder: c.clipOrder,
+          urlUsed: c.url.slice(0, 100) + '...',
+          hasTransforms: c.url.includes('so_') || c.url.includes('eo_') || c.url.includes('e_accelerate'),
+        }))
+      }
     })
   } catch (error) {
     console.error('[Assemble] Error:', error)
