@@ -276,7 +276,7 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
             Historique des versions ({assemblies.length})
           </h3>
           <div className="space-y-2">
-            {assemblies.map((assembly, index) => (
+            {assemblies.map((assembly: any, index: number) => (
               <div 
                 key={assembly.id}
                 className={`flex items-center justify-between p-3 rounded-lg ${
