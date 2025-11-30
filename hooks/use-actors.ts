@@ -16,8 +16,8 @@ export function useActors() {
 
     try {
       // Load all actors from database
-      const { data, error: dbError } = await supabase
-        .from('actors')
+      const { data, error: dbError } = await (supabase
+        .from('actors') as any)
         .select('*')
         .order('is_custom', { ascending: true }) // Preset actors first
         .order('name', { ascending: true })

@@ -16,11 +16,9 @@ const BEAT_EXPRESSIONS: Record<ScriptBeat, ExpressionType> = {
 }
 
 // Choix du moteur selon la durée et le format
-function getVideoEngine(clipCount: number, duration: number): VideoEngine {
-  // Pack multi-clips (≥2 clips assemblés) → Veo 3.1 obligatoire
-  // Clip unique ≤ 12s → Sora 2 par défaut
-  if (clipCount >= 2) return 'veo3.1'
-  return duration > 12 ? 'veo3.1' : 'sora2'
+function getVideoEngine(_clipCount: number, _duration: number): VideoEngine {
+  // Veo 3.1 uniquement - meilleur rapport qualité/prix
+  return 'veo3.1'
 }
 
 interface GeneratePlanParams {
@@ -549,6 +547,8 @@ Chaque first_frame.location DOIT être "${preset.first_frame.location}".`
       voice_url: undefined,
       ambient_url: undefined,
       final_url: undefined,
+      voice_volume: 1.0,
+      ambient_volume: 0.3,
     },
   }))
 

@@ -63,8 +63,8 @@ export default function AdminPromptsPage() {
 
   const loadPrompts = async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('system_prompts')
+    const { data, error } = await (supabase
+      .from('system_prompts') as any)
       .select('*')
       .order('name')
 

@@ -9,8 +9,8 @@ export default async function DashboardPage() {
   const supabase = await createClient()
   
   // Fetch user's campaigns
-  const { data: campaigns } = await supabase
-    .from('campaigns')
+  const { data: campaigns } = await (supabase
+    .from('campaigns') as any)
     .select('*')
     .order('created_at', { ascending: false })
 
@@ -43,7 +43,7 @@ export default async function DashboardPage() {
       {/* Campaigns grid */}
       {campaigns && campaigns.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {campaigns.map((campaign) => (
+          {campaigns.map((campaign: any) => (
             <Link key={campaign.id} href={`/campaign/${campaign.id}`}>
               <Card className="group hover:shadow-lg hover:border-foreground/20 transition-all duration-300 cursor-pointer h-full">
                 <CardHeader className="pb-3">

@@ -226,8 +226,8 @@ export default function AdminActorsPage() {
 
   const loadActors = async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('actors')
+    const { data, error } = await (supabase
+      .from('actors') as any)
       .select('*')
       .order('created_at', { ascending: false })
 

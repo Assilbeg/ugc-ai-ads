@@ -65,8 +65,8 @@ export default function ExistingCampaignPage() {
 
       try {
         // Charger la campagne
-        const { data: campaign, error: campaignError } = await supabase
-          .from('campaigns')
+        const { data: campaign, error: campaignError } = await (supabase
+          .from('campaigns') as any)
           .select('*')
           .eq('id', campaignId)
           .single()
@@ -79,8 +79,8 @@ export default function ExistingCampaignPage() {
         }
 
         // Charger les clips associés
-        const { data: clips, error: clipsError } = await supabase
-          .from('campaign_clips')
+        const { data: clips, error: clipsError } = await (supabase
+          .from('campaign_clips') as any)
           .select('*')
           .eq('campaign_id', campaignId)
           .order('order', { ascending: true })
@@ -108,7 +108,7 @@ export default function ExistingCampaignPage() {
           step = 5
         } else {
           // On a des clips
-          const hasGeneratedVideos = clips.some(c => c.video?.raw_url)
+          const hasGeneratedVideos = clips.some((c: any) => c.video?.raw_url)
           if (hasGeneratedVideos || campaign.status === 'completed' || campaign.status === 'generating') {
             step = 6
           } else {
@@ -118,7 +118,7 @@ export default function ExistingCampaignPage() {
 
         // Reconstruire les first frames depuis les clips
         const generatedFirstFrames: GeneratedFirstFrames = {}
-        clips?.forEach((clip, index) => {
+        clips?.forEach((clip: any, index: number) => {
           if (clip.first_frame?.image_url) {
             generatedFirstFrames[index] = {
               url: clip.first_frame.image_url,
@@ -166,8 +166,8 @@ export default function ExistingCampaignPage() {
       // Pour preset_id, on le stocke dans brief._preset_id (car FK peut échouer)
       if (updates.preset_id !== undefined) {
         // Vérifier si le preset existe en DB
-        const { data: presetExists } = await supabase
-          .from('intention_presets')
+        const { data: presetExists } = await (supabase
+          .from('intention_presets') as any)
           .select('id')
           .eq('id', updates.preset_id)
           .single()
@@ -186,8 +186,8 @@ export default function ExistingCampaignPage() {
       }
 
       if (Object.keys(campaignUpdates).length > 0) {
-        await supabase
-          .from('campaigns')
+        await (supabase
+          .from('campaigns') as any)
           .update(campaignUpdates)
           .eq('id', campaignId)
       }

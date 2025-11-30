@@ -111,8 +111,8 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient()
     
     // D'abord récupérer les intention_media existantes
-    const { data: existingActor } = await supabase
-      .from('actors')
+    const { data: existingActor } = await (supabase
+      .from('actors') as any)
       .select('intention_media')
       .eq('id', actorId)
       .single()
@@ -134,8 +134,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { error: updateError } = await supabase
-      .from('actors')
+    const { error: updateError } = await (supabase
+      .from('actors') as any)
       .update({ intention_media: mergedIntentionMedia })
       .eq('id', actorId)
 

@@ -93,8 +93,8 @@ async function uploadToCloudinaryIfNeeded(
  */
 async function updateCampaignStatus(supabase: any, campaignId: string, status: string) {
   try {
-    await supabase
-      .from('campaigns')
+    await (supabase
+      .from('campaigns') as any)
       .update({ status })
       .eq('id', campaignId)
   } catch (err) {
@@ -249,8 +249,8 @@ export async function POST(request: NextRequest) {
       const supabase = await createClient()
       
       // 1. Créer une nouvelle entrée dans campaign_assemblies
-      const { data: assembly, error: assemblyError } = await supabase
-        .from('campaign_assemblies')
+      const { data: assembly, error: assemblyError } = await (supabase
+        .from('campaign_assemblies') as any)
         .insert({
           campaign_id: campaignId,
           final_video_url: result.video_url,
@@ -266,8 +266,8 @@ export async function POST(request: NextRequest) {
         // Fallback: mettre à jour la campagne directement si la table n'existe pas encore
         if (assemblyError.code === '42P01') { // Table doesn't exist
           console.log('[Assemble] campaign_assemblies table not found, updating campaign directly')
-          await supabase
-            .from('campaigns')
+          await (supabase
+            .from('campaigns') as any)
             .update({ 
               final_video_url: result.video_url,
               status: 'completed'
@@ -279,8 +279,8 @@ export async function POST(request: NextRequest) {
       }
 
       // 2. Mettre à jour la campagne avec le dernier assemblage (pour compatibilité)
-      await supabase
-        .from('campaigns')
+      await (supabase
+        .from('campaigns') as any)
         .update({ 
           final_video_url: result.video_url,
           status: 'completed'

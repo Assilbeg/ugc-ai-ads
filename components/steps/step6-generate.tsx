@@ -309,8 +309,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         return null
       }
 
-      const { data: campaign, error } = await supabase
-        .from('campaigns')
+      const { data: campaign, error } = await (supabase
+        .from('campaigns') as any)
         .insert({
           user_id: user.id,
           actor_id: state.actor_id,
@@ -318,7 +318,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           product: state.product,
           brief: state.brief,
           status: 'generating',
-        } as any)
+        })
         .select()
         .single()
 
@@ -343,8 +343,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
 
     try {
       // Supprimer les anciens clips et insérer les nouveaux (upsert simplifié)
-      const { error: deleteError } = await supabase
-        .from('campaign_clips')
+      const { error: deleteError } = await (supabase
+        .from('campaign_clips') as any)
         .delete()
         .eq('campaign_id', dbCampaignId)
 
@@ -363,9 +363,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         status: clip.status || 'pending',
       }))
 
-      const { error: insertError } = await supabase
-        .from('campaign_clips')
-        .insert(clipsToInsert as any)
+      const { error: insertError } = await (supabase
+        .from('campaign_clips') as any)
+        .insert(clipsToInsert)
 
       if (insertError) {
         console.error('Error saving clips:', insertError)

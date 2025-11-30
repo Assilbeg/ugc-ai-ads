@@ -8,16 +8,16 @@ export default async function AdminDashboard() {
   const supabase = await createClient()
   
   // Get counts
-  const { count: actorsCount } = await supabase
-    .from('actors')
+  const { count: actorsCount } = await (supabase
+    .from('actors') as any)
     .select('*', { count: 'exact', head: true })
   
-  const { count: presetsCount } = await supabase
-    .from('intention_presets')
+  const { count: presetsCount } = await (supabase
+    .from('intention_presets') as any)
     .select('*', { count: 'exact', head: true })
   
-  const { count: campaignsCount } = await supabase
-    .from('campaigns')
+  const { count: campaignsCount } = await (supabase
+    .from('campaigns') as any)
     .select('*', { count: 'exact', head: true })
 
   const stats = [

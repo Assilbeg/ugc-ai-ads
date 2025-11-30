@@ -73,8 +73,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Load prompt template from Supabase (editable via /admin/prompts)
-    const { data: promptData } = await supabase
-      .from('system_prompts')
+    const { data: promptData } = await (supabase
+      .from('system_prompts') as any)
       .select('prompt')
       .eq('id', promptId)
       .single()
@@ -89,8 +89,8 @@ export async function POST(request: NextRequest) {
     // VÉRIFIER SI UN ASSET EXISTE DÉJÀ (sauf si previousFrame ou skipCache)
     // ══════════════════════════════════════════════════════════════
     if (!previousFrameUrl && !skipCache && actorId) {
-      const { data: existingAsset } = await supabase
-        .from('generated_assets')
+      const { data: existingAsset } = await (supabase
+        .from('generated_assets') as any)
         .select('id, url')
         .eq('asset_type', 'first_frame')
         .eq('actor_id', actorId)
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
         console.log('✓ Cache hit! Reusing existing first frame:', existingAsset.url?.slice(0, 50))
         
         // Incrémenter le compteur d'utilisation
-        await supabase.rpc('increment_asset_use_count', { asset_id: existingAsset.id })
+        await (supabase.rpc as any)('increment_asset_use_count', { asset_id: existingAsset.id })
 
         return NextResponse.json({ 
           url: existingAsset.url, 
@@ -125,8 +125,8 @@ export async function POST(request: NextRequest) {
     // SAUVEGARDER L'ASSET (sauf si previousFrame car trop spécifique)
     // ══════════════════════════════════════════════════════════════
     if (!previousFrameUrl && actorId && url) {
-      const { error: insertError } = await supabase
-        .from('generated_assets')
+      const { error: insertError } = await (supabase
+        .from('generated_assets') as any)
         .insert({
           asset_type: 'first_frame',
           actor_id: actorId,

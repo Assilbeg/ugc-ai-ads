@@ -516,8 +516,8 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
         return
       }
 
-      const { data, error } = await supabase
-        .from('actors')
+      const { data, error } = await (supabase
+        .from('actors') as any)
         .select('*')
         .eq('id', state.actor_id)
         .single()
@@ -547,8 +547,8 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
         return
       }
 
-      const { data } = await supabase
-        .from('intention_presets')
+      const { data } = await (supabase
+        .from('intention_presets') as any)
         .select('*')
         .eq('id', state.preset_id)
         .single()

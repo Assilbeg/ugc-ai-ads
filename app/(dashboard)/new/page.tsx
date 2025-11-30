@@ -75,8 +75,8 @@ export default function NewCampaignPage() {
       // Créer la campagne en base avec juste l'acteur
       console.log('Creating campaign with actor:', actorId)
 
-      const { data: campaign, error } = await supabase
-        .from('campaigns')
+      const { data: campaign, error } = await (supabase
+        .from('campaigns') as any)
         .insert({
           user_id: user.id,
           actor_id: actorId,

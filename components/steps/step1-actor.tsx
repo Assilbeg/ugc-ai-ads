@@ -26,8 +26,8 @@ export function Step1Actor({ selectedActorId, onSelect, onNext }: Step1ActorProp
     setLoading(true)
     
     // Load all actors from database
-    const { data, error } = await supabase
-      .from('actors')
+    const { data, error } = await (supabase
+      .from('actors') as any)
       .select('*')
       .order('is_custom', { ascending: true }) // Preset actors first, then custom
       .order('name', { ascending: true })

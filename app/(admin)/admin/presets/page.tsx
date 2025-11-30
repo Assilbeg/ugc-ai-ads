@@ -66,8 +66,8 @@ export default function AdminPresetsPage() {
 
   const loadPresets = async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('intention_presets')
+    const { data, error } = await (supabase
+      .from('intention_presets') as any)
       .select('*')
       .order('name')
 

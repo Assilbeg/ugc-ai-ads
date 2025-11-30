@@ -83,8 +83,8 @@ export function useCampaignCreation() {
       if (!user) throw new Error('Non authentifié')
 
       // Create campaign
-      const { data: campaign, error: campaignError } = await supabase
-        .from('campaigns')
+      const { data: campaign, error: campaignError } = await (supabase
+        .from('campaigns') as any)
         .insert({
           user_id: user.id,
           actor_id: state.actor_id,
@@ -111,8 +111,8 @@ export function useCampaignCreation() {
           status: 'pending',
         }))
 
-        const { error: clipsError } = await supabase
-          .from('campaign_clips')
+        const { error: clipsError } = await (supabase
+          .from('campaign_clips') as any)
           .insert(clipsToInsert)
 
         if (clipsError) throw clipsError
