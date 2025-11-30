@@ -287,38 +287,40 @@ export async function generateVideoMinimax(
 }
 
 // ─────────────────────────────────────────────────────────────────
-// CHATTERBOX - Voice Cloning / TTS
+// CHATTERBOX HD - Speech-to-Speech Voice Conversion
+// Docs: https://fal.ai/models/resemble-ai/chatterboxhd/speech-to-speech
 // ─────────────────────────────────────────────────────────────────
-interface ChatterboxInput {
-  text: string
-  audio_url: string
-  exaggeration?: number
-  cfg_weight?: number
+interface ChatterboxS2SInput {
+  source_audio_url: string        // Audio extrait de la vidéo Veo3
+  target_voice_audio_url?: string // Voix de référence de l'acteur
+  high_quality_audio?: boolean    // true = 48kHz, false = 24kHz
 }
 
-interface ChatterboxOutput {
-  audio_url: string
+interface ChatterboxS2SOutput {
+  audio: { url: string }
 }
 
-export async function cloneVoice(
-  text: string,
-  referenceVoiceUrl: string
+export async function speechToSpeech(
+  sourceAudioUrl: string,
+  targetVoiceUrl: string
 ): Promise<string> {
-  const path = 'fal-ai/chatterbox/tts'
+  const path = 'resemble-ai/chatterboxhd/speech-to-speech'
   
-  const input: ChatterboxInput = {
-    text,
-    audio_url: referenceVoiceUrl,
-    exaggeration: 0.5,
-    cfg_weight: 0.5,
+  const input: ChatterboxS2SInput = {
+    source_audio_url: sourceAudioUrl,
+    target_voice_audio_url: targetVoiceUrl,
+    high_quality_audio: true,
   }
 
-  console.log('Cloning voice with Chatterbox:', { text: text.slice(0, 50) + '...' })
+  console.log('[Chatterbox S2S] Converting voice:', { 
+    source: sourceAudioUrl.slice(0, 50) + '...',
+    target: targetVoiceUrl.slice(0, 50) + '...'
+  })
 
   const queue = await falRequest<FalQueueResponse>({ path, input })
-  const result = await pollUntilComplete<ChatterboxOutput>(queue.request_id, path, 60, 3000)
+  const result = await pollUntilComplete<ChatterboxS2SOutput>(queue.request_id, path, 120, 5000)
   
-  return result.audio_url
+  return result.audio.url
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -353,23 +355,14 @@ export async function generateAmbientAudio(
 }
 
 // ─────────────────────────────────────────────────────────────────
-// HELPER - Generate video based on engine choice
+// HELPER - Generate video (Veo3.1 uniquement)
 // ─────────────────────────────────────────────────────────────────
 export async function generateVideo(
   prompt: string,
   firstFrameUrl: string,
-  engine: 'veo3.1' | 'sora2' | 'kling' | 'minimax',
+  _engine: 'veo3.1', // On garde le paramètre pour compatibilité mais on force Veo3.1
   duration: number
 ): Promise<string> {
-  switch (engine) {
-    case 'veo3.1':
-      return generateVideoVeo31(prompt, firstFrameUrl, duration as 4 | 6 | 8)
-    case 'kling':
-      return generateVideoKling(prompt, firstFrameUrl, duration <= 5 ? 5 : 10)
-    case 'minimax':
-      return generateVideoMinimax(prompt, firstFrameUrl)
-    default:
-      // Fallback to Kling
-      return generateVideoKling(prompt, firstFrameUrl, duration <= 5 ? 5 : 10)
-  }
+  // Toujours utiliser Veo3.1 - meilleur rapport qualité/prix
+  return generateVideoVeo31(prompt, firstFrameUrl, duration as 4 | 6 | 8)
 }

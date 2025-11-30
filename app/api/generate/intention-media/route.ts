@@ -53,10 +53,11 @@ function buildContextFromPreset(preset: IntentionPreset): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { actorId, soulImageUrl, presets } = body as {
+    const { actorId, soulImageUrl, presets, customPrompts } = body as {
       actorId: string
       soulImageUrl: string
       presets: IntentionPreset[]
+      customPrompts?: Record<string, string> // presetId -> custom prompt
     }
 
     if (!actorId || !soulImageUrl || !presets?.length) {
@@ -70,8 +71,15 @@ export async function POST(request: NextRequest) {
 
     // Générer toutes les images en parallèle
     const generationPromises = presets.map(async (preset) => {
-      const context = buildContextFromPreset(preset)
-      const fullPrompt = INTENTION_TEMPLATE.replace('{CONTEXT}', context)
+      // Utiliser le prompt personnalisé s'il existe, sinon construire le prompt par défaut
+      let fullPrompt: string
+      if (customPrompts?.[preset.id]) {
+        fullPrompt = customPrompts[preset.id]
+        console.log(`[Intention Media] Using custom prompt for ${preset.id}`)
+      } else {
+        const context = buildContextFromPreset(preset)
+        fullPrompt = INTENTION_TEMPLATE.replace('{CONTEXT}', context)
+      }
 
       console.log(`[Intention Media] Generating ${preset.id}...`)
       

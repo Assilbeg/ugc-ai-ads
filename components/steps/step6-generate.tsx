@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { NewCampaignState, CampaignClip, ClipStatus } from '@/types'
-import { useVideoGeneration } from '@/hooks/use-video-generation'
+import { useVideoGeneration, RegenerateWhat } from '@/hooks/use-video-generation'
 import { useActors } from '@/hooks/use-actors'
 import { useCampaignCreation } from '@/hooks/use-campaign-creation'
 import { getPresetById } from '@/lib/presets'
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
+import { Slider } from '@/components/ui/slider'
 
 interface Step6GenerateProps {
   state: NewCampaignState
@@ -21,7 +22,7 @@ const STATUS_LABELS: Record<ClipStatus, string> = {
   pending: 'En attente',
   generating_frame: 'Génération image...',
   generating_video: 'Génération vidéo...',
-  generating_voice: 'Clonage voix...',
+  generating_voice: 'Transformation voix...',
   generating_ambient: 'Ambiance sonore...',
   completed: 'Terminé',
   failed: 'Échec',
@@ -45,6 +46,7 @@ export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps)
   const [generatedClips, setGeneratedClips] = useState<CampaignClip[]>([])
   const [campaignId, setCampaignId] = useState<string | null>(null)
   const [started, setStarted] = useState(false)
+  const [expandedClip, setExpandedClip] = useState<number | null>(null)
 
   const actor = state.actor_id ? getActorById(state.actor_id) : undefined
   const preset = state.preset_id ? getPresetById(state.preset_id) : undefined
@@ -54,14 +56,9 @@ export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps)
     if (!actor || !preset || clips.length === 0) return
 
     setStarted(true)
-
-    // First save the campaign to get an ID
-    // Note: In a real implementation, saveCampaign would need access to state
-    // For now, we'll generate a temporary ID
     const tempCampaignId = `temp-${Date.now()}`
     setCampaignId(tempCampaignId)
 
-    // Generate all clips
     const results = await generateAllClips(
       clips,
       actor,
@@ -73,27 +70,45 @@ export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps)
     setGeneratedClips(results)
   }
 
-  const handleRegenerateClip = async (clipIndex: number) => {
+  const handleRegenerateAsset = async (clipIndex: number, what: RegenerateWhat) => {
     if (!actor || !preset) return
 
-    const clip = clips[clipIndex]
+    const clipToRegenerate = generatedClips[clipIndex] || clips[clipIndex]
     const result = await regenerateSingleClip(
-      clip,
+      clipToRegenerate,
       actor,
       campaignId || 'temp',
       preset.ambient_audio.prompt,
-      'all',
+      what,
       preset.id
     )
 
     if (result) {
-      setGeneratedClips(prev => prev.map((c, i) => i === clipIndex ? result : c))
+      setGeneratedClips(prev => {
+        const newClips = [...prev]
+        newClips[clipIndex] = result
+        return newClips
+      })
     }
   }
 
+  const handleVolumeChange = (clipIndex: number, type: 'voice' | 'ambient', value: number) => {
+    setGeneratedClips(prev => {
+      const newClips = [...prev]
+      if (newClips[clipIndex]) {
+        newClips[clipIndex] = {
+          ...newClips[clipIndex],
+          audio: {
+            ...newClips[clipIndex].audio,
+            [type === 'voice' ? 'voice_volume' : 'ambient_volume']: value,
+          }
+        }
+      }
+      return newClips
+    })
+  }
+
   const handleFinish = async () => {
-    // Save final campaign to database
-    // In a real implementation, this would update the campaign with generated URLs
     if (campaignId) {
       onComplete(campaignId)
     }
@@ -133,10 +148,24 @@ export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps)
             <h3 className="text-xl font-semibold mb-2">
               Prêt à générer {clips.length} clips
             </h3>
-            <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-              La génération peut prendre plusieurs minutes. 
-              Chaque clip passera par : image → vidéo → voix → ambiance.
+            <p className="text-muted-foreground mb-4 max-w-md mx-auto">
+              La génération peut prendre plusieurs minutes.
             </p>
+            
+            {/* Pipeline explanation */}
+            <div className="text-left bg-muted/50 rounded-xl p-4 mb-8 max-w-md mx-auto">
+              <p className="text-sm font-medium mb-2">Pipeline par clip :</p>
+              <div className="space-y-1 text-xs text-muted-foreground">
+                <p>1️⃣ <span className="text-amber-500">Image</span> — NanoBanana Pro (~0.15€)</p>
+                <p>2️⃣ <span className="text-blue-500">Vidéo</span> — Veo3.1 (~1-2€) ⚠️</p>
+                <p>3️⃣ <span className="text-violet-500">Voix</span> — Chatterbox S2S (~0.02€)</p>
+                <p>4️⃣ <span className="text-fuchsia-500">Ambiance</span> — ElevenLabs (~0.03€)</p>
+              </div>
+              <p className="text-xs text-muted-foreground mt-3 pt-2 border-t border-border">
+                💡 Tu pourras régénérer voix/ambiance sans refaire la vidéo
+              </p>
+            </div>
+
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Button variant="ghost" onClick={onBack} className="h-11 px-5 rounded-xl">
                 ← Modifier le plan
@@ -160,9 +189,7 @@ export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps)
           <Card className="rounded-xl">
             <CardContent className="p-5">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-medium">
-                  Progression globale
-                </span>
+                <span className="text-sm font-medium">Progression globale</span>
                 <span className="text-sm text-muted-foreground">
                   {Math.round(getOverallProgress())}%
                 </span>
@@ -177,13 +204,12 @@ export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps)
               const clipProgress = progress[clip.id || `clip-${clip.order}`]
               const generatedClip = generatedClips[index]
               const currentStatus = clipProgress?.status || generatedClip?.status || 'pending'
+              const isExpanded = expandedClip === index
 
               return (
-                <Card 
-                  key={clip.id || index}
-                  className="rounded-xl"
-                >
+                <Card key={clip.id || index} className="rounded-xl overflow-hidden">
                   <CardContent className="p-5">
+                    {/* Header row */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <span className="text-lg font-bold text-muted-foreground">
@@ -199,35 +225,25 @@ export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps)
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
                         <Badge className={STATUS_COLORS[currentStatus]}>
                           {STATUS_LABELS[currentStatus]}
                         </Badge>
                         
-                        {currentStatus === 'failed' && !generating && (
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleRegenerateClip(index)}
-                          >
-                            🔄 Réessayer
-                          </Button>
-                        )}
-
                         {currentStatus === 'completed' && !generating && (
                           <Button 
                             variant="ghost" 
                             size="sm"
-                            onClick={() => handleRegenerateClip(index)}
+                            onClick={() => setExpandedClip(isExpanded ? null : index)}
                           >
-                            🔄
+                            {isExpanded ? '▲' : '▼'}
                           </Button>
                         )}
                       </div>
                     </div>
 
-                    {/* Individual progress bar */}
-                    {clipProgress && clipProgress.status !== 'completed' && clipProgress.status !== 'failed' && (
+                    {/* Progress bar during generation */}
+                    {clipProgress && !['completed', 'failed'].includes(clipProgress.status) && (
                       <div className="mt-3">
                         <Progress value={clipProgress.progress} className="h-1" />
                         <p className="text-xs text-muted-foreground mt-1">
@@ -236,15 +252,123 @@ export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps)
                       </div>
                     )}
 
-                    {/* Preview when completed */}
-                    {generatedClip?.video?.url && (
-                      <div className="mt-3 rounded-lg overflow-hidden bg-muted aspect-video">
-                        <video 
-                          src={generatedClip.video.url} 
-                          className="w-full h-full object-cover"
-                          controls
-                          muted
-                        />
+                    {/* Failed state */}
+                    {currentStatus === 'failed' && !generating && (
+                      <div className="mt-3 flex items-center gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleRegenerateAsset(index, 'all')}
+                        >
+                          🔄 Tout régénérer
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Expanded view for completed clips */}
+                    {isExpanded && generatedClip && (
+                      <div className="mt-4 pt-4 border-t border-border space-y-4">
+                        {/* Video preview */}
+                        {generatedClip.video?.raw_url && (
+                          <div className="rounded-lg overflow-hidden bg-muted aspect-video">
+                            <video 
+                              src={generatedClip.video.raw_url} 
+                              className="w-full h-full object-cover"
+                              controls
+                            />
+                          </div>
+                        )}
+
+                        {/* Audio controls */}
+                        <div className="grid grid-cols-2 gap-4">
+                          {/* Voice volume */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-medium">🎙️ Voix</span>
+                              <span className="text-xs text-muted-foreground">
+                                {generatedClip.audio?.voice_volume ?? 100}%
+                              </span>
+                            </div>
+                            <Slider
+                              value={[generatedClip.audio?.voice_volume ?? 100]}
+                              min={0}
+                              max={100}
+                              step={5}
+                              onValueChange={([v]) => handleVolumeChange(index, 'voice', v)}
+                            />
+                          </div>
+
+                          {/* Ambient volume */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-medium">🎵 Ambiance</span>
+                              <span className="text-xs text-muted-foreground">
+                                {generatedClip.audio?.ambient_volume ?? 20}%
+                              </span>
+                            </div>
+                            <Slider
+                              value={[generatedClip.audio?.ambient_volume ?? 20]}
+                              min={0}
+                              max={50}
+                              step={5}
+                              onValueChange={([v]) => handleVolumeChange(index, 'ambient', v)}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Regenerate individual assets */}
+                        <div className="flex flex-wrap gap-2 pt-2">
+                          <span className="text-xs text-muted-foreground mr-2">Régénérer :</span>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => handleRegenerateAsset(index, 'frame')}
+                            disabled={generating}
+                          >
+                            🖼️ Image
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="h-7 text-xs text-orange-500 border-orange-500/30"
+                            onClick={() => handleRegenerateAsset(index, 'video')}
+                            disabled={generating}
+                          >
+                            🎬 Vidéo (coûteux)
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => handleRegenerateAsset(index, 'voice')}
+                            disabled={generating}
+                          >
+                            🎙️ Voix
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => handleRegenerateAsset(index, 'ambient')}
+                            disabled={generating}
+                          >
+                            🎵 Ambiance
+                          </Button>
+                        </div>
+
+                        {/* Debug: show asset URLs */}
+                        <details className="text-xs text-muted-foreground">
+                          <summary className="cursor-pointer hover:text-foreground">
+                            Assets générés
+                          </summary>
+                          <div className="mt-2 space-y-1 font-mono text-[10px] bg-muted p-2 rounded">
+                            <p>🖼️ Frame: {generatedClip.first_frame?.image_url?.slice(0, 60)}...</p>
+                            <p>🎬 Video: {generatedClip.video?.raw_url?.slice(0, 60)}...</p>
+                            <p>🎙️ Voice: {generatedClip.audio?.transformed_voice_url?.slice(0, 60)}...</p>
+                            <p>🎵 Ambient: {generatedClip.audio?.ambient_url?.slice(0, 60)}...</p>
+                          </div>
+                        </details>
                       </div>
                     )}
                   </CardContent>
@@ -280,4 +404,3 @@ export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps)
     </div>
   )
 }
-

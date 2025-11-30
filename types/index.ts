@@ -83,7 +83,7 @@ export type ProductHoldingType =
   | "pointing_at"
   | "none";
 
-export type VideoEngine = "veo3.1" | "sora2";
+export type VideoEngine = "veo3.1"; // Uniquement Veo3.1 - le meilleur rapport qualité/prix
 
 export type CampaignStatus = "draft" | "generating" | "completed" | "failed";
 
@@ -108,6 +108,7 @@ export interface ActorVoice {
 export interface ActorIntentionMedia {
   image_url?: string;   // Image de l'acteur dans cette intention
   video_url?: string;   // Vidéo preview de l'acteur dans cette intention
+  custom_frame_prompt?: string; // Prompt personnalisé pour la génération du first frame
 }
 
 export interface Actor {
@@ -183,6 +184,7 @@ export interface ProductConfig {
 // ─────────────────────────────────────────────────────────────────
 export interface CampaignBrief {
   what_selling: string;
+  pain_point: string;              // Le problème/frustration de l'audience
   target_audience?: string;
   key_benefits?: string[];
   target_duration: 15 | 30 | 45 | 60;
@@ -206,16 +208,27 @@ export interface ClipScript {
 
 export interface ClipVideo {
   engine: VideoEngine;
-  duration: 4 | 6 | 8 | 12;
+  duration: 4 | 6 | 8;
   prompt: string;
-  url?: string;
-  camera_style: CameraStyleType; // Style de caméra pour ce clip
+  // Vidéo brute générée par Veo3 (avec audio original)
+  raw_url?: string;
+  // Vidéo finale avec audio mixé
+  final_url?: string;
+  camera_style: CameraStyleType;
 }
 
 export interface ClipAudio {
-  voice_url?: string;
+  // Audio source (extrait de la vidéo Veo3)
+  source_audio_url?: string;
+  // Audio transformé par Chatterbox S2S
+  transformed_voice_url?: string;
+  // Ambiance générée (ElevenLabs SFX)
   ambient_url?: string;
-  final_url?: string;
+  // Volumes (0-100)
+  voice_volume: number;    // Défaut: 100
+  ambient_volume: number;  // Défaut: 20
+  // Audio final mixé (voix + ambiance)
+  final_audio_url?: string;
 }
 
 export interface CampaignClip {
@@ -252,6 +265,14 @@ export interface Campaign {
 // ─────────────────────────────────────────────────────────────────
 // TYPES POUR L'UI (Flow de création)
 // ─────────────────────────────────────────────────────────────────
+// First frames générés (pour éviter de regénérer)
+export interface GeneratedFirstFrames {
+  [clipIndex: number]: {
+    url: string;
+    generatedAt: number; // timestamp
+  };
+}
+
 export interface NewCampaignState {
   step: 1 | 2 | 3 | 4 | 5 | 6;
   actor_id?: string;
@@ -259,6 +280,7 @@ export interface NewCampaignState {
   preset_id?: string;
   brief: Partial<CampaignBrief>;
   generated_clips?: CampaignClip[];
+  generated_first_frames?: GeneratedFirstFrames; // Cache des first frames
 }
 
 // ─────────────────────────────────────────────────────────────────

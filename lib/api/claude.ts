@@ -53,7 +53,36 @@ Ton job : générer le MEILLEUR plan de campagne possible, optimisé pour :
 Tu écris par défaut en français.
 
 ══════════════════════════════════════════════════════════════════
-0. SÉCURITÉ / CONFORMITÉ (OBLIGATOIRE)
+0. RÈGLES HOOK UGC (CRITIQUE - À LIRE EN PREMIER)
+══════════════════════════════════════════════════════════════════
+
+Le HOOK est le moment le plus important. Il doit STOPPER LE SCROLL en 1 seconde.
+
+❌ HOOKS INTERDITS (trop faibles, génériques, "AI slop") :
+- "Aujourd'hui je vais te parler de..."
+- "Tu veux savoir comment...?"
+- "Salut ! Alors voilà..."
+- "J'ai découvert quelque chose d'incroyable..."
+- Toute introduction qui ne tape pas direct sur le PROBLÈME
+
+✅ HOOKS EFFICACES (pattern à suivre) :
+Le hook doit être une PHRASE QUE LA CIBLE SE DIT À ELLE-MÊME, qui exprime sa frustration.
+C'est négatif, c'est direct, c'est personnel. On parle à la première personne.
+
+EXEMPLES DE BONS HOOKS :
+- "Postuler sur LinkedIn m'a jamais rien rapporté" (candidature)
+- "J'ai passé 3 mois à envoyer des CV pour rien" (emploi)
+- "Je comprenais rien au code y'a encore 2 mois" (formation dev)
+- "J'arrivais plus à dormir tellement j'étais stressée" (bien-être)
+- "Mon compte en banque me faisait flipper chaque fin de mois" (finance)
+- "Je scrollais TikTok au lieu de bosser sur mon projet" (productivité)
+
+FORMULE : [Situation négative passée] + [émotion/frustration] → doit résonner avec le PAIN POINT du brief.
+
+Le hook NE DOIT PAS mentionner la solution. Il pose juste le problème de manière viscérale.
+
+══════════════════════════════════════════════════════════════════
+0.1 SÉCURITÉ / CONFORMITÉ (OBLIGATOIRE)
 ══════════════════════════════════════════════════════════════════
 
 Tu génères uniquement du contenu publicitaire sûr et conforme :
@@ -163,7 +192,13 @@ Le Script audio doit être LITTÉRAL ET FERMÉ :
 - Tu écris exactement ce qui doit être dit.
 Exception : si l'utilisateur fournit déjà ces mots OU demande explicitement un style "avec fillers".
 
-3.1 PRONONCIATION FRANÇAISE "SAFE" (OBLIGATOIRE)
+3.1 CTA INTERDITS (phrases à éviter absolument)
+- "Je dois filer" / "Je dois y aller" / "Je vous laisse"
+- "Bon allez" / "Bref allez"
+- Toute phrase qui sonne comme une excuse pour partir
+Le CTA doit être DIRECT et orienté ACTION : "Le lien est en bio", "Teste par toi-même", "Clique et regarde"
+
+3.2 PRONONCIATION FRANÇAISE "SAFE" (OBLIGATOIRE)
 Pour éviter les erreurs de prononciation des modèles (surtout Veo 3.1) :
 
 - PAS DE SIGLES / ABRÉVIATIONS dans le Script audio.
@@ -395,9 +430,17 @@ ${preset.first_frame.camera_style_by_beat
 BRIEF CLIENT
 ════════════════════════════════════════
 - Produit/Service : ${brief.what_selling}
+- PROBLÈME DE L'AUDIENCE (CRUCIAL) : ${brief.pain_point || 'Non spécifié'}
 - Audience cible : ${brief.target_audience || 'Non spécifié'}
 - Bénéfices clés : ${brief.key_benefits?.join(', ') || 'Non spécifié'}
 - Durée totale cible : ${brief.target_duration} secondes
+
+⚠️ UTILISE LE PROBLÈME CI-DESSUS pour :
+- Le HOOK : reformule ce problème comme une phrase que la cible se dit ("J'en avais marre de...", "Je galérais à...")
+- L'AGITATION : amplifie cette douleur, montre que tu comprends
+- La SOLUTION : réponds directement à ce problème spécifique
+
+RAPPEL HOOK : Le hook doit être la VOIX INTÉRIEURE de la cible, pas une intro générique !
 
 ════════════════════════════════════════
 PRODUIT VISIBLE
@@ -428,16 +471,22 @@ INSTRUCTIONS FINALES
 1. Respecte la structure narrative : ${preset.script.structure.join(' → ')}
 2. La durée totale doit approcher ${brief.target_duration} secondes
 3. Utilise le moteur approprié (Veo 3.1 pour multi-clips, Sora 2 pour clip unique ≤12s)
-4. Chaque clip doit être visuellement autonome (re-décrire le décor)
-5. Le prompt first_frame doit décrire l'acteur dans la pose de départ
-6. Le script audio doit respecter les bornes de mots
-7. Le prompt vidéo doit suivre le template avec les NEGATIVES à la fin
-8. CRITIQUE - COHÉRENCE TENUE : Décris la MÊME tenue dans TOUS les clips (y compris le HOOK). Ex: "wearing the same oversized grey sweater" - C'est une vidéo filmée en une session, pas de changement de vêtements !
-9. GESTES OBLIGATOIRES : Chaque clip DOIT avoir un "gesture" cohérent avec ce que dit le script
-10. MODE SCÈNE : ${preset.first_frame.scene_mode === 'multi_location' ? 'MULTI-LIEUX - utilise les lieux définis par beat' : 'LIEU UNIQUE - tous les clips ont le même lieu'}
-11. Chaque first_frame DOIT inclure : prompt, expression, gesture, location
-12. CAMERA STYLE : Utilise "${preset.first_frame.camera_style || 'handheld_subtle'}" par défaut. ${preset.first_frame.camera_style_by_beat ? 'Override par beat si défini.' : ''} Adapte les UGC keywords dans le prompt vidéo.
-13. Chaque video DOIT inclure : engine, duration, prompt, camera_style`
+4. Le script audio doit respecter les bornes de mots
+5. Le prompt vidéo doit suivre le template avec les NEGATIVES à la fin
+6. CRITIQUE - COHÉRENCE TENUE : Décris la MÊME tenue dans TOUS les clips. C'est une vidéo filmée en une session, pas de changement de vêtements !
+7. GESTES OBLIGATOIRES : Chaque clip DOIT avoir un "gesture" cohérent avec ce que dit le script
+8. Chaque first_frame DOIT inclure : prompt, expression, gesture, location
+9. Chaque video DOIT inclure : engine, duration, prompt, camera_style
+10. CAMERA STYLE : Utilise "${preset.first_frame.camera_style || 'handheld_subtle'}" par défaut.
+
+⚠️⚠️⚠️ RÈGLE CRITIQUE LIEU ⚠️⚠️⚠️
+${preset.first_frame.scene_mode === 'multi_location' 
+  ? `MODE MULTI-LIEUX ACTIVÉ : Utilise les lieux définis par beat (${Object.entries(preset.first_frame.location_by_beat || {}).map(([beat, loc]) => `${beat}=${loc}`).join(', ')})`
+  : `MODE LIEU UNIQUE : TOUS les clips doivent être dans "${preset.first_frame.location}" (${preset.first_frame.location}).
+NE CHANGE PAS DE LIEU entre les clips. L'acteur reste dans le MÊME endroit : ${preset.first_frame.location}.
+Chaque first_frame.prompt DOIT mentionner "${preset.first_frame.location}" comme lieu.
+Chaque first_frame.location DOIT être "${preset.first_frame.location}".`
+}`
 
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',

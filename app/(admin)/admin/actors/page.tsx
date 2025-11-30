@@ -201,6 +201,9 @@ export default function AdminActorsPage() {
   const [selectedIntentions, setSelectedIntentions] = useState<string[]>([]) // preset ids
   const [expandedActor, setExpandedActor] = useState<string | null>(null)
   const [showPrompts, setShowPrompts] = useState<string | null>(null) // presetId to show prompt
+  const [editingPrompt, setEditingPrompt] = useState<{ actorId: string; presetId: string } | null>(null)
+  const [customPrompts, setCustomPrompts] = useState<Record<string, Record<string, string>>>({}) // actorId -> presetId -> prompt
+  const [savingPrompt, setSavingPrompt] = useState(false)
   const supabase = createClient()
 
   // Form state
@@ -387,6 +390,15 @@ export default function AdminActorsPage() {
     try {
       const presetsToGenerate = INTENTION_PRESETS.filter(p => selectedIntentions.includes(p.id))
       
+      // Collecter les prompts personnalisés pour les intentions sélectionnées
+      const customPromptsToSend: Record<string, string> = {}
+      for (const preset of presetsToGenerate) {
+        const customPrompt = actor.intention_media?.[preset.id]?.custom_frame_prompt
+        if (customPrompt) {
+          customPromptsToSend[preset.id] = customPrompt
+        }
+      }
+      
       const response = await fetch('/api/generate/intention-media', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -394,6 +406,7 @@ export default function AdminActorsPage() {
           actorId: actor.id,
           soulImageUrl: actor.soul_image_url,
           presets: presetsToGenerate,
+          customPrompts: Object.keys(customPromptsToSend).length > 0 ? customPromptsToSend : undefined,
         }),
       })
 
@@ -427,6 +440,112 @@ export default function AdminActorsPage() {
       .map(p => p.id)
       .filter(id => !existing.includes(id))
     setSelectedIntentions(missing)
+  }
+
+  // Récupérer le prompt (personnalisé ou par défaut)
+  const getPromptForIntention = (actor: Actor, preset: IntentionPreset): string => {
+    // D'abord vérifier si on a un prompt en cours d'édition dans le state local
+    const localPrompt = customPrompts[actor.id]?.[preset.id]
+    if (localPrompt !== undefined) return localPrompt
+
+    // Ensuite vérifier le prompt personnalisé sauvegardé
+    const savedPrompt = actor.intention_media?.[preset.id]?.custom_frame_prompt
+    if (savedPrompt) return savedPrompt
+
+    // Sinon retourner le prompt par défaut
+    return buildIntentionPrompt(preset)
+  }
+
+  // Mettre à jour le prompt localement
+  const handlePromptChange = (actorId: string, presetId: string, value: string) => {
+    setCustomPrompts(prev => ({
+      ...prev,
+      [actorId]: {
+        ...prev[actorId],
+        [presetId]: value
+      }
+    }))
+  }
+
+  // Sauvegarder le prompt personnalisé
+  const handleSaveCustomPrompt = async (actor: Actor, presetId: string) => {
+    const newPrompt = customPrompts[actor.id]?.[presetId]
+    if (newPrompt === undefined) return
+
+    setSavingPrompt(true)
+    
+    // Récupérer l'intention_media existante
+    const existingMedia = actor.intention_media || {}
+    const updatedMedia = {
+      ...existingMedia,
+      [presetId]: {
+        ...existingMedia[presetId],
+        custom_frame_prompt: newPrompt
+      }
+    }
+
+    const { error } = await supabase
+      .from('actors')
+      .update({ intention_media: updatedMedia })
+      .eq('id', actor.id)
+
+    if (error) {
+      alert('Erreur: ' + error.message)
+    } else {
+      await loadActors()
+      // Nettoyer le state local pour ce prompt
+      setCustomPrompts(prev => {
+        const newState = { ...prev }
+        if (newState[actor.id]) {
+          delete newState[actor.id][presetId]
+        }
+        return newState
+      })
+      setEditingPrompt(null)
+    }
+
+    setSavingPrompt(false)
+  }
+
+  // Réinitialiser au prompt par défaut
+  const handleResetPrompt = async (actor: Actor, presetId: string) => {
+    setSavingPrompt(true)
+    
+    const existingMedia = actor.intention_media || {}
+    const updatedMedia = {
+      ...existingMedia,
+      [presetId]: {
+        ...existingMedia[presetId],
+        custom_frame_prompt: undefined // Supprimer le prompt personnalisé
+      }
+    }
+
+    const { error } = await supabase
+      .from('actors')
+      .update({ intention_media: updatedMedia })
+      .eq('id', actor.id)
+
+    if (error) {
+      alert('Erreur: ' + error.message)
+    } else {
+      await loadActors()
+      // Nettoyer le state local
+      setCustomPrompts(prev => {
+        const newState = { ...prev }
+        if (newState[actor.id]) {
+          delete newState[actor.id][presetId]
+        }
+        return newState
+      })
+      setEditingPrompt(null)
+    }
+
+    setSavingPrompt(false)
+  }
+
+  // Vérifier si un prompt est personnalisé
+  const isPromptCustomized = (actor: Actor, presetId: string): boolean => {
+    return !!actor.intention_media?.[presetId]?.custom_frame_prompt
   }
 
   // Auto-génération après création d'un nouvel acteur
@@ -846,28 +965,123 @@ export default function AdminActorsPage() {
                         })}
                       </div>
 
-                      {/* Show Prompt Details */}
+                      {/* Show/Edit Prompt Details */}
                       {showPrompts && (
                         <div className="mb-4 p-3 bg-muted/50 rounded-xl border border-border">
-                          <div className="flex items-center justify-between mb-2">
-                            <h5 className="text-xs font-medium flex items-center gap-2">
-                              📝 Prompt pour : {INTENTION_PRESETS.find(p => p.id === showPrompts)?.name}
-                            </h5>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                navigator.clipboard.writeText(buildIntentionPrompt(INTENTION_PRESETS.find(p => p.id === showPrompts)!))
-                                alert('Prompt copié !')
-                              }}
-                              className="h-6 text-[10px] px-2"
-                            >
-                              📋 Copier
-                            </Button>
-                          </div>
-                          <p className="text-xs text-muted-foreground font-mono bg-background/50 p-2 rounded-lg leading-relaxed">
-                            {buildIntentionPrompt(INTENTION_PRESETS.find(p => p.id === showPrompts)!)}
-                          </p>
+                          {(() => {
+                            const preset = INTENTION_PRESETS.find(p => p.id === showPrompts)!
+                            const isEditing = editingPrompt?.actorId === actor.id && editingPrompt?.presetId === showPrompts
+                            const currentPrompt = getPromptForIntention(actor, preset)
+                            const isCustom = isPromptCustomized(actor, showPrompts)
+                            const hasLocalChanges = customPrompts[actor.id]?.[showPrompts] !== undefined
+
+                            return (
+                              <>
+                                <div className="flex items-center justify-between mb-2">
+                                  <h5 className="text-xs font-medium flex items-center gap-2">
+                                    📝 Prompt pour : {preset.name}
+                                    {isCustom && (
+                                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                        Personnalisé
+                                      </Badge>
+                                    )}
+                                  </h5>
+                                  <div className="flex gap-1">
+                                    {!isEditing ? (
+                                      <>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => {
+                                            navigator.clipboard.writeText(currentPrompt)
+                                            alert('Prompt copié !')
+                                          }}
+                                          className="h-6 text-[10px] px-2"
+                                        >
+                                          📋 Copier
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => {
+                                            setEditingPrompt({ actorId: actor.id, presetId: showPrompts })
+                                            // Initialiser avec le prompt actuel si pas déjà en local
+                                            if (customPrompts[actor.id]?.[showPrompts] === undefined) {
+                                              handlePromptChange(actor.id, showPrompts, currentPrompt)
+                                            }
+                                          }}
+                                          className="h-6 text-[10px] px-2"
+                                        >
+                                          ✏️ Éditer
+                                        </Button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => {
+                                            setEditingPrompt(null)
+                                            // Nettoyer les changements locaux
+                                            setCustomPrompts(prev => {
+                                              const newState = { ...prev }
+                                              if (newState[actor.id]) {
+                                                delete newState[actor.id][showPrompts]
+                                              }
+                                              return newState
+                                            })
+                                          }}
+                                          disabled={savingPrompt}
+                                          className="h-6 text-[10px] px-2"
+                                        >
+                                          ✕ Annuler
+                                        </Button>
+                                        {isCustom && (
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => handleResetPrompt(actor, showPrompts)}
+                                            disabled={savingPrompt}
+                                            className="h-6 text-[10px] px-2 text-orange-600 hover:text-orange-700"
+                                          >
+                                            🔄 Défaut
+                                          </Button>
+                                        )}
+                                        <Button
+                                          size="sm"
+                                          variant="default"
+                                          onClick={() => handleSaveCustomPrompt(actor, showPrompts)}
+                                          disabled={savingPrompt || !hasLocalChanges}
+                                          className="h-6 text-[10px] px-2"
+                                        >
+                                          {savingPrompt ? '...' : '💾 Sauvegarder'}
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                {isEditing ? (
+                                  <Textarea
+                                    value={customPrompts[actor.id]?.[showPrompts] || currentPrompt}
+                                    onChange={(e) => handlePromptChange(actor.id, showPrompts, e.target.value)}
+                                    className="text-xs font-mono bg-background p-2 rounded-lg leading-relaxed min-h-[150px] resize-y"
+                                    placeholder="Entrez votre prompt personnalisé..."
+                                  />
+                                ) : (
+                                  <p className="text-xs text-muted-foreground font-mono bg-background/50 p-2 rounded-lg leading-relaxed whitespace-pre-wrap">
+                                    {currentPrompt}
+                                  </p>
+                                )}
+                                
+                                {isEditing && (
+                                  <p className="text-[10px] text-muted-foreground mt-2">
+                                    💡 Ce prompt sera utilisé lors de la génération de l'image pour cette intention.
+                                  </p>
+                                )}
+                              </>
+                            )
+                          })()}
                         </div>
                       )}
 

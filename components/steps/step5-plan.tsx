@@ -24,6 +24,7 @@ interface FirstFrameStatus {
 interface Step5PlanProps {
   state: NewCampaignState
   onClipsGenerated: (clips: CampaignClip[]) => void
+  onFirstFramesUpdate: (frames: { [index: number]: { url: string; generatedAt: number } }) => void
   onNext: () => void
   onBack: () => void
 }
@@ -55,15 +56,14 @@ const BEAT_EMOJIS: Record<string, string> = {
   cta: '🚀',
 }
 
-// Configuration des étapes de chargement avec ordre et durées réalistes
-// Total ~12-15s pour simuler le temps de génération Claude (on garde la dernière en boucle)
+// Configuration des étapes de chargement - toutes démarrent ensemble avec des vitesses différentes
 const LOADING_STEPS = [
-  { beat: 'hook', label: 'HOOK', emoji: '🎣', order: 0, duration: 1500 },      // Premier
-  { beat: 'solution', label: 'SOLUTION', emoji: '✨', order: 1, duration: 2500 }, // 2ème, plus long
-  { beat: 'problem', label: 'PROBLÈME', emoji: '😰', order: 2, duration: 2000 }, // 3ème
-  { beat: 'proof', label: 'PREUVE', emoji: '📊', order: 3, duration: 1800 },    // 4ème
-  { beat: 'agitation', label: 'AGITATION', emoji: '🔥', order: 4, duration: 1600 }, // 5ème
-  { beat: 'cta', label: 'CTA', emoji: '🚀', order: 5, duration: 0 },           // Dernier - reste en boucle
+  { beat: 'hook', label: 'HOOK', emoji: '🎣' },
+  { beat: 'solution', label: 'SOLUTION', emoji: '✨' },
+  { beat: 'problem', label: 'PROBLÈME', emoji: '😰' },
+  { beat: 'proof', label: 'PREUVE', emoji: '📊' },
+  { beat: 'agitation', label: 'AGITATION', emoji: '🔥' },
+  { beat: 'cta', label: 'CTA', emoji: '🚀' },
 ]
 
 function LoadingAnimation() {
@@ -72,19 +72,26 @@ function LoadingAnimation() {
   const [progress, setProgress] = useState<Record<string, number>>({})
 
   useEffect(() => {
-    // Trier les étapes par ordre d'exécution
-    const sortedSteps = [...LOADING_STEPS].sort((a, b) => a.order - b.order)
+    // Durées beaucoup plus longues pour un remplissage visuel lent (8s à 18s)
+    const stepDurations: Record<string, number> = {}
+    LOADING_STEPS.forEach((step, index) => {
+      // Durée de base très longue + variation aléatoire importante
+      const baseDuration = 8000 + (index * 1800)
+      const randomVariation = Math.random() * 4000 - 1500 // -1500 à +2500
+      stepDurations[step.beat] = Math.max(6000, baseDuration + randomVariation)
+    })
+
+    // Le dernier (CTA) reste en boucle infinie
+    const lastBeat = LOADING_STEPS[LOADING_STEPS.length - 1].beat
     
-    let totalDelay = 300 // Délai initial
-    
-    sortedSteps.forEach((step, index) => {
-      const startDelay = totalDelay
-      const duration = step.duration
-      const isLast = index === sortedSteps.length - 1
+    // Délai initial avec plus de décalage (staggered start)
+    LOADING_STEPS.forEach((step, index) => {
+      const startDelay = 300 + (index * 400) // Plus de décalage entre chaque tuile
+      const duration = stepDurations[step.beat]
+      const isLast = step.beat === lastBeat
       
-      // Démarrer l'animation de cette étape
       setTimeout(() => {
-        setActiveStep(step.beat)
+        setActiveStep(prev => prev || step.beat) // Premier devient actif
         
         if (isLast) {
           // Dernière étape : animation en boucle infinie (pulse entre 30-90%)
@@ -92,10 +99,10 @@ function LoadingAnimation() {
           let currentProgress = 0
           const animate = () => {
             if (goingUp) {
-              currentProgress += 2
+              currentProgress += 1.2
               if (currentProgress >= 90) goingUp = false
             } else {
-              currentProgress -= 1
+              currentProgress -= 0.6
               if (currentProgress <= 30) goingUp = true
             }
             setProgress(prev => ({ ...prev, [step.beat]: currentProgress }))
@@ -103,28 +110,31 @@ function LoadingAnimation() {
           }
           requestAnimationFrame(animate)
         } else {
-          // Animer la progression de 0 à 100
+          // Animer la progression de 0 à 100 avec une courbe ease-out
           const startTime = Date.now()
           const animate = () => {
             const elapsed = Date.now() - startTime
-            const progressPercent = Math.min((elapsed / duration) * 100, 100)
+            const linearProgress = Math.min(elapsed / duration, 1)
+            // Courbe ease-out pour un remplissage plus naturel (rapide au début, ralentit à la fin)
+            const easedProgress = 1 - Math.pow(1 - linearProgress, 2.5)
+            const progressPercent = easedProgress * 100
             
             setProgress(prev => ({ ...prev, [step.beat]: progressPercent }))
             
-            if (progressPercent < 100) {
+            if (linearProgress < 1) {
               requestAnimationFrame(animate)
             } else {
-              // Marquer comme terminé
-              setCompletedSteps(prev => new Set([...prev, step.beat]))
+              // Forcer la barre à 100% puis attendre le rendu avant d'afficher la checkmark
+              setProgress(prev => ({ ...prev, [step.beat]: 100 }))
+              // Délai plus long pour s'assurer que le 100% est rendu visuellement
+              setTimeout(() => {
+                setCompletedSteps(prev => new Set([...prev, step.beat]))
+              }, 400)
             }
           }
           requestAnimationFrame(animate)
         }
       }, startDelay)
-      
-      if (!isLast) {
-        totalDelay += duration + 200 // Petit délai entre chaque étape
-      }
     })
   }, [])
 
@@ -133,7 +143,8 @@ function LoadingAnimation() {
   const overallProgress = Math.min((completedCount / totalSteps) * 100, 95) // Max 95% tant que loading
 
   return (
-    <div className="py-12">
+    <div className="fixed inset-0 z-50 bg-background flex items-center justify-center">
+      <div className="w-full max-w-4xl px-6 py-12">
       {/* Title */}
       <div className="text-center mb-10">
         <div className="inline-flex items-center gap-2 px-4 py-2 bg-foreground text-background rounded-full text-sm font-medium mb-4">
@@ -156,9 +167,10 @@ function LoadingAnimation() {
         {/* Beat cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {LOADING_STEPS.map((item, index) => {
-            const isCompleted = completedSteps.has(item.beat)
-            const isActive = activeStep === item.beat
             const stepProgress = progress[item.beat] || 0
+            // La pastille verte n'apparaît que si la barre est vraiment à 100%
+            const isCompleted = completedSteps.has(item.beat) && stepProgress >= 99.9
+            const isActive = activeStep === item.beat
             
             return (
               <div
@@ -185,9 +197,14 @@ function LoadingAnimation() {
                 <div className="flex items-center gap-3">
                   <div className={`relative w-10 h-10 rounded-xl ${BEAT_COLORS[item.beat]} flex items-center justify-center text-lg`}>
                     {item.emoji}
-                    {/* Pastille verte de completion */}
+                    {/* Sablier pendant le chargement, checkmark quand terminé */}
+                    {isActive && !isCompleted && (
+                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-foreground/80 rounded-full flex items-center justify-center shadow-sm">
+                        <span className="text-[10px]">⏳</span>
+                      </div>
+                    )}
                     {isCompleted && (
-                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center shadow-sm">
+                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center shadow-sm animate-in zoom-in duration-200">
                         <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                         </svg>
@@ -232,11 +249,12 @@ function LoadingAnimation() {
           </span>
         </div>
       </div>
+      </div>
     </div>
   )
 }
 
-export function Step5Plan({ state, onClipsGenerated, onNext, onBack }: Step5PlanProps) {
+export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext, onBack }: Step5PlanProps) {
   const { clips, loading, error, generatePlan, updateClipScript, setClips } = usePlanGeneration()
   const [editingClip, setEditingClip] = useState<number | null>(null)
   const [editText, setEditText] = useState('')
@@ -253,14 +271,38 @@ export function Step5Plan({ state, onClipsGenerated, onNext, onBack }: Step5Plan
   
   const supabase = createClient()
 
-  // Restaurer les clips depuis le state parent (quand on revient de l'étape 6)
+  // Restaurer les clips et first frames depuis le state parent
   useEffect(() => {
     if (!hasRestoredClips && state.generated_clips && state.generated_clips.length > 0 && clips.length === 0) {
       setClips(state.generated_clips)
       setHasGenerated(true)
       setHasRestoredClips(true)
+      
+      // Initialiser firstFrames depuis le cache parent OU depuis les clips
+      const preGeneratedFrames: FirstFrameStatus = {}
+      
+      // D'abord, récupérer depuis le cache parent (prioritaire car plus fiable)
+      if (state.generated_first_frames) {
+        Object.entries(state.generated_first_frames).forEach(([indexStr, frame]) => {
+          const index = parseInt(indexStr)
+          if (frame.url) {
+            preGeneratedFrames[index] = { loading: false, url: frame.url }
+          }
+        })
+      }
+      
+      // Ensuite, compléter avec les URLs dans les clips (pour step4)
+      state.generated_clips.forEach((clip, index) => {
+        if (clip.first_frame?.image_url && !preGeneratedFrames[index]) {
+          preGeneratedFrames[index] = { loading: false, url: clip.first_frame.image_url }
+        }
+      })
+      
+      if (Object.keys(preGeneratedFrames).length > 0) {
+        setFirstFrames(preGeneratedFrames)
+      }
     }
-  }, [state.generated_clips, clips.length, hasRestoredClips, setClips])
+  }, [state.generated_clips, state.generated_first_frames, clips.length, hasRestoredClips, setClips])
 
   // Generate first frame for a single clip
   const generateFirstFrame = useCallback(async (clipIndex: number, clip: CampaignClip, previousFrameUrl?: string) => {
@@ -293,6 +335,7 @@ export function Step5Plan({ state, onClipsGenerated, onNext, onBack }: Step5Plan
           soulImageUrl: actor.soul_image_url,
           prompt: clip.first_frame.prompt,
           previousFrameUrl, // Utiliser l'image du clip précédent pour continuité
+          actorId: actor.id, // Pour le cache des assets
         }),
       })
 
@@ -326,6 +369,14 @@ export function Step5Plan({ state, onClipsGenerated, onNext, onBack }: Step5Plan
     let previousUrl: string | undefined = undefined
     
     for (let i = 0; i < clips.length; i++) {
+      // Vérifier si ce clip a déjà une image générée
+      const existingFrame = firstFrames[i]
+      if (existingFrame?.url) {
+        // Utiliser l'image existante comme référence pour le prochain clip
+        previousUrl = existingFrame.url
+        continue
+      }
+      
       // Passer l'URL du clip précédent pour continuité visuelle
       const generatedUrl = await generateFirstFrame(i, clips[i], previousUrl)
       
@@ -340,14 +391,43 @@ export function Step5Plan({ state, onClipsGenerated, onNext, onBack }: Step5Plan
     }
     
     setGeneratingFrames(false)
-  }, [actor, clips, generatingFrames, generateFirstFrame])
+  }, [actor, clips, generatingFrames, generateFirstFrame, firstFrames])
 
-  // Auto-generate first frames when clips are ready
+  // Auto-generate first frames when clips are ready (seulement si toutes les images ne sont pas déjà là)
   useEffect(() => {
-    if (clips.length > 0 && actor && Object.keys(firstFrames).length === 0 && !generatingFrames) {
+    const existingFrameCount = Object.values(firstFrames).filter(f => f.url).length
+    const needsGeneration = clips.length > 0 && existingFrameCount < clips.length
+    
+    if (needsGeneration && actor && !generatingFrames) {
       generateAllFirstFrames()
     }
   }, [clips, actor, firstFrames, generatingFrames, generateAllFirstFrames])
+
+  // Sauvegarder les first frames dans le state parent pour persistance
+  useEffect(() => {
+    const framesToSave: { [index: number]: { url: string; generatedAt: number } } = {}
+    let hasNewFrames = false
+    
+    Object.entries(firstFrames).forEach(([indexStr, frame]) => {
+      if (frame.url) {
+        const index = parseInt(indexStr)
+        // Vérifier si ce frame n'est pas déjà dans le state parent
+        const existingFrame = state.generated_first_frames?.[index]
+        if (!existingFrame || existingFrame.url !== frame.url) {
+          hasNewFrames = true
+        }
+        framesToSave[index] = {
+          url: frame.url,
+          generatedAt: existingFrame?.generatedAt || Date.now()
+        }
+      }
+    })
+    
+    // Sauvegarder seulement si on a de nouveaux frames
+    if (hasNewFrames && Object.keys(framesToSave).length > 0) {
+      onFirstFramesUpdate(framesToSave)
+    }
+  }, [firstFrames, state.generated_first_frames, onFirstFramesUpdate])
 
   // Load actor from database
   useEffect(() => {

@@ -171,7 +171,7 @@ export const INTENTION_PRESETS: IntentionPreset[] = [
       ],
       cta_templates: [
         'Bref le lien est en bio',
-        'Allez voir ça, je vous laisse je dois y aller',
+        'Teste par toi-même, le lien est juste là',
       ],
     },
     ambient_audio: {
