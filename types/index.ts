@@ -299,6 +299,7 @@ export interface ClipAdjustments {
 
 export interface NewCampaignState {
   step: 1 | 2 | 3 | 4 | 5 | 6;
+  campaign_id?: string; // ID de la campagne une fois créée (pour persistance URL)
   actor_id?: string;
   product: ProductConfig;
   preset_id?: string;

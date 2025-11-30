@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { NewCampaignState, ProductConfig, CampaignBrief, CampaignClip, GeneratedFirstFrames } from '@/types'
 import { StepIndicator } from '@/components/steps/step-indicator'
 import { Step1Actor } from '@/components/steps/step1-actor'
@@ -25,12 +26,14 @@ const STEPS = [
 
 export default function NewCampaignPage() {
   const router = useRouter()
+  const supabase = createClient()
   const { getActorById } = useActors()
   const [state, setState] = useState<NewCampaignState>({
     step: 1,
     product: { has_product: false },
     brief: {},
   })
+  const [isCreatingCampaign, setIsCreatingCampaign] = useState(false)
   
   // Modal de confirmation
   const [confirmModal, setConfirmModal] = useState<{
@@ -53,6 +56,73 @@ export default function NewCampaignPage() {
   const handleFirstFramesUpdate = useCallback((frames: GeneratedFirstFrames) => {
     setState(prev => ({ ...prev, generated_first_frames: frames }))
   }, [])
+
+  // ══════════════════════════════════════════════════════════════
+  // CRÉER LA CAMPAGNE DÈS LE STEP 1 ET REDIRIGER
+  // ══════════════════════════════════════════════════════════════
+  const createCampaignAndRedirect = useCallback(async (actorId: string) => {
+    if (isCreatingCampaign) return
+    setIsCreatingCampaign(true)
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        console.error('User not authenticated')
+        setIsCreatingCampaign(false)
+        return
+      }
+
+      // Créer la campagne en base avec juste l'acteur
+      console.log('Creating campaign with actor:', actorId)
+
+      const { data: campaign, error } = await supabase
+        .from('campaigns')
+        .insert({
+          user_id: user.id,
+          actor_id: actorId,
+          preset_id: null, // Sera mis à jour plus tard
+          product: { has_product: false },
+          brief: {},
+          status: 'draft',
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Supabase error:', error.message, error.code, error.details, error.hint)
+        setIsCreatingCampaign(false)
+        // Fallback: continuer sans persistance
+        setState(prev => ({ ...prev, actor_id: actorId, step: 2 }))
+        return
+      }
+
+      if (!campaign) {
+        console.error('No campaign returned')
+        setIsCreatingCampaign(false)
+        setState(prev => ({ ...prev, actor_id: actorId, step: 2 }))
+        return
+      }
+
+      const campaignId = (campaign as any).id
+      console.log('✓ Campaign created, redirecting to:', `/new/${campaignId}`)
+      
+      // Rediriger vers /new/[id] pour avoir l'URL persistante
+      router.replace(`/new/${campaignId}`)
+    } catch (err) {
+      console.error('Error creating campaign:', err)
+      setIsCreatingCampaign(false)
+      // Fallback: continuer sans persistance
+      setState(prev => ({ ...prev, actor_id: actorId, step: 2 }))
+    }
+  }, [supabase, router, isCreatingCampaign])
+
+  // Gérer le passage au step suivant
+  // Au step 1, on crée la campagne et on redirige vers /new/[id]
+  const handleStep1Next = useCallback(() => {
+    if (state.actor_id) {
+      createCampaignAndRedirect(state.actor_id)
+    }
+  }, [state.actor_id, createCampaignAndRedirect])
 
   const nextStep = () => {
     if (state.step < 6) {
@@ -108,7 +178,7 @@ export default function NewCampaignPage() {
           <Step1Actor
             selectedActorId={state.actor_id}
             onSelect={(actorId) => updateState({ actor_id: actorId })}
-            onNext={nextStep}
+            onNext={handleStep1Next}
           />
         )
       case 2:

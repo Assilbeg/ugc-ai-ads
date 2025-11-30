@@ -59,6 +59,7 @@ export function buildPreviewUrl(
 ): string {
   // Extraire le cloud_name et public_id de l'URL existante
   // Format: https://res.cloudinary.com/{cloud_name}/video/upload/{public_id}.mp4
+  // ou: https://res.cloudinary.com/{cloud_name}/video/upload/{folder}/{public_id}.mp4
   const match = cloudinaryUrl.match(/cloudinary\.com\/([^/]+)\/video\/upload\/(.+)$/)
   
   if (!match) {
@@ -67,8 +68,8 @@ export function buildPreviewUrl(
   }
 
   const [, cloudName, pathWithExtension] = match
-  // Retirer l'extension et les transformations existantes
-  const publicId = pathWithExtension.replace(/\.[^.]+$/, '').split('/').pop()
+  // Retirer SEULEMENT l'extension, garder le chemin complet (dossier inclus)
+  const publicId = pathWithExtension.replace(/\.[^.]+$/, '')
 
   const transformations: string[] = []
 

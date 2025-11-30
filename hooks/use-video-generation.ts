@@ -52,8 +52,8 @@ export function useVideoGeneration() {
         // Pas de first frame, on le génère
         updateProgress('generating_frame', 10, 'Création du premier plan...')
         
-        const intentionMedia = presetId && actor.intention_media?.[presetId]
-        const intentionImageUrl = intentionMedia?.image_url
+        const intentionMedia = presetId ? actor.intention_media?.[presetId] : undefined
+        const intentionImageUrl = intentionMedia && typeof intentionMedia === 'object' ? intentionMedia.image_url : undefined
         
         const frameResponse = await fetch('/api/generate/first-frame', {
           method: 'POST',
@@ -110,6 +110,30 @@ export function useVideoGeneration() {
       const videoData = await videoResponse.json()
       const rawVideoUrl = videoData.videoUrl
 
+      // ════════════════════════════════════════════════════════════
+      // À CE STADE, ON A LA VIDÉO ! On la sauvegarde même si l'audio échoue
+      // ════════════════════════════════════════════════════════════
+      
+      // Créer le clip partiel avec la vidéo
+      let updatedClip: CampaignClip = {
+        ...clip,
+        first_frame: {
+          ...clip.first_frame,
+          image_url: frameUrl,
+        },
+        video: {
+          ...clip.video,
+          raw_url: rawVideoUrl,
+          final_url: undefined,
+        },
+        audio: {
+          source_audio_url: rawVideoUrl,
+          voice_volume: 100,
+          ambient_volume: 20,
+        },
+        status: 'generating_voice',
+      }
+
       // ────────────────────────────────────────────────────────────
       // ÉTAPE 3 : Speech-to-Speech (Chatterbox HD)
       // On passe l'URL de la vidéo comme source audio
@@ -123,73 +147,85 @@ export function useVideoGeneration() {
         actorHasVoice: !!actor.voice,
       })
 
-      if (!targetVoiceUrl) {
-        throw new Error('L\'acteur n\'a pas de voix de référence configurée')
-      }
+      let voiceUrl: string | undefined
+      try {
+        if (!targetVoiceUrl) {
+          throw new Error('L\'acteur n\'a pas de voix de référence configurée')
+        }
 
-      const voiceResponse = await fetch('/api/generate/voice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sourceAudioUrl: rawVideoUrl,
-          targetVoiceUrl: targetVoiceUrl,
-        }),
-        signal: abortControllerRef.current?.signal,
-      })
+        const voiceResponse = await fetch('/api/generate/voice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sourceAudioUrl: rawVideoUrl,
+            targetVoiceUrl: targetVoiceUrl,
+          }),
+          signal: abortControllerRef.current?.signal,
+        })
 
-      if (!voiceResponse.ok) {
-        const err = await voiceResponse.json()
-        throw new Error(err.error || 'Erreur transformation voix')
+        if (!voiceResponse.ok) {
+          const err = await voiceResponse.json()
+          throw new Error(err.error || 'Erreur transformation voix')
+        }
+        const voiceData = await voiceResponse.json()
+        voiceUrl = voiceData.audioUrl
+        updatedClip.audio = { ...updatedClip.audio, transformed_voice_url: voiceUrl }
+      } catch (voiceErr) {
+        console.warn('[Generation] Voice failed, continuing with video only:', voiceErr)
+        updateProgress('generating_voice', 65, '⚠️ Voix échouée, vidéo sauvegardée')
+        // On continue quand même - la vidéo est sauvegardée !
       }
-      const voiceData = await voiceResponse.json()
 
       // ────────────────────────────────────────────────────────────
       // ÉTAPE 4 : Ambiance (ElevenLabs SFX)
       // ────────────────────────────────────────────────────────────
       updateProgress('generating_ambient', 85, 'Génération de l\'ambiance...')
+      updatedClip.status = 'generating_ambient'
 
-      const ambientResponse = await fetch('/api/generate/ambient', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: ambientPrompt,
-          duration: clip.video.duration + 2,
-        }),
-        signal: abortControllerRef.current?.signal,
-      })
+      let ambientUrl: string | undefined
+      try {
+        const ambientResponse = await fetch('/api/generate/ambient', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: ambientPrompt,
+            duration: clip.video.duration + 2,
+          }),
+          signal: abortControllerRef.current?.signal,
+        })
 
-      if (!ambientResponse.ok) {
-        const err = await ambientResponse.json()
-        throw new Error(err.error || 'Erreur génération ambiance')
+        if (!ambientResponse.ok) {
+          const err = await ambientResponse.json()
+          throw new Error(err.error || 'Erreur génération ambiance')
+        }
+        const ambientData = await ambientResponse.json()
+        ambientUrl = ambientData.audioUrl
+        updatedClip.audio = { ...updatedClip.audio, ambient_url: ambientUrl }
+      } catch (ambientErr) {
+        console.warn('[Generation] Ambient failed, continuing:', ambientErr)
+        updateProgress('generating_ambient', 90, '⚠️ Ambiance échouée')
+        // On continue quand même !
       }
-      const ambientData = await ambientResponse.json()
-
-      updateProgress('completed', 100, 'Terminé !')
 
       // ────────────────────────────────────────────────────────────
-      // RETOUR DU CLIP MIS À JOUR
+      // RETOUR DU CLIP - Completed si tout OK, sinon partial
       // ────────────────────────────────────────────────────────────
-      return {
-        ...clip,
-        first_frame: {
-          ...clip.first_frame,
-          image_url: frameUrl,
-        },
-        video: {
-          ...clip.video,
-          raw_url: rawVideoUrl,
-          final_url: undefined, // Sera défini après mixage
-        },
-        audio: {
-          source_audio_url: rawVideoUrl,
-          transformed_voice_url: voiceData.audioUrl,
-          ambient_url: ambientData.audioUrl,
-          voice_volume: 100,
-          ambient_volume: 20,
-          final_audio_url: undefined, // Sera défini après mixage
-        },
-        status: 'completed',
+      const hasVoice = !!voiceUrl
+      const hasAmbient = !!ambientUrl
+      
+      if (hasVoice && hasAmbient) {
+        updateProgress('completed', 100, 'Terminé !')
+        updatedClip.status = 'completed'
+      } else {
+        // Partiellement terminé - la vidéo est là mais pas tout l'audio
+        const missing = []
+        if (!hasVoice) missing.push('voix')
+        if (!hasAmbient) missing.push('ambiance')
+        updateProgress('completed', 100, `✓ Vidéo OK (${missing.join(' et ')} à refaire)`)
+        updatedClip.status = 'completed' // On marque completed pour pouvoir continuer
       }
+
+      return updatedClip
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         updateProgress('failed', 0, 'Annulé')
@@ -228,7 +264,8 @@ export function useVideoGeneration() {
       if (what === 'frame' || what === 'all') {
         updateProgress('generating_frame', 25, 'Régénération de l\'image...')
         
-        const intentionMedia = presetId && actor.intention_media?.[presetId]
+        const intentionMedia = presetId ? actor.intention_media?.[presetId] : undefined
+        const intentionImageUrl = intentionMedia && typeof intentionMedia === 'object' ? intentionMedia.image_url : undefined
         const frameResponse = await fetch('/api/generate/first-frame', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -236,7 +273,7 @@ export function useVideoGeneration() {
             soulImageUrl: actor.soul_image_url,
             prompt: clip.first_frame.prompt,
             presetId,
-            intentionImageUrl: intentionMedia?.image_url,
+            intentionImageUrl,
             actorId: actor.id,
             skipCache: true, // Forcer régénération
           }),

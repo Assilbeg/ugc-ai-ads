@@ -73,7 +73,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   const [generatedClips, setGeneratedClips] = useState<CampaignClip[]>(() => {
     return hasExistingVideos ? clips : []
   })
-  const [campaignId, setCampaignId] = useState<string | null>(null)
+  const [campaignId, setCampaignId] = useState<string | null>(state.campaign_id || null)
   const [started, setStarted] = useState(hasExistingVideos) // Déjà "started" si on a des vidéos
   const [fullscreenVideo, setFullscreenVideo] = useState<string | null>(null)
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -118,14 +118,32 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     }))
   }, [])
 
-  // Prévisualiser avec les ajustements (via Cloudinary URL)
-  const previewWithAdjustments = useCallback(async (index: number) => {
+  // Reset les ajustements à leurs valeurs par défaut
+  const resetAdjustments = useCallback((index: number) => {
+    const clip = clips[index] || generatedClips[index]
+    if (!clip) return
+    
+    setAdjustments(prev => ({
+      ...prev,
+      [index]: {
+        trimStart: 0,
+        trimEnd: clip.video.duration,
+        speed: 1.0,
+        isApplied: false,
+        // Garder cloudinaryId si déjà uploadé
+        cloudinaryId: prev[index]?.cloudinaryId,
+      }
+    }))
+  }, [clips, generatedClips])
+
+  // Appliquer les ajustements (uploader vers Cloudinary si nécessaire)
+  const applyAdjustments = useCallback(async (index: number) => {
     const clip = generatedClips[index] || clips[index]
-    const adj = adjustments[index]
+    let adj = adjustments[index]
     
     if (!clip?.video?.raw_url || !adj) return
     
-    // Si pas encore uploadé sur Cloudinary, on doit d'abord uploader
+    // Si pas encore uploadé sur Cloudinary, uploader d'abord
     if (!adj.cloudinaryId) {
       setAdjustments(prev => ({
         ...prev,
@@ -142,52 +160,19 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         if (!response.ok) throw new Error('Upload failed')
         
         const data = await response.json()
+        adj = { ...adj, cloudinaryId: data.publicId }
         setAdjustments(prev => ({
           ...prev,
-          [index]: { 
-            ...prev[index], 
-            cloudinaryId: data.publicId,
-            isUploading: false 
-          }
+          [index]: { ...prev[index], cloudinaryId: data.publicId, isUploading: false }
         }))
-        
-        // Construire l'URL de preview
-        const previewUrl = buildPreviewUrl(data.url, {
-          trimStart: adj.trimStart,
-          trimEnd: adj.trimEnd,
-          speed: adj.speed
-        })
-        
-        setFullscreenVideo(previewUrl)
-        setPreviewingClip(index)
       } catch (err) {
         console.error('Upload error:', err)
         setAdjustments(prev => ({
           ...prev,
           [index]: { ...prev[index], isUploading: false }
         }))
+        return
       }
-    } else {
-      // Déjà sur Cloudinary, juste construire l'URL
-      const cloudinaryUrl = `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/video/upload/${adj.cloudinaryId}.mp4`
-      const previewUrl = buildPreviewUrl(cloudinaryUrl, {
-        trimStart: adj.trimStart,
-        trimEnd: adj.trimEnd,
-        speed: adj.speed
-      })
-      
-      setFullscreenVideo(previewUrl)
-      setPreviewingClip(index)
-    }
-  }, [generatedClips, clips, adjustments])
-
-  // Appliquer les ajustements (sauvegarder l'URL transformée)
-  const applyAdjustments = useCallback(async (index: number) => {
-    const adj = adjustments[index]
-    if (!adj?.cloudinaryId) {
-      // D'abord prévisualiser pour uploader
-      await previewWithAdjustments(index)
-      return
     }
     
     const cloudinaryUrl = `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/video/upload/${adj.cloudinaryId}.mp4`
@@ -199,7 +184,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     
     setAdjustments(prev => ({
       ...prev,
-      [index]: { ...prev[index], adjustedUrl, isApplied: true }
+      [index]: { ...prev[index], adjustedUrl, isApplied: true, isUploading: false }
     }))
     
     // Mettre à jour le clip avec l'URL ajustée
@@ -215,26 +200,114 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       setGeneratedClips(updatedClips)
       onClipsUpdate(updatedClips)
     }
-  }, [adjustments, generatedClips, onClipsUpdate, previewWithAdjustments])
+  }, [adjustments, generatedClips, clips, onClipsUpdate])
 
-  // Assembler la vidéo finale
+  // Assembler la vidéo finale (applique les ajustements automatiquement)
   const assembleVideo = useCallback(async () => {
     if (!campaignId) return
     
     setAssembling(true)
     
     try {
-      // Collecter les URLs des clips (ajustées si disponibles, sinon raw)
-      const videoUrls = generatedClips.map((clip, index) => {
+      // Construire les clips avec durées et ajustements pour l'assemblage
+      interface ClipForAssembly {
+        url: string
+        duration: number
+        clipOrder: number
+        trimStart: number
+        trimEnd: number
+        speed: number
+        cloudinaryId?: string
+      }
+      const clipsForAssembly: ClipForAssembly[] = []
+      
+      for (let index = 0; index < generatedClips.length; index++) {
+        const clip = generatedClips[index]
         const adj = adjustments[index]
-        return adj?.adjustedUrl || clip.video?.raw_url
-      }).filter(Boolean)
+        
+        if (!clip?.video?.raw_url) continue
+        
+        // Valeurs par défaut
+        const trimStart = adj?.trimStart ?? 0
+        const trimEnd = adj?.trimEnd ?? clip.video.duration
+        const speed = adj?.speed ?? 1.0
+        
+        // Vérifier si des ajustements ont été faits
+        const hasAdjustments = (
+          trimStart !== 0 ||
+          trimEnd !== clip.video.duration ||
+          speed !== 1.0
+        )
+        
+        let url = clip.video.raw_url
+        let cloudinaryId = adj?.cloudinaryId
+        
+        // Calculer la durée ajustée
+        const trimmedDuration = trimEnd - trimStart
+        const duration = trimmedDuration / speed
+        
+        if (hasAdjustments) {
+          // Upload vers Cloudinary si pas encore fait
+          if (!cloudinaryId) {
+            console.log(`[Assemble] Uploading clip ${index + 1} to Cloudinary for transformations...`)
+            try {
+              const uploadResponse = await fetch('/api/cloudinary/upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ videoUrl: clip.video.raw_url })
+              })
+              
+              if (uploadResponse.ok) {
+                const uploadData = await uploadResponse.json()
+                cloudinaryId = uploadData.publicId
+                console.log(`[Assemble] Clip ${index + 1} uploaded:`, cloudinaryId)
+                
+                // Sauvegarder le cloudinaryId pour éviter de re-uploader
+                setAdjustments(prev => ({
+                  ...prev,
+                  [index]: { ...prev[index], cloudinaryId }
+                }))
+              } else {
+                const errorData = await uploadResponse.text()
+                console.error(`[Assemble] Failed to upload clip ${index + 1}:`, errorData)
+              }
+            } catch (uploadErr) {
+              console.error(`[Assemble] Upload error for clip ${index + 1}:`, uploadErr)
+            }
+          }
+          
+          // Construire l'URL avec transformations si on a un cloudinaryId
+          if (cloudinaryId) {
+            const cloudinaryUrl = `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/video/upload/${cloudinaryId}.mp4`
+            url = buildPreviewUrl(cloudinaryUrl, {
+              trimStart,
+              trimEnd,
+              speed
+            })
+            console.log(`[Assemble] Clip ${index + 1} with adjustments: trim=${trimStart}-${trimEnd}s, speed=${speed}x`)
+          } else {
+            console.warn(`[Assemble] Clip ${index + 1} has adjustments but Cloudinary upload failed, using raw video`)
+          }
+        }
+        
+        clipsForAssembly.push({ 
+          url, 
+          duration,
+          clipOrder: clip.order,
+          trimStart,
+          trimEnd,
+          speed,
+          cloudinaryId
+        })
+      }
+      
+      console.log('[Assemble] Final clips:', clipsForAssembly.length, 'clips ready')
       
       const response = await fetch('/api/assemble', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          videoUrls,
+          clips: clipsForAssembly,
           campaignId
         })
       })
@@ -242,14 +315,15 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       if (!response.ok) throw new Error('Assemblage failed')
       
       const data = await response.json()
+      console.log('[Assemble] Success:', data)
       
-      // Rediriger vers la campagne
+      // Rediriger immédiatement vers la campagne (l'animation sera sur la page)
       onComplete(campaignId)
     } catch (err) {
       console.error('Assemble error:', err)
-    } finally {
-      setAssembling(false)
+      setAssembling(false) // Reset seulement en cas d'erreur
     }
+    // Note: on ne reset pas setAssembling(false) en cas de succès car on redirige
   }, [campaignId, generatedClips, adjustments, onComplete])
 
   // ══════════════════════════════════════════════════════════════
@@ -349,28 +423,42 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     }
   }, [supabase])
 
-  // Auto-save quand des clips sont générés
+  // Track si on vient de générer de nouvelles vidéos (pas juste charger depuis la base)
+  const [hasNewlyGeneratedClips, setHasNewlyGeneratedClips] = useState(false)
+
+  // Auto-save UNIQUEMENT quand des clips sont NOUVELLEMENT générés (pas au chargement)
   useEffect(() => {
-    if (campaignId && generatedClips.length > 0 && !campaignId.startsWith('temp-')) {
+    if (campaignId && generatedClips.length > 0 && !campaignId.startsWith('temp-') && hasNewlyGeneratedClips) {
       // Sauvegarder les clips avec vidéo générée
       const clipsWithVideo = generatedClips.filter(c => c.video?.raw_url)
       if (clipsWithVideo.length > 0) {
+        console.log('[AutoSave] Saving newly generated clips:', clipsWithVideo.length)
         saveClipsToDb(campaignId, generatedClips)
+        setHasNewlyGeneratedClips(false) // Reset après sauvegarde
       }
     }
-  }, [campaignId, generatedClips, saveClipsToDb])
+  }, [campaignId, generatedClips, saveClipsToDb, hasNewlyGeneratedClips])
 
   const handleStartGeneration = async () => {
     if (!actor || !preset || clips.length === 0) return
 
     setStarted(true)
     
-    // Créer la campagne en base AVANT de générer
-    const dbCampaignId = await createCampaignInDb()
+    // Utiliser le campaign_id existant (depuis /new/[id]) ou en créer un nouveau
+    let dbCampaignId: string | null = state.campaign_id || null
+    
     if (!dbCampaignId) {
-      console.error('Failed to create campaign, using temp ID')
-      setCampaignId(`temp-${Date.now()}`)
+      // Pas de campaign_id dans le state, créer en base
+      dbCampaignId = await createCampaignInDb()
+      if (!dbCampaignId) {
+        console.error('Failed to create campaign, using temp ID')
+        setCampaignId(`temp-${Date.now()}`)
+      } else {
+        setCampaignId(dbCampaignId)
+      }
     } else {
+      // Campaign existe déjà, on l'utilise
+      console.log('✓ Using existing campaign:', dbCampaignId)
       setCampaignId(dbCampaignId)
     }
 
@@ -407,6 +495,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       preset.ambient_audio.prompt,
       preset.id
     )
+
+    // Marquer qu'on a de nouveaux clips générés (pour déclencher la sauvegarde)
+    setHasNewlyGeneratedClips(true)
 
     // Fusionner avec les clips existants - on utilise l'order comme clé unique
     // IMPORTANT: On ne compare pas les id car ils peuvent être undefined
@@ -609,10 +700,32 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                           muted
                           loop
                           playsInline
+                          ref={(video) => {
+                            if (video) {
+                              const adj = adjustments[index]
+                              if (adj) {
+                                // Appliquer la vitesse en temps réel
+                                video.playbackRate = adj.speed || 1
+                                // Gérer le trim (boucle entre trimStart et trimEnd)
+                                const handleTimeUpdate = () => {
+                                  const trimEnd = adj.trimEnd ?? clip.video.duration
+                                  const trimStart = adj.trimStart ?? 0
+                                  if (video.currentTime >= trimEnd || video.currentTime < trimStart) {
+                                    video.currentTime = trimStart
+                                  }
+                                }
+                                video.ontimeupdate = handleTimeUpdate
+                                // Démarrer au bon point si nécessaire
+                                if (adj.trimStart && video.currentTime < adj.trimStart) {
+                                  video.currentTime = adj.trimStart
+                                }
+                              }
+                            }
+                          }}
                         />
                         {/* Bouton plein écran au hover */}
                         <button
-                          onClick={() => setFullscreenVideo(videoUrl)}
+                          onClick={() => { setPreviewingClip(index); setFullscreenVideo(videoUrl) }}
                           className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/30 transition-colors"
                         >
                           <Play className="w-10 h-10 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -807,41 +920,20 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                               </div>
                             )}
                             
-                            {/* Action Buttons */}
-                            <div className="flex items-center gap-2">
+                            {/* Reset Button - seulement si modifié */}
+                            {(adjustments[index]?.trimStart !== 0 ||
+                              adjustments[index]?.trimEnd !== clip.video.duration ||
+                              adjustments[index]?.speed !== 1.0) && (
                               <Button
-                                variant="outline"
+                                variant="ghost"
                                 size="sm"
-                                className="h-8 text-xs rounded-lg flex-1"
-                                onClick={() => previewWithAdjustments(index)}
-                                disabled={adjustments[index]?.isUploading}
+                                className="h-7 text-xs rounded-lg text-muted-foreground"
+                                onClick={() => resetAdjustments(index)}
                               >
-                                {adjustments[index]?.isUploading ? (
-                                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                ) : (
-                                  <Eye className="w-3 h-3 mr-1" />
-                                )}
-                                Prévisualiser
+                                <RefreshCw className="w-3 h-3 mr-1" />
+                                Reset
                               </Button>
-                              <Button
-                                size="sm"
-                                className="h-8 text-xs rounded-lg flex-1"
-                                onClick={() => applyAdjustments(index)}
-                                disabled={adjustments[index]?.isUploading || adjustments[index]?.isApplied}
-                              >
-                                {adjustments[index]?.isApplied ? (
-                                  <>
-                                    <Check className="w-3 h-3 mr-1" />
-                                    Appliqué
-                                  </>
-                                ) : (
-                                  <>
-                                    <Check className="w-3 h-3 mr-1" />
-                                    Appliquer
-                                  </>
-                                )}
-                              </Button>
-                            </div>
+                            )}
                           </div>
                           
                           {/* Section RÉGÉNÉRER (coûteux) */}
@@ -954,24 +1046,54 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         variant={confirmRegen?.what === 'video' ? 'danger' : 'warning'}
       />
 
-      {/* Modal vidéo plein écran */}
+      {/* Modal vidéo plein écran avec ajustements HTML5 */}
       {fullscreenVideo && (
         <div 
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-          onClick={() => setFullscreenVideo(null)}
+          className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4"
+          onClick={() => { setFullscreenVideo(null); setPreviewingClip(null) }}
         >
           <button
-            onClick={() => setFullscreenVideo(null)}
+            onClick={() => { setFullscreenVideo(null); setPreviewingClip(null) }}
             className="absolute top-4 right-4 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
           >
             <X className="w-6 h-6 text-white" />
           </button>
+          
+          {/* Afficher les infos d'ajustement */}
+          {previewingClip !== null && adjustments[previewingClip] && (
+            <div className="absolute top-4 left-4 bg-black/70 backdrop-blur-sm rounded-xl px-4 py-2 text-white text-sm">
+              <div className="flex items-center gap-4">
+                <span>⏱ {adjustments[previewingClip].trimStart?.toFixed(1)}s → {adjustments[previewingClip].trimEnd?.toFixed(1)}s</span>
+                <span>⚡ {adjustments[previewingClip].speed}x</span>
+              </div>
+            </div>
+          )}
+          
           <video 
             src={fullscreenVideo} 
-            className="max-h-[90vh] max-w-full rounded-xl"
+            className="max-h-[85vh] max-w-full rounded-xl"
             controls
             autoPlay
             onClick={(e) => e.stopPropagation()}
+            ref={(video) => {
+              if (video && previewingClip !== null) {
+                const adj = adjustments[previewingClip]
+                if (adj) {
+                  // Appliquer la vitesse
+                  video.playbackRate = adj.speed || 1
+                  // Démarrer au bon timing (trim start)
+                  if (adj.trimStart > 0 && video.currentTime < adj.trimStart) {
+                    video.currentTime = adj.trimStart
+                  }
+                  // Boucler à la fin du trim
+                  video.ontimeupdate = () => {
+                    if (video.currentTime >= (adj.trimEnd || video.duration)) {
+                      video.currentTime = adj.trimStart || 0
+                    }
+                  }
+                }
+              }
+            }}
           />
         </div>
       )}
