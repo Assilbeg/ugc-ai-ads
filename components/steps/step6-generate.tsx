@@ -237,7 +237,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   }, [adjustments, generatedClips, clips, onClipsUpdate])
 
   // Assembler la vidéo finale (applique les ajustements automatiquement)
-  // Lance l'assemblage D'ABORD puis redirige
+  // ATTEND LA RÉPONSE DU SERVEUR avant de rediriger (garantit que l'assemblage est lancé)
   const assembleVideo = useCallback(async () => {
     if (!campaignId) return
     
@@ -278,38 +278,42 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         })
       
       console.log('[Assemble] Total clips:', clipsForAssembly.length)
+      console.log('[Assemble] Sending to API and waiting for response...')
       
       // 1. Mettre le status à "assembling" AVANT tout
       await (supabase.from('campaigns') as any)
         .update({ status: 'assembling' })
         .eq('id', campaignId)
       
-      // 2. Lancer l'assemblage avec keepalive pour survivre à la navigation
-      // On utilise keepalive ET on attend un peu avant de rediriger
-      const assemblePromise = fetch('/api/assemble', {
+      // 2. Lancer l'assemblage et ATTENDRE LA RÉPONSE COMPLÈTE
+      // C'est plus lent mais garantit que l'assemblage est bien fait
+      const response = await fetch('/api/assemble', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clips: clipsForAssembly,
           campaignId
-        }),
-        keepalive: true // Important: permet à la requête de survivre à la navigation
+        })
       })
       
-      // Petite attente pour s'assurer que la requête est bien partie
-      await new Promise(resolve => setTimeout(resolve, 100))
+      const result = await response.json()
+      console.log('[Assemble] API response:', response.status, result)
       
-      // 3. Rediriger vers la page campagne
-      window.location.href = `/campaign/${campaignId}?assembling=1`
+      if (!response.ok) {
+        throw new Error(result.error || 'Erreur assemblage')
+      }
       
-      // Note: On n'attend pas la réponse, le polling sur la page campagne s'en chargera
-      assemblePromise.catch(err => {
-        console.error('[Assemble] Error:', err)
-      })
+      // 3. Assemblage terminé ! Rediriger vers la page campagne
+      console.log('[Assemble] Success! Redirecting...')
+      window.location.href = `/campaign/${campaignId}`
       
     } catch (err) {
       console.error('Assemble error:', err)
       setAssembling(false)
+      // En cas d'erreur, mettre le status à failed
+      await (supabase.from('campaigns') as any)
+        .update({ status: 'failed' })
+        .eq('id', campaignId)
     }
   }, [campaignId, generatedClips, adjustments, supabase])
 
@@ -1020,7 +1024,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                   {assembling ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Assemblage...
+                      Assemblage en cours (≈30s)...
                     </>
                   ) : (
                     <>
