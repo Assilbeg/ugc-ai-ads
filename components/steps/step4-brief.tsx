@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CampaignBrief, CampaignClip, Actor, IntentionPreset, ProductConfig } from '@/types'
+import { CampaignBrief, CampaignClip, Actor, IntentionPreset, ProductConfig, ScriptLanguage } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
-import { ArrowLeft, Sparkles, Check, Clock, Target, Gift, ShoppingBag, AlertCircle, Link, Loader2, Wand2, ImageIcon, FileText } from 'lucide-react'
+import { ArrowLeft, Sparkles, Check, Clock, Target, Gift, ShoppingBag, AlertCircle, Link, Loader2, Wand2, ImageIcon, FileText, Globe } from 'lucide-react'
 
 // Configuration des beats pour l'animation
 const BEAT_STEPS = [
@@ -31,7 +31,7 @@ function GeneratingAnimation({ phase }: { phase: 'script' | 'images' }) {
     }
   }, [phase, scriptDone])
 
-  // Animation de la barre principale
+  // Animation de la barre principale - plus progressive
   useEffect(() => {
     const duration = phase === 'script' ? 15000 : 10000
     const startTime = Date.now()
@@ -39,7 +39,8 @@ function GeneratingAnimation({ phase }: { phase: 'script' | 'images' }) {
     const animate = () => {
       const elapsed = Date.now() - startTime
       const linearProgress = Math.min(elapsed / duration, 1)
-      const easedProgress = 1 - Math.pow(1 - linearProgress, 2)
+      // Courbe plus linéaire pour une progression plus visible
+      const easedProgress = linearProgress * 0.7 + Math.pow(linearProgress, 2) * 0.3
       
       if (phase === 'script') {
         setProgress(easedProgress * 55)
@@ -99,7 +100,7 @@ function GeneratingAnimation({ phase }: { phase: 'script' | 'images' }) {
   }, [phase])
 
   return (
-    <div className="fixed inset-0 bg-background z-50 flex items-center justify-center overflow-hidden">
+    <div className="fixed inset-0 bg-background z-[100] flex items-center justify-center overflow-hidden">
       <div className="max-w-2xl w-full mx-4 space-y-8">
         {/* Title */}
         <div className="text-center">
@@ -258,6 +259,19 @@ const DURATION_OPTIONS = [
   { value: 60, label: '60s', clips: '6-8 clips' },
 ]
 
+const LANGUAGE_OPTIONS: { value: ScriptLanguage; label: string; flag: string }[] = [
+  { value: 'fr', label: 'Français', flag: '🇫🇷' },
+  { value: 'en-us', label: 'English (US)', flag: '🇺🇸' },
+  { value: 'en-uk', label: 'English (UK)', flag: '🇬🇧' },
+  { value: 'es', label: 'Español (España)', flag: '🇪🇸' },
+  { value: 'es-latam', label: 'Español (Latam)', flag: '🇲🇽' },
+  { value: 'de', label: 'Deutsch', flag: '🇩🇪' },
+  { value: 'it', label: 'Italiano', flag: '🇮🇹' },
+  { value: 'pt-br', label: 'Português (BR)', flag: '🇧🇷' },
+  { value: 'pt', label: 'Português (PT)', flag: '🇵🇹' },
+  { value: 'nl', label: 'Nederlands', flag: '🇳🇱' },
+]
+
 export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, product, onClipsGenerated, onFirstFramesUpdate }: Step4BriefProps) {
   const [url, setUrl] = useState('')
   const [extracting, setExtracting] = useState(false)
@@ -357,9 +371,19 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
                   actorId: actor.id, // Pour le cache des assets
                 }),
               })
-                .then(res => res.ok ? res.json() : null)
+                .then(async res => {
+                  if (!res.ok) {
+                    const errorData = await res.json().catch(() => ({}))
+                    console.error(`First frame ${i} failed:`, errorData.error || res.statusText)
+                    return null
+                  }
+                  return res.json()
+                })
                 .then(result => ({ index: i, url: result?.url, cached: result?.cached }))
-                .catch(() => ({ index: i, url: null }))
+                .catch((err) => {
+                  console.error(`First frame ${i} error:`, err)
+                  return { index: i, url: null }
+                })
             )
           }
           
@@ -565,45 +589,124 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
           </div>
         </div>
 
-        {/* Duration selection */}
-        <div className="space-y-4 pt-2">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-foreground/5 flex items-center justify-center">
-              <Clock className="w-4 h-4 text-foreground/70" />
+        {/* Duration and Language selection */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+          {/* Duration selection */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-foreground/5 flex items-center justify-center">
+                <Clock className="w-4 h-4 text-foreground/70" />
+              </div>
+              <Label className="text-base font-medium">
+                Durée <span className="text-destructive">*</span>
+              </Label>
             </div>
-            <Label className="text-base font-medium">
-              Durée souhaitée <span className="text-destructive">*</span>
-            </Label>
-          </div>
-          <div className="grid grid-cols-4 gap-3">
-            {DURATION_OPTIONS.map((option) => {
-              const isSelected = brief.target_duration === option.value
-              return (
-                <Card
-                  key={option.value}
-                  className={`
-                    cursor-pointer transition-all duration-200 rounded-xl p-0 gap-0
-                    ${isSelected
-                      ? 'ring-2 ring-foreground bg-foreground text-background shadow-md'
-                      : 'border-border hover:border-foreground/30 bg-background'
-                    }
-                  `}
-                  onClick={() => onChange({ ...brief, target_duration: option.value as 15 | 30 | 45 | 60 })}
-                >
-                  <div className="p-4 text-center relative">
-                    <div className="text-2xl font-bold">{option.label}</div>
-                    <div className={`text-xs mt-1 ${isSelected ? 'text-background/70' : 'text-muted-foreground'}`}>
-                      {option.clips}
-                    </div>
-                    {isSelected && (
-                      <div className="absolute top-2 right-2 w-5 h-5 bg-background rounded-full flex items-center justify-center">
-                        <Check className="w-3 h-3 text-foreground" />
+            <div className="grid grid-cols-4 gap-2">
+              {DURATION_OPTIONS.map((option) => {
+                const isSelected = brief.target_duration === option.value
+                return (
+                  <Card
+                    key={option.value}
+                    className={`
+                      cursor-pointer transition-all duration-200 rounded-xl p-0 gap-0
+                      ${isSelected
+                        ? 'ring-2 ring-foreground bg-foreground text-background shadow-md'
+                        : 'border-border hover:border-foreground/30 bg-background'
+                      }
+                    `}
+                    onClick={() => onChange({ ...brief, target_duration: option.value as 15 | 30 | 45 | 60 })}
+                  >
+                    <div className="p-3 text-center relative">
+                      <div className="text-lg font-bold">{option.label}</div>
+                      <div className={`text-[10px] mt-0.5 ${isSelected ? 'text-background/70' : 'text-muted-foreground'}`}>
+                        {option.clips}
                       </div>
-                    )}
-                  </div>
-                </Card>
-              )
-            })}
+                      {isSelected && (
+                        <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-background rounded-full flex items-center justify-center">
+                          <Check className="w-2.5 h-2.5 text-foreground" />
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Language selection */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-foreground/5 flex items-center justify-center">
+                <Globe className="w-4 h-4 text-foreground/70" />
+              </div>
+              <Label className="text-base font-medium">Langue du script</Label>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {LANGUAGE_OPTIONS.slice(0, 4).map((option) => {
+                const isSelected = (brief.language || 'fr') === option.value
+                return (
+                  <Card
+                    key={option.value}
+                    className={`
+                      cursor-pointer transition-all duration-200 rounded-xl p-0 gap-0
+                      ${isSelected
+                        ? 'ring-2 ring-foreground bg-foreground text-background shadow-md'
+                        : 'border-border hover:border-foreground/30 bg-background'
+                      }
+                    `}
+                    onClick={() => onChange({ ...brief, language: option.value })}
+                  >
+                    <div className="p-2.5 flex items-center gap-2 relative">
+                      <span className="text-lg">{option.flag}</span>
+                      <span className={`text-sm font-medium truncate ${isSelected ? 'text-background' : ''}`}>
+                        {option.label}
+                      </span>
+                      {isSelected && (
+                        <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-background rounded-full flex items-center justify-center">
+                          <Check className="w-2.5 h-2.5 text-foreground" />
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+            {/* More languages dropdown hint */}
+            <details className="group">
+              <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+                + Autres langues
+              </summary>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {LANGUAGE_OPTIONS.slice(4).map((option) => {
+                  const isSelected = brief.language === option.value
+                  return (
+                    <Card
+                      key={option.value}
+                      className={`
+                        cursor-pointer transition-all duration-200 rounded-xl p-0 gap-0
+                        ${isSelected
+                          ? 'ring-2 ring-foreground bg-foreground text-background shadow-md'
+                          : 'border-border hover:border-foreground/30 bg-background'
+                        }
+                      `}
+                      onClick={() => onChange({ ...brief, language: option.value })}
+                    >
+                      <div className="p-2.5 flex items-center gap-2 relative">
+                        <span className="text-lg">{option.flag}</span>
+                        <span className={`text-sm font-medium truncate ${isSelected ? 'text-background' : ''}`}>
+                          {option.label}
+                        </span>
+                        {isSelected && (
+                          <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-background rounded-full flex items-center justify-center">
+                            <Check className="w-2.5 h-2.5 text-foreground" />
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  )
+                })}
+              </div>
+            </details>
           </div>
         </div>
       </div>
@@ -644,4 +747,3 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
     </div>
   )
 }
-

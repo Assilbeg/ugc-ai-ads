@@ -182,12 +182,25 @@ export interface ProductConfig {
 // ─────────────────────────────────────────────────────────────────
 // BRIEF UTILISATEUR
 // ─────────────────────────────────────────────────────────────────
+export type ScriptLanguage = 
+  | "fr"      // Français (France métropolitaine)
+  | "en-us"   // English (American)
+  | "en-uk"   // English (British)
+  | "es"      // Español (España)
+  | "es-latam" // Español (Latinoamérica)
+  | "de"      // Deutsch
+  | "it"      // Italiano
+  | "pt-br"   // Português (Brasil)
+  | "pt"      // Português (Portugal)
+  | "nl";     // Nederlands
+
 export interface CampaignBrief {
   what_selling: string;
   pain_point: string;              // Le problème/frustration de l'audience
   target_audience?: string;
   key_benefits?: string[];
   target_duration: 15 | 30 | 45 | 60;
+  language?: ScriptLanguage;       // Langue du script (défaut: fr)
 }
 
 // ─────────────────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
 import { NewCampaignState, CampaignClip, CampaignBrief, Actor } from '@/types'
 import { usePlanGeneration } from '@/hooks/use-plan-generation'
@@ -70,31 +71,59 @@ function LoadingAnimation() {
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set())
   const [activeStep, setActiveStep] = useState<string | null>(null)
   const [progress, setProgress] = useState<Record<string, number>>({})
+  const [overallProgress, setOverallProgress] = useState(0)
+  const [mounted, setMounted] = useState(false)
+
+  // S'assurer qu'on est côté client pour le Portal
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
-    // Durées beaucoup plus longues pour un remplissage visuel lent (8s à 18s)
+    // ═══════════════════════════════════════════════════════════════
+    // BARRE GLOBALE : Animation indépendante qui démarre immédiatement
+    // ═══════════════════════════════════════════════════════════════
+    const globalDuration = 25000 // 25 secondes pour aller de 0 à 95%
+    const globalStartTime = Date.now()
+    
+    const animateGlobal = () => {
+      const elapsed = Date.now() - globalStartTime
+      const linearProgress = Math.min(elapsed / globalDuration, 1)
+      // Courbe ease-out pour un remplissage naturel
+      const easedProgress = 1 - Math.pow(1 - linearProgress, 2)
+      const progressPercent = easedProgress * 95 // Max 95%
+      
+      setOverallProgress(progressPercent)
+      
+      if (linearProgress < 1) {
+        requestAnimationFrame(animateGlobal)
+      }
+    }
+    // Démarrer immédiatement
+    requestAnimationFrame(animateGlobal)
+
+    // ═══════════════════════════════════════════════════════════════
+    // TUILES INDIVIDUELLES : Animation avec délai décalé
+    // ═══════════════════════════════════════════════════════════════
     const stepDurations: Record<string, number> = {}
     LOADING_STEPS.forEach((step, index) => {
-      // Durée de base très longue + variation aléatoire importante
       const baseDuration = 8000 + (index * 1800)
-      const randomVariation = Math.random() * 4000 - 1500 // -1500 à +2500
+      const randomVariation = Math.random() * 4000 - 1500
       stepDurations[step.beat] = Math.max(6000, baseDuration + randomVariation)
     })
 
-    // Le dernier (CTA) reste en boucle infinie
     const lastBeat = LOADING_STEPS[LOADING_STEPS.length - 1].beat
     
-    // Délai initial avec plus de décalage (staggered start)
     LOADING_STEPS.forEach((step, index) => {
-      const startDelay = 300 + (index * 400) // Plus de décalage entre chaque tuile
+      const startDelay = 300 + (index * 400)
       const duration = stepDurations[step.beat]
       const isLast = step.beat === lastBeat
       
       setTimeout(() => {
-        setActiveStep(prev => prev || step.beat) // Premier devient actif
+        setActiveStep(prev => prev || step.beat)
         
         if (isLast) {
-          // Dernière étape : animation en boucle infinie (pulse entre 30-90%)
+          // Dernière tuile : animation en boucle
           let goingUp = true
           let currentProgress = 0
           const animate = () => {
@@ -110,12 +139,11 @@ function LoadingAnimation() {
           }
           requestAnimationFrame(animate)
         } else {
-          // Animer la progression de 0 à 100 avec une courbe ease-out
+          // Autres tuiles : progression de 0 à 100%
           const startTime = Date.now()
           const animate = () => {
             const elapsed = Date.now() - startTime
             const linearProgress = Math.min(elapsed / duration, 1)
-            // Courbe ease-out pour un remplissage plus naturel (rapide au début, ralentit à la fin)
             const easedProgress = 1 - Math.pow(1 - linearProgress, 2.5)
             const progressPercent = easedProgress * 100
             
@@ -124,9 +152,7 @@ function LoadingAnimation() {
             if (linearProgress < 1) {
               requestAnimationFrame(animate)
             } else {
-              // Forcer la barre à 100% puis attendre le rendu avant d'afficher la checkmark
               setProgress(prev => ({ ...prev, [step.beat]: 100 }))
-              // Délai plus long pour s'assurer que le 100% est rendu visuellement
               setTimeout(() => {
                 setCompletedSteps(prev => new Set([...prev, step.beat]))
               }, 400)
@@ -138,12 +164,23 @@ function LoadingAnimation() {
     })
   }, [])
 
-  const completedCount = completedSteps.size
-  const totalSteps = LOADING_STEPS.length - 1 // On ne compte pas la dernière qui reste en boucle
-  const overallProgress = Math.min((completedCount / totalSteps) * 100, 95) // Max 95% tant que loading
-
-  return (
-    <div className="fixed inset-0 z-50 bg-background flex items-center justify-center">
+  // Contenu de l'overlay
+  const overlayContent = (
+    <div 
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: 'hsl(var(--background))',
+        zIndex: 99999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'auto',
+      }}
+    >
       <div className="w-full max-w-4xl px-6 py-12">
       {/* Title */}
       <div className="text-center mb-10">
@@ -157,11 +194,19 @@ function LoadingAnimation() {
       {/* Animated timeline */}
       <div className="max-w-3xl mx-auto">
         {/* Timeline bar */}
-        <div className="relative h-1.5 bg-muted rounded-full mb-8 overflow-hidden">
-          <div 
-            className="absolute inset-y-0 left-0 bg-foreground rounded-full transition-all duration-300 ease-out"
-            style={{ width: `${overallProgress}%` }}
-          />
+        <div className="flex items-center gap-3 mb-8">
+          <div className="relative h-2 flex-1 bg-muted rounded-full overflow-hidden">
+            <div 
+              className="absolute inset-y-0 left-0 bg-foreground rounded-full"
+              style={{ 
+                width: `${overallProgress}%`,
+                transition: 'width 0.1s linear'
+              }}
+            />
+          </div>
+          <span className="text-sm font-medium text-foreground tabular-nums w-12 text-right">
+            {Math.round(overallProgress)}%
+          </span>
         </div>
 
         {/* Beat cards */}
@@ -252,6 +297,11 @@ function LoadingAnimation() {
       </div>
     </div>
   )
+
+  // Utiliser un Portal pour rendre l'overlay directement dans le body
+  // Cela évite les problèmes de stacking context avec les parents
+  if (!mounted) return null
+  return createPortal(overlayContent, document.body)
 }
 
 export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext, onBack }: Step5PlanProps) {
@@ -568,10 +618,18 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
   const totalDuration = clips.reduce((sum, c) => sum + c.video.duration, 0)
   const generatedFrames = Object.values(firstFrames).filter(f => f.url).length
 
-  // Helper pour vérifier si le script est trop long (~3 mots/seconde max avec marge de tolérance)
+  // Helper pour vérifier si le script est trop long
+  // Bornes réelles selon les durées Veo 3.1 (4s/6s/8s) utilisées par claude.ts
   const getWordWarning = (text: string, duration: number): { isWarning: boolean; wordCount: number; maxWords: number } => {
     const wordCount = text.split(/\s+/).filter(Boolean).length
-    const maxWords = Math.floor(duration * 3) // ~3 mots/seconde avec marge de tolérance
+    // Bornes exactes de claude.ts pour Veo 3.1
+    const maxWordsByDuration: Record<number, number> = {
+      4: 15,   // 4s = 12-15 mots max
+      6: 22,   // 6s = 18-22 mots max
+      8: 30,   // 8s = 25-30 mots max
+      12: 45,  // 12s = 40-45 mots max (Sora 2)
+    }
+    const maxWords = maxWordsByDuration[duration] || Math.floor(duration * 3.5)
     return {
       isWarning: wordCount > maxWords,
       wordCount,

@@ -10,47 +10,67 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
-import { Slider } from '@/components/ui/slider'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { Loader2, Play, X, Video, Mic, Music, Maximize2, Clock } from 'lucide-react'
 
 interface Step6GenerateProps {
   state: NewCampaignState
+  onClipsUpdate: (clips: CampaignClip[]) => void
   onComplete: (campaignId: string) => void
   onBack: () => void
 }
 
-const STATUS_LABELS: Record<ClipStatus, string> = {
-  pending: 'En attente',
-  generating_frame: 'Génération image...',
-  generating_video: 'Génération vidéo...',
-  generating_voice: 'Transformation voix...',
-  generating_ambient: 'Ambiance sonore...',
-  completed: 'Terminé',
-  failed: 'Échec',
+const BEAT_LABELS: Record<string, string> = {
+  hook: 'HOOK',
+  problem: 'PROBLÈME',
+  agitation: 'AGITATION',
+  solution: 'SOLUTION',
+  proof: 'PREUVE',
+  cta: 'CTA',
 }
 
-const STATUS_COLORS: Record<ClipStatus, string> = {
-  pending: 'bg-muted text-muted-foreground',
-  generating_frame: 'bg-amber-600 text-white',
-  generating_video: 'bg-blue-600 text-white',
-  generating_voice: 'bg-violet-600 text-white',
-  generating_ambient: 'bg-fuchsia-600 text-white',
-  completed: 'bg-green-600 text-white',
-  failed: 'bg-destructive text-destructive-foreground',
+const BEAT_COLORS: Record<string, string> = {
+  hook: 'bg-amber-500',
+  problem: 'bg-red-500',
+  agitation: 'bg-orange-500',
+  solution: 'bg-emerald-500',
+  proof: 'bg-blue-500',
+  cta: 'bg-violet-500',
 }
 
-export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps) {
+const STATUS_STEPS = [
+  { status: 'generating_video', label: 'Vidéo', icon: Video, color: 'text-blue-500' },
+  { status: 'generating_voice', label: 'Voix', icon: Mic, color: 'text-violet-500' },
+  { status: 'generating_ambient', label: 'Ambiance', icon: Music, color: 'text-fuchsia-500' },
+]
+
+export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step6GenerateProps) {
   const { getActorById } = useActors()
   const { generating, progress, generateAllClips, regenerateSingleClip, cancel, getOverallProgress } = useVideoGeneration()
   const { saveCampaign, saving } = useCampaignCreation()
   
-  const [generatedClips, setGeneratedClips] = useState<CampaignClip[]>([])
-  const [campaignId, setCampaignId] = useState<string | null>(null)
-  const [started, setStarted] = useState(false)
-  const [expandedClip, setExpandedClip] = useState<number | null>(null)
-
   const actor = state.actor_id ? getActorById(state.actor_id) : undefined
   const preset = state.preset_id ? getPresetById(state.preset_id) : undefined
   const clips = state.generated_clips || []
+  
+  // Vérifier si des vidéos ont déjà été générées (clips avec raw_url)
+  const hasExistingVideos = clips.some(c => c.video?.raw_url)
+  
+  // Initialiser avec les clips existants s'ils ont des vidéos
+  const [generatedClips, setGeneratedClips] = useState<CampaignClip[]>(() => {
+    return hasExistingVideos ? clips : []
+  })
+  const [campaignId, setCampaignId] = useState<string | null>(null)
+  const [started, setStarted] = useState(hasExistingVideos) // Déjà "started" si on a des vidéos
+  const [fullscreenVideo, setFullscreenVideo] = useState<string | null>(null)
+  
+  // Modal de confirmation pour régénération
+  const [confirmRegen, setConfirmRegen] = useState<{
+    clipIndex: number
+    what: RegenerateWhat
+    label: string
+    warning?: string
+  } | null>(null)
 
   const handleStartGeneration = async () => {
     if (!actor || !preset || clips.length === 0) return
@@ -59,21 +79,46 @@ export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps)
     const tempCampaignId = `temp-${Date.now()}`
     setCampaignId(tempCampaignId)
 
+    // Filtrer les clips qui n'ont pas encore de vidéo générée
+    const clipsWithoutVideo = clips.filter(c => !c.video?.raw_url)
+    
+    // ⚠️ MODE TEST : Génère uniquement le premier clip sans vidéo
+    const clipsToGenerate = clipsWithoutVideo.slice(0, 1) // TODO: retirer .slice(0, 1) pour générer tous les clips
+    console.log('🧪 MODE TEST: Génération du premier clip uniquement', clipsToGenerate.length)
+
+    if (clipsToGenerate.length === 0) {
+      console.log('Tous les clips ont déjà des vidéos')
+      return
+    }
+
     const results = await generateAllClips(
-      clips,
+      clipsToGenerate,
       actor,
       tempCampaignId,
       preset.ambient_audio.prompt,
       preset.id
     )
 
-    setGeneratedClips(results)
+    // Fusionner avec les clips existants - on utilise l'order comme clé unique
+    // IMPORTANT: On ne compare pas les id car ils peuvent être undefined
+    const updatedClips = clips.map((clip, index) => {
+      // Chercher par order (qui est unique et défini par Claude)
+      const generated = results.find(r => r.order !== undefined && clip.order !== undefined && r.order === clip.order)
+      return generated || clip
+    })
+
+    setGeneratedClips(updatedClips)
+    onClipsUpdate(updatedClips) // Sauvegarder dans le state parent
   }
 
-  const handleRegenerateAsset = async (clipIndex: number, what: RegenerateWhat) => {
-    if (!actor || !preset) return
+  const handleConfirmRegenerate = async () => {
+    if (!confirmRegen || !actor || !preset) return
 
+    const { clipIndex, what } = confirmRegen
     const clipToRegenerate = generatedClips[clipIndex] || clips[clipIndex]
+    
+    setConfirmRegen(null)
+    
     const result = await regenerateSingleClip(
       clipToRegenerate,
       actor,
@@ -84,27 +129,27 @@ export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps)
     )
 
     if (result) {
-      setGeneratedClips(prev => {
-        const newClips = [...prev]
-        newClips[clipIndex] = result
-        return newClips
-      })
+      const updatedClips = [...generatedClips]
+      updatedClips[clipIndex] = result
+      setGeneratedClips(updatedClips)
+      onClipsUpdate(updatedClips) // Sauvegarder dans le state parent
     }
   }
 
-  const handleVolumeChange = (clipIndex: number, type: 'voice' | 'ambient', value: number) => {
-    setGeneratedClips(prev => {
-      const newClips = [...prev]
-      if (newClips[clipIndex]) {
-        newClips[clipIndex] = {
-          ...newClips[clipIndex],
-          audio: {
-            ...newClips[clipIndex].audio,
-            [type === 'voice' ? 'voice_volume' : 'ambient_volume']: value,
-          }
-        }
-      }
-      return newClips
+  const askRegenerate = (clipIndex: number, what: RegenerateWhat) => {
+    const labels: Record<RegenerateWhat, string> = {
+      video: 'la vidéo',
+      voice: 'la voix',
+      ambient: 'l\'ambiance',
+      frame: 'l\'image',
+      all: 'tout',
+    }
+    
+    setConfirmRegen({
+      clipIndex,
+      what,
+      label: labels[what],
+      warning: what === 'video' ? '⚠️ Coûteux (~1-2€)' : undefined
     })
   }
 
@@ -114,65 +159,74 @@ export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps)
     }
   }
 
+  // Nombre de clips avec vidéo générée
+  const clipsWithVideo = generatedClips.filter(c => c.video?.raw_url).length
+  const allClipsHaveVideo = clipsWithVideo === clips.length && clips.length > 0
+  
   const allCompleted = generatedClips.length > 0 && 
     generatedClips.every(c => c.status === 'completed')
 
   const hasFailures = generatedClips.some(c => c.status === 'failed')
+  
+  // Clips restants à générer
+  const remainingClips = clips.length - clipsWithVideo
+
+  const getClipStatus = (index: number): ClipStatus => {
+    const clipProgress = progress[clips[index]?.id || `clip-${clips[index]?.order}`]
+    // Si on a une vidéo générée, c'est completed
+    const hasVideo = generatedClips[index]?.video?.raw_url || clips[index]?.video?.raw_url
+    if (hasVideo && !clipProgress) return 'completed'
+    return clipProgress?.status || generatedClips[index]?.status || 'pending'
+  }
+
+  const getCurrentStep = (status: ClipStatus): number => {
+    if (status === 'generating_video') return 0
+    if (status === 'generating_voice') return 1
+    if (status === 'generating_ambient') return 2
+    if (status === 'completed') return 3
+    return -1
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="text-center max-w-lg mx-auto">
-        <h2 className="text-2xl font-semibold tracking-tight">Génération en cours</h2>
-        <p className="text-muted-foreground mt-2">
+        <h2 className="text-3xl font-semibold tracking-tight">
+          {!started ? 'Génération des vidéos' : generating ? 'Génération en cours...' : allCompleted ? '🎉 Vidéos prêtes !' : 'Génération terminée'}
+        </h2>
+        <p className="text-muted-foreground mt-3 text-lg">
           {!started 
-            ? 'Prêt à générer tes vidéos UGC' 
+            ? `${clips.length} clips à générer` 
             : generating 
-              ? 'Les vidéos sont en cours de génération...'
-              : allCompleted
-                ? '🎉 Toutes les vidéos sont prêtes !'
-                : hasFailures
-                  ? 'Certains clips ont échoué. Tu peux les régénérer.'
-                  : 'Génération terminée'
+              ? 'Cela peut prendre quelques minutes...'
+              : hasFailures
+                ? 'Certains clips ont échoué'
+                : 'Tu peux prévisualiser et ajuster tes vidéos'
           }
         </p>
       </div>
 
-      {/* Not started state */}
-      {!started && (
+      {/* Not started state - seulement si aucune vidéo n'existe */}
+      {!started && !hasExistingVideos && (
         <Card className="rounded-2xl">
-          <CardContent className="p-10 text-center">
-            <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-muted flex items-center justify-center">
-              <span className="text-4xl">🎬</span>
+          <CardContent className="p-12 text-center">
+            <div className="w-24 h-24 mx-auto mb-8 rounded-2xl bg-muted flex items-center justify-center">
+              <span className="text-5xl">🎬</span>
             </div>
-            <h3 className="text-xl font-semibold mb-2">
+            <h3 className="text-2xl font-semibold mb-3">
               Prêt à générer {clips.length} clips
             </h3>
-            <p className="text-muted-foreground mb-4 max-w-md mx-auto">
-              La génération peut prendre plusieurs minutes.
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+              Chaque clip passe par : Vidéo → Voix → Ambiance
             </p>
             
-            {/* Pipeline explanation */}
-            <div className="text-left bg-muted/50 rounded-xl p-4 mb-8 max-w-md mx-auto">
-              <p className="text-sm font-medium mb-2">Pipeline par clip :</p>
-              <div className="space-y-1 text-xs text-muted-foreground">
-                <p>1️⃣ <span className="text-amber-500">Image</span> — NanoBanana Pro (~0.15€)</p>
-                <p>2️⃣ <span className="text-blue-500">Vidéo</span> — Veo3.1 (~1-2€) ⚠️</p>
-                <p>3️⃣ <span className="text-violet-500">Voix</span> — Chatterbox S2S (~0.02€)</p>
-                <p>4️⃣ <span className="text-fuchsia-500">Ambiance</span> — ElevenLabs (~0.03€)</p>
-              </div>
-              <p className="text-xs text-muted-foreground mt-3 pt-2 border-t border-border">
-                💡 Tu pourras régénérer voix/ambiance sans refaire la vidéo
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button variant="ghost" onClick={onBack} className="h-11 px-5 rounded-xl">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8">
+              <Button variant="ghost" onClick={onBack} className="h-12 px-6 rounded-xl text-base">
                 ← Modifier le plan
               </Button>
               <Button 
                 onClick={handleStartGeneration}
-                className="h-12 px-8 rounded-xl font-medium"
+                className="h-14 px-10 rounded-xl font-medium text-lg"
                 size="lg"
               >
                 🚀 Lancer la génération
@@ -182,196 +236,225 @@ export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps)
         </Card>
       )}
 
-      {/* Generation in progress */}
+      {/* Generation in progress / Completed */}
       {started && (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {/* Overall progress */}
-          <Card className="rounded-xl">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-medium">Progression globale</span>
-                <span className="text-sm text-muted-foreground">
-                  {Math.round(getOverallProgress())}%
-                </span>
-              </div>
-              <Progress value={getOverallProgress()} className="h-2" />
-            </CardContent>
-          </Card>
+          {generating && (
+            <Card className="rounded-xl bg-foreground text-background">
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="font-medium">Progression globale</span>
+                  <span className="opacity-70">
+                    {Math.round(getOverallProgress())}%
+                  </span>
+                </div>
+                <Progress value={getOverallProgress()} className="h-2.5 bg-background/20" />
+              </CardContent>
+            </Card>
+          )}
 
-          {/* Clips progress */}
-          <div className="grid gap-4">
+          {/* Clips grid */}
+          <div className="space-y-5">
             {clips.map((clip, index) => {
-              const clipProgress = progress[clip.id || `clip-${clip.order}`]
               const generatedClip = generatedClips[index]
-              const currentStatus = clipProgress?.status || generatedClip?.status || 'pending'
-              const isExpanded = expandedClip === index
-
+              const currentStatus = getClipStatus(index)
+              const currentStep = getCurrentStep(currentStatus)
+              const clipProgress = progress[clip.id || `clip-${clip.order}`]
+              const isCompleted = currentStatus === 'completed'
+              const isFailed = currentStatus === 'failed'
+              const isGenerating = currentStatus !== 'pending' && currentStatus !== 'completed' && currentStatus !== 'failed'
+              
+              const videoUrl = generatedClip?.video?.raw_url
+              const firstFrameUrl = clip.first_frame?.image_url || state.generated_first_frames?.[index]?.url
+              
               return (
-                <Card key={clip.id || index} className="rounded-xl overflow-hidden">
-                  <CardContent className="p-5">
-                    {/* Header row */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg font-bold text-muted-foreground">
-                          {index + 1}
-                        </span>
-                        <div>
-                          <p className="font-medium text-foreground line-clamp-1">
-                            {clip.script.text.slice(0, 50)}...
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {clip.video.duration}s • {clip.beat.toUpperCase()}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <Badge className={STATUS_COLORS[currentStatus]}>
-                          {STATUS_LABELS[currentStatus]}
-                        </Badge>
-                        
-                        {currentStatus === 'completed' && !generating && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => setExpandedClip(isExpanded ? null : index)}
+                <Card 
+                  key={clip.id || index} 
+                  className={`rounded-2xl overflow-hidden transition-all ${
+                    isCompleted ? 'ring-2 ring-green-500/30' : 
+                    isFailed ? 'ring-2 ring-red-500/30' : ''
+                  }`}
+                >
+                  <div className="flex">
+                    {/* Left: Video/Image Preview - Sans padding */}
+                    <div className="w-40 flex-shrink-0 relative group">
+                      {videoUrl ? (
+                        <>
+                          <video 
+                            src={videoUrl} 
+                            className="w-full h-full object-cover"
+                            controls
+                            poster={firstFrameUrl}
+                          />
+                          {/* Bouton plein écran */}
+                          <button
+                            onClick={() => setFullscreenVideo(videoUrl)}
+                            className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                           >
-                            {isExpanded ? '▲' : '▼'}
-                          </Button>
-                        )}
-                      </div>
+                            <Maximize2 className="w-3.5 h-3.5 text-white" />
+                          </button>
+                        </>
+                      ) : firstFrameUrl ? (
+                        <>
+                          <img 
+                            src={firstFrameUrl} 
+                            alt={`Clip ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                          {isGenerating && (
+                            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
+                              <Loader2 className="w-8 h-8 animate-spin text-white mb-2" />
+                              <span className="text-white text-xs font-medium">
+                                {currentStatus === 'generating_video' ? 'Vidéo...' : 
+                                 currentStatus === 'generating_voice' ? 'Voix...' : 
+                                 currentStatus === 'generating_ambient' ? 'Ambiance...' : ''}
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="w-full h-full min-h-[120px] flex items-center justify-center bg-muted">
+                          <Play className="w-8 h-8 text-muted-foreground" />
+                        </div>
+                      )}
+                      
+                      {/* Badge Completed */}
+                      {isCompleted && (
+                        <div className="absolute top-2 right-2 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                          <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Progress bar during generation */}
-                    {clipProgress && !['completed', 'failed'].includes(clipProgress.status) && (
-                      <div className="mt-3">
-                        <Progress value={clipProgress.progress} className="h-1" />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {clipProgress.message}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Failed state */}
-                    {currentStatus === 'failed' && !generating && (
-                      <div className="mt-3 flex items-center gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleRegenerateAsset(index, 'all')}
-                        >
-                          🔄 Tout régénérer
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* Expanded view for completed clips */}
-                    {isExpanded && generatedClip && (
-                      <div className="mt-4 pt-4 border-t border-border space-y-4">
-                        {/* Video preview */}
-                        {generatedClip.video?.raw_url && (
-                          <div className="rounded-lg overflow-hidden bg-muted aspect-video">
-                            <video 
-                              src={generatedClip.video.raw_url} 
-                              className="w-full h-full object-cover"
-                              controls
-                            />
-                          </div>
-                        )}
-
-                        {/* Audio controls */}
-                        <div className="grid grid-cols-2 gap-4">
-                          {/* Voice volume */}
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-medium">🎙️ Voix</span>
-                              <span className="text-xs text-muted-foreground">
-                                {generatedClip.audio?.voice_volume ?? 100}%
-                              </span>
+                    {/* Right: Content */}
+                    <div className="flex-1 p-4 flex flex-col">
+                      {/* Header */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="w-7 h-7 rounded-full bg-foreground text-background flex items-center justify-center font-bold text-sm">
+                              {index + 1}
+                            </span>
+                            <Badge className={`${BEAT_COLORS[clip.beat]} text-white text-xs px-2 py-0.5`}>
+                              {BEAT_LABELS[clip.beat]}
+                            </Badge>
+                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                              <Clock className="w-3.5 h-3.5" />
+                              <span>{clip.video.duration}s</span>
                             </div>
-                            <Slider
-                              value={[generatedClip.audio?.voice_volume ?? 100]}
-                              min={0}
-                              max={100}
-                              step={5}
-                              onValueChange={([v]) => handleVolumeChange(index, 'voice', v)}
-                            />
                           </div>
-
-                          {/* Ambient volume */}
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-medium">🎵 Ambiance</span>
-                              <span className="text-xs text-muted-foreground">
-                                {generatedClip.audio?.ambient_volume ?? 20}%
-                              </span>
-                            </div>
-                            <Slider
-                              value={[generatedClip.audio?.ambient_volume ?? 20]}
-                              min={0}
-                              max={50}
-                              step={5}
-                              onValueChange={([v]) => handleVolumeChange(index, 'ambient', v)}
-                            />
-                          </div>
+                          <p className="text-sm text-foreground leading-relaxed">
+                            "{clip.script.text}"
+                          </p>
                         </div>
+                      </div>
 
-                        {/* Regenerate individual assets */}
-                        <div className="flex flex-wrap gap-2 pt-2">
-                          <span className="text-xs text-muted-foreground mr-2">Régénérer :</span>
+                      {/* Generation steps indicator */}
+                      {(isGenerating || isCompleted) && (
+                        <div className="flex items-center gap-4 mb-4">
+                          {STATUS_STEPS.map((step, stepIndex) => {
+                            const StepIcon = step.icon
+                            const isActive = stepIndex === currentStep
+                            const isDone = stepIndex < currentStep || isCompleted
+                            
+                            return (
+                              <div key={step.status} className="flex items-center gap-2">
+                                <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
+                                  isDone ? 'bg-green-500' : 
+                                  isActive ? 'bg-foreground' : 
+                                  'bg-muted'
+                                }`}>
+                                  {isDone ? (
+                                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  ) : isActive ? (
+                                    <Loader2 className="w-4 h-4 text-background animate-spin" />
+                                  ) : (
+                                    <StepIcon className="w-4 h-4 text-muted-foreground" />
+                                  )}
+                                </div>
+                                <span className={`text-sm font-medium ${
+                                  isDone ? 'text-green-600' : 
+                                  isActive ? 'text-foreground' : 
+                                  'text-muted-foreground'
+                                }`}>
+                                  {step.label}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      {/* Progress message */}
+                      {clipProgress && !['completed', 'failed'].includes(clipProgress.status) && (
+                        <div className="mb-4">
+                          <Progress value={clipProgress.progress} className="h-1.5 mb-2" />
+                          <p className="text-sm text-muted-foreground">
+                            {clipProgress.message}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Failed state */}
+                      {isFailed && (
+                        <div className="mb-4">
                           <Button 
-                            variant="outline" 
+                            variant="destructive" 
                             size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => handleRegenerateAsset(index, 'frame')}
+                            className="h-9 text-sm rounded-lg"
+                            onClick={() => askRegenerate(index, 'all')}
                             disabled={generating}
                           >
-                            🖼️ Image
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            className="h-7 text-xs text-orange-500 border-orange-500/30"
-                            onClick={() => handleRegenerateAsset(index, 'video')}
-                            disabled={generating}
-                          >
-                            🎬 Vidéo (coûteux)
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => handleRegenerateAsset(index, 'voice')}
-                            disabled={generating}
-                          >
-                            🎙️ Voix
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => handleRegenerateAsset(index, 'ambient')}
-                            disabled={generating}
-                          >
-                            🎵 Ambiance
+                            🔄 Réessayer tout
                           </Button>
                         </div>
+                      )}
 
-                        {/* Debug: show asset URLs */}
-                        <details className="text-xs text-muted-foreground">
-                          <summary className="cursor-pointer hover:text-foreground">
-                            Assets générés
-                          </summary>
-                          <div className="mt-2 space-y-1 font-mono text-[10px] bg-muted p-2 rounded">
-                            <p>🖼️ Frame: {generatedClip.first_frame?.image_url?.slice(0, 60)}...</p>
-                            <p>🎬 Video: {generatedClip.video?.raw_url?.slice(0, 60)}...</p>
-                            <p>🎙️ Voice: {generatedClip.audio?.transformed_voice_url?.slice(0, 60)}...</p>
-                            <p>🎵 Ambient: {generatedClip.audio?.ambient_url?.slice(0, 60)}...</p>
+                      {/* Completed: Regenerate buttons only */}
+                      {isCompleted && generatedClip && (
+                        <div className="mt-auto pt-4 border-t border-border">
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm text-muted-foreground">Régénérer :</span>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              className="h-9 text-sm px-4 rounded-lg border-orange-500/40 text-orange-600 hover:bg-orange-50 hover:border-orange-500"
+                              onClick={() => askRegenerate(index, 'video')}
+                              disabled={generating}
+                            >
+                              <Video className="w-4 h-4 mr-2" />
+                              Vidéo
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              className="h-9 text-sm px-4 rounded-lg"
+                              onClick={() => askRegenerate(index, 'voice')}
+                              disabled={generating}
+                            >
+                              <Mic className="w-4 h-4 mr-2" />
+                              Voix
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              className="h-9 text-sm px-4 rounded-lg"
+                              onClick={() => askRegenerate(index, 'ambient')}
+                              disabled={generating}
+                            >
+                              <Music className="w-4 h-4 mr-2" />
+                              Ambiance
+                            </Button>
                           </div>
-                        </details>
-                      </div>
-                    )}
-                  </CardContent>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </Card>
               )
             })}
@@ -380,25 +463,74 @@ export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps)
           {/* Actions */}
           <div className="flex items-center justify-between pt-6">
             {generating ? (
-              <Button variant="destructive" onClick={cancel} className="h-11 px-5 rounded-xl">
+              <Button variant="destructive" onClick={cancel} className="h-12 px-6 rounded-xl text-base">
                 ✕ Annuler
               </Button>
             ) : (
-              <Button variant="ghost" onClick={onBack} className="h-11 px-5 rounded-xl">
+              <Button variant="ghost" onClick={onBack} className="h-12 px-6 rounded-xl text-base">
                 ← Retour au plan
               </Button>
             )}
 
-            {allCompleted && (
-              <Button 
-                onClick={handleFinish}
-                disabled={saving}
-                className="h-11 px-6 rounded-xl font-medium bg-green-600 hover:bg-green-500"
-              >
-                {saving ? 'Sauvegarde...' : '✓ Terminer et sauvegarder'}
-              </Button>
-            )}
+            <div className="flex items-center gap-3">
+              {/* Bouton pour continuer la génération si des clips restent */}
+              {!generating && remainingClips > 0 && (
+                <Button 
+                  onClick={handleStartGeneration}
+                  className="h-12 px-6 rounded-xl font-medium text-base"
+                >
+                  🚀 Générer {remainingClips} clip{remainingClips > 1 ? 's' : ''} restant{remainingClips > 1 ? 's' : ''}
+                </Button>
+              )}
+
+              {allCompleted && (
+                <Button 
+                  onClick={handleFinish}
+                  disabled={saving}
+                  className="h-12 px-8 rounded-xl font-medium text-base bg-green-600 hover:bg-green-500"
+                >
+                  {saving ? 'Sauvegarde...' : '✓ Terminer et sauvegarder'}
+                </Button>
+              )}
+            </div>
           </div>
+        </div>
+      )}
+
+      {/* Modal confirmation régénération */}
+      <ConfirmModal
+        isOpen={!!confirmRegen}
+        onCancel={() => setConfirmRegen(null)}
+        onConfirm={handleConfirmRegenerate}
+        title={`Régénérer ${confirmRegen?.label} ?`}
+        message={
+          confirmRegen?.warning 
+            ? `${confirmRegen.warning} — Cette action va régénérer ${confirmRegen.label} du clip.`
+            : `Cette action va régénérer ${confirmRegen?.label || ''} du clip.`
+        }
+        confirmText="Régénérer"
+        variant={confirmRegen?.what === 'video' ? 'danger' : 'warning'}
+      />
+
+      {/* Modal vidéo plein écran */}
+      {fullscreenVideo && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setFullscreenVideo(null)}
+        >
+          <button
+            onClick={() => setFullscreenVideo(null)}
+            className="absolute top-4 right-4 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
+          >
+            <X className="w-6 h-6 text-white" />
+          </button>
+          <video 
+            src={fullscreenVideo} 
+            className="max-h-[90vh] max-w-full rounded-xl"
+            controls
+            autoPlay
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </div>

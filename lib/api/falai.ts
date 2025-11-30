@@ -1,5 +1,5 @@
 // Fal.ai API Client
-// Handles: NanoBanana Pro (first frames), Veo 3.1, Kling, Chatterbox, ElevenLabs
+// Handles: NanoBanana Pro (first frames), Veo 3.1, Chatterbox HD, ElevenLabs v2
 
 const FAL_API_URL = 'https://queue.fal.run'
 
@@ -12,7 +12,8 @@ interface FalRequestOptions {
 interface FalQueueResponse {
   request_id: string
   status: 'IN_QUEUE' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED'
-  response_url?: string
+  response_url: string
+  status_url: string
 }
 
 interface FalStatusResponse {
@@ -51,11 +52,10 @@ async function falRequest<T>({ path, input }: FalRequestOptions): Promise<T> {
   return result
 }
 
-// Check status of a queued request
-async function checkStatus(requestId: string, path: string): Promise<FalStatusResponse> {
+// Check status of a queued request (using the status_url from queue response)
+async function checkStatusByUrl(statusUrl: string): Promise<FalStatusResponse> {
   const FAL_KEY = process.env.FAL_KEY!
   
-  const statusUrl = `${FAL_API_URL}/${path}/requests/${requestId}/status`
   console.log(`[Fal.ai] Checking status: ${statusUrl}`)
   
   const response = await fetch(statusUrl, {
@@ -75,14 +75,13 @@ async function checkStatus(requestId: string, path: string): Promise<FalStatusRe
   return result
 }
 
-// Get result of a completed request
-async function getResult<T>(requestId: string, path: string): Promise<T> {
+// Get result of a completed request (using the response_url from queue response)
+async function getResultByUrl<T>(responseUrl: string): Promise<T> {
   const FAL_KEY = process.env.FAL_KEY!
   
-  const resultUrl = `${FAL_API_URL}/${path}/requests/${requestId}`
-  console.log(`[Fal.ai] Getting result: ${resultUrl}`)
+  console.log(`[Fal.ai] Getting result: ${responseUrl}`)
   
-  const response = await fetch(resultUrl, {
+  const response = await fetch(responseUrl, {
     headers: {
       'Authorization': `Key ${FAL_KEY}`,
     },
@@ -97,18 +96,18 @@ async function getResult<T>(requestId: string, path: string): Promise<T> {
   return response.json()
 }
 
-// Poll until completion
-async function pollUntilComplete<T>(
-  requestId: string, 
-  path: string,
+// Poll until completion using URLs from queue response
+async function pollUntilCompleteWithUrls<T>(
+  statusUrl: string,
+  responseUrl: string,
   maxAttempts = 120,
   intervalMs = 5000
 ): Promise<T> {
   for (let i = 0; i < maxAttempts; i++) {
-    const status = await checkStatus(requestId, path)
+    const status = await checkStatusByUrl(statusUrl)
     
     if (status.status === 'COMPLETED') {
-      return getResult<T>(requestId, path)
+      return getResultByUrl<T>(responseUrl)
     }
     
     if (status.status === 'FAILED') {
@@ -184,16 +183,17 @@ export async function generateFirstFrame(
 }
 
 // ─────────────────────────────────────────────────────────────────
-// VEO 3 - Video Generation
+// VEO 3.1 - Video Generation (Image to Video)
+// Docs: https://fal.ai/models/fal-ai/veo3.1/image-to-video
 // ─────────────────────────────────────────────────────────────────
-interface Veo3Input {
+interface Veo31Input {
   prompt: string
-  image_url?: string
-  duration?: string
-  aspect_ratio?: string
+  image_url: string      // First frame (required for image-to-video)
+  duration?: string      // "5s" | "6s" | "8s"
+  aspect_ratio?: string  // "9:16" for vertical
 }
 
-interface Veo3Output {
+interface Veo31Output {
   video: { url: string }
 }
 
@@ -202,86 +202,35 @@ export async function generateVideoVeo31(
   firstFrameUrl: string,
   duration: 4 | 6 | 8 = 6
 ): Promise<string> {
-  const path = 'fal-ai/veo3'
+  // Utiliser l'endpoint image-to-video de Veo 3.1
+  const path = 'fal-ai/veo3.1/image-to-video'
   
-  const input: Veo3Input = {
+  const input: Veo31Input = {
     prompt,
     image_url: firstFrameUrl,
     duration: `${duration}s`,
     aspect_ratio: '9:16',
   }
 
-  console.log('Generating video with Veo3:', { duration, prompt: prompt.slice(0, 100) + '...' })
+  console.log('[Veo3.1] Generating video:', { 
+    duration, 
+    firstFrameUrl: firstFrameUrl?.slice(0, 80),
+    prompt: prompt.slice(0, 100) + '...' 
+  })
 
-  const queue = await falRequest<FalQueueResponse>({ path, input })
-  const result = await pollUntilComplete<Veo3Output>(queue.request_id, path, 180, 10000)
-  
-  return result.video.url
-}
-
-// ─────────────────────────────────────────────────────────────────
-// KLING - Video Generation 
-// ─────────────────────────────────────────────────────────────────
-interface KlingInput {
-  prompt: string
-  image_url?: string
-  duration?: string
-  aspect_ratio?: string
-}
-
-interface KlingOutput {
-  video: { url: string }
-}
-
-export async function generateVideoKling(
-  prompt: string,
-  firstFrameUrl: string,
-  duration: 5 | 10 = 5
-): Promise<string> {
-  const path = 'fal-ai/kling-video/v1.5/pro/image-to-video'
-  
-  const input: KlingInput = {
-    prompt,
-    image_url: firstFrameUrl,
-    duration: `${duration}`,
-    aspect_ratio: '9:16',
+  if (!firstFrameUrl) {
+    throw new Error('First frame URL is required for Veo3.1 image-to-video')
   }
 
-  console.log('Generating video with Kling:', { duration, prompt: prompt.slice(0, 100) + '...' })
-
   const queue = await falRequest<FalQueueResponse>({ path, input })
-  const result = await pollUntilComplete<KlingOutput>(queue.request_id, path, 180, 10000)
+  const result = await pollUntilCompleteWithUrls<Veo31Output>(
+    queue.status_url, 
+    queue.response_url, 
+    180, 
+    10000
+  )
   
-  return result.video.url
-}
-
-// ─────────────────────────────────────────────────────────────────
-// MINIMAX - Video Generation
-// ─────────────────────────────────────────────────────────────────
-interface MinimaxInput {
-  prompt: string
-  first_frame_image?: string
-}
-
-interface MinimaxOutput {
-  video: { url: string }
-}
-
-export async function generateVideoMinimax(
-  prompt: string,
-  firstFrameUrl: string
-): Promise<string> {
-  const path = 'fal-ai/minimax/video-01-live/image-to-video'
-  
-  const input: MinimaxInput = {
-    prompt,
-    first_frame_image: firstFrameUrl,
-  }
-
-  console.log('Generating video with Minimax:', { prompt: prompt.slice(0, 100) + '...' })
-
-  const queue = await falRequest<FalQueueResponse>({ path, input })
-  const result = await pollUntilComplete<MinimaxOutput>(queue.request_id, path, 180, 10000)
+  console.log('[Veo3.1] Video generated:', result.video?.url?.slice(0, 80))
   
   return result.video.url
 }
@@ -318,17 +267,20 @@ export async function speechToSpeech(
   })
 
   const queue = await falRequest<FalQueueResponse>({ path, input })
-  const result = await pollUntilComplete<ChatterboxS2SOutput>(queue.request_id, path, 120, 5000)
+  const result = await pollUntilCompleteWithUrls<ChatterboxS2SOutput>(queue.status_url, queue.response_url, 120, 5000)
   
   return result.audio.url
 }
 
 // ─────────────────────────────────────────────────────────────────
-// ELEVENLABS - Sound Effects / Ambient Audio
+// ELEVENLABS v2 - Sound Effects / Ambient Audio
+// Docs: https://fal.ai/models/fal-ai/elevenlabs/sound-effects/v2
 // ─────────────────────────────────────────────────────────────────
 interface ElevenLabsSFXInput {
   text: string
   duration_seconds?: number
+  prompt_influence?: number  // 0-1, default 0.3
+  output_format?: string     // default "mp3_44100_128"
 }
 
 interface ElevenLabsSFXOutput {
@@ -339,17 +291,23 @@ export async function generateAmbientAudio(
   description: string,
   durationSeconds: number = 10
 ): Promise<string> {
-  const path = 'fal-ai/elevenlabs/sound-effects'
+  const path = 'fal-ai/elevenlabs/sound-effects/v2'
   
   const input: ElevenLabsSFXInput = {
     text: description,
-    duration_seconds: durationSeconds,
+    duration_seconds: Math.min(durationSeconds, 22), // Max 22s selon la doc
+    prompt_influence: 0.5, // Équilibre entre fidélité au prompt et variation
   }
 
-  console.log('Generating ambient audio:', { description: description.slice(0, 50) + '...' })
+  console.log('[ElevenLabs v2] Generating ambient audio:', { 
+    description: description.slice(0, 50) + '...',
+    duration: durationSeconds 
+  })
 
   const queue = await falRequest<FalQueueResponse>({ path, input })
-  const result = await pollUntilComplete<ElevenLabsSFXOutput>(queue.request_id, path, 60, 3000)
+  const result = await pollUntilCompleteWithUrls<ElevenLabsSFXOutput>(queue.status_url, queue.response_url, 60, 3000)
+  
+  console.log('[ElevenLabs v2] Audio generated:', result.audio?.url?.slice(0, 80))
   
   return result.audio.url
 }

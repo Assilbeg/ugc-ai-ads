@@ -40,43 +40,63 @@ export function useVideoGeneration() {
 
     try {
       // ────────────────────────────────────────────────────────────
-      // ÉTAPE 1 : First Frame (NanoBanana Pro)
+      // ÉTAPE 1 : First Frame - RÉUTILISER SI DÉJÀ GÉNÉRÉ
       // ────────────────────────────────────────────────────────────
-      updateProgress('generating_frame', 10, 'Génération de l\'image...')
+      let frameUrl = clip.first_frame.image_url
       
-      const intentionMedia = presetId && actor.intention_media?.[presetId]
-      const intentionImageUrl = intentionMedia?.image_url
-      
-      const frameResponse = await fetch('/api/generate/first-frame', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          soulImageUrl: actor.soul_image_url,
-          prompt: clip.first_frame.prompt,
-          presetId: presetId,
-          intentionImageUrl: intentionImageUrl,
-          actorId: actor.id,
-        }),
-        signal: abortControllerRef.current?.signal,
-      })
+      if (frameUrl) {
+        // First frame déjà généré à l'étape du plan, on le réutilise !
+        console.log('[Generation] ✓ Réutilisation du first frame existant:', frameUrl.slice(0, 50))
+        updateProgress('generating_frame', 15, 'First frame existant ✓')
+      } else {
+        // Pas de first frame, on le génère
+        updateProgress('generating_frame', 10, 'Génération de l\'image...')
+        
+        const intentionMedia = presetId && actor.intention_media?.[presetId]
+        const intentionImageUrl = intentionMedia?.image_url
+        
+        const frameResponse = await fetch('/api/generate/first-frame', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            soulImageUrl: actor.soul_image_url,
+            prompt: clip.first_frame.prompt,
+            presetId: presetId,
+            intentionImageUrl: intentionImageUrl,
+            actorId: actor.id,
+          }),
+          signal: abortControllerRef.current?.signal,
+        })
 
-      if (!frameResponse.ok) {
-        const err = await frameResponse.json()
-        throw new Error(err.error || 'Erreur génération image')
+        if (!frameResponse.ok) {
+          const err = await frameResponse.json()
+          throw new Error(err.error || 'Erreur génération image')
+        }
+        const frameData = await frameResponse.json()
+        frameUrl = frameData.url || frameData.imageUrl
       }
-      const frameData = await frameResponse.json()
       
       // ────────────────────────────────────────────────────────────
       // ÉTAPE 2 : Vidéo (Veo3.1) - LE PLUS COÛTEUX
       // ────────────────────────────────────────────────────────────
       updateProgress('generating_video', 25, 'Génération de la vidéo Veo3.1...')
 
+      console.log('[Generation] Video params:', {
+        frameUrl: frameUrl?.slice(0, 80),
+        prompt: clip.video.prompt?.slice(0, 50),
+        duration: clip.video.duration,
+      })
+
+      if (!frameUrl) {
+        throw new Error('First frame URL manquant pour la génération vidéo')
+      }
+
       const videoResponse = await fetch('/api/generate/video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: clip.video.prompt,
-          firstFrameUrl: frameData.url || frameData.imageUrl,
+          firstFrameUrl: frameUrl,
           engine: 'veo3.1',
           duration: clip.video.duration,
         }),
@@ -96,12 +116,23 @@ export function useVideoGeneration() {
       // ────────────────────────────────────────────────────────────
       updateProgress('generating_voice', 60, 'Transformation de la voix...')
 
+      const targetVoiceUrl = actor.voice?.reference_audio_url
+      console.log('[Generation] Voice params:', {
+        sourceAudioUrl: rawVideoUrl?.slice(0, 50),
+        targetVoiceUrl: targetVoiceUrl?.slice(0, 50),
+        actorHasVoice: !!actor.voice,
+      })
+
+      if (!targetVoiceUrl) {
+        throw new Error('L\'acteur n\'a pas de voix de référence configurée')
+      }
+
       const voiceResponse = await fetch('/api/generate/voice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sourceAudioUrl: rawVideoUrl, // Audio de la vidéo Veo3
-          targetVoiceUrl: actor.voice.reference_audio_url, // Voix de l'acteur
+          sourceAudioUrl: rawVideoUrl,
+          targetVoiceUrl: targetVoiceUrl,
         }),
         signal: abortControllerRef.current?.signal,
       })
@@ -142,7 +173,7 @@ export function useVideoGeneration() {
         ...clip,
         first_frame: {
           ...clip.first_frame,
-          image_url: frameData.url || frameData.imageUrl,
+          image_url: frameUrl,
         },
         video: {
           ...clip.video,

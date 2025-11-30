@@ -218,6 +218,27 @@ Pour éviter les erreurs de prononciation des modèles (surtout Veo 3.1) :
 - Si un terme anglais / nom de marque DOIT être dit (demande explicite) :
   Le Script audio reste littéral.
 
+3.3 ACCENT & LANGUE STANDARD (OBLIGATOIRE)
+Tu DOIS adapter l'instruction d'accent selon la langue du brief (champ "language").
+
+MAPPING LANGUE → INSTRUCTION D'ACCENT (à inclure dans CHAQUE video.prompt) :
+
+- "fr" (défaut) : "speaks in standard metropolitan French accent, Parisian pronunciation, clear and neutral, no Quebec/Belgian/Swiss accent"
+- "en-us" : "speaks in standard American English accent, neutral Midwest pronunciation, clear and professional, no regional accent"
+- "en-uk" : "speaks in standard British English accent, RP pronunciation, clear and neutral, no regional accent"
+- "es" : "speaks in standard Castilian Spanish accent, Madrid pronunciation, clear and neutral, no Latin American accent"
+- "es-latam" : "speaks in neutral Latin American Spanish accent, Mexican standard pronunciation, clear, no regional accent"
+- "de" : "speaks in standard High German accent, Hochdeutsch pronunciation, clear and neutral, no Austrian/Swiss accent"
+- "it" : "speaks in standard Italian accent, Tuscan/Roman pronunciation, clear and neutral, no regional dialect"
+- "pt-br" : "speaks in standard Brazilian Portuguese accent, São Paulo pronunciation, clear and neutral, no regional accent"
+- "pt" : "speaks in standard European Portuguese accent, Lisbon pronunciation, clear and neutral, no Brazilian accent"
+- "nl" : "speaks in standard Dutch accent, Randstad pronunciation, clear and neutral, no Belgian Dutch accent"
+
+⚠️ RÈGLE CRITIQUE : 
+- Détecte la langue du brief automatiquement si non spécifiée (utilise "fr" par défaut)
+- L'instruction d'accent DOIT apparaître AVANT le texte du script dans video.prompt
+- Le script lui-même doit être rédigé dans la langue appropriée
+
 ══════════════════════════════════════════════════════════════════
 4. TEMPLATE DE PROMPT VIDÉO SORA 2 / VEO 3.1 (OBLIGATOIRE)
 ══════════════════════════════════════════════════════════════════
@@ -250,7 +271,13 @@ Tu dois rédiger le champ "video.prompt" en suivant STRICTEMENT ce template dans
    - Gestes simples (hand gestures, looking at camera, nodding)
 
 6. Script audio (LITTÉRAL, entre guillemets) :
-   "Le texte exact que l'acteur dit"
+   TOUJOURS commencer par l'instruction d'accent (selon la langue du brief), puis le texte :
+   "[instruction d'accent de la section 3.3]: [Le texte exact que l'acteur dit]"
+   
+   EXEMPLES PAR LANGUE :
+   - FR: "speaks in standard metropolitan French accent, Parisian pronunciation, clear and neutral, no Quebec/Belgian/Swiss accent: Postuler sur LinkedIn m'a jamais rien rapporté"
+   - EN-US: "speaks in standard American English accent, neutral Midwest pronunciation, clear and professional, no regional accent: I've been applying on LinkedIn for months with zero results"
+   - ES: "speaks in standard Castilian Spanish accent, Madrid pronunciation, clear and neutral, no Latin American accent: Llevar tres meses enviando currículums sin conseguir nada"
 
 7. Sound / Background ambiance :
    - Description courte de l'ambiance sonore
@@ -385,7 +412,7 @@ Structure attendue :
       "video": {
         "engine": "veo3.1",
         "duration": 6,
-        "prompt": "Prompt complet suivant le template ci-dessus, avec UGC keywords ADAPTÉS au camera_style et NEGATIVES à la fin.",
+        "prompt": "Prompt complet suivant le template ci-dessus, avec UGC keywords ADAPTÉS au camera_style. IMPORTANT: Dans la section Script audio, toujours inclure 'speaks in standard metropolitan French accent, Parisian pronunciation, no regional accent:' AVANT le texte. Terminer par les NEGATIVES.",
         "camera_style": "handheld_subtle"
       },
       "status": "pending"
@@ -434,6 +461,7 @@ BRIEF CLIENT
 - Audience cible : ${brief.target_audience || 'Non spécifié'}
 - Bénéfices clés : ${brief.key_benefits?.join(', ') || 'Non spécifié'}
 - Durée totale cible : ${brief.target_duration} secondes
+- LANGUE DU SCRIPT : ${brief.language || 'fr'} ← UTILISE L'INSTRUCTION D'ACCENT CORRESPONDANTE (section 3.3)
 
 ⚠️ UTILISE LE PROBLÈME CI-DESSUS pour :
 - Le HOOK : reformule ce problème comme une phrase que la cible se dit ("J'en avais marre de...", "Je galérais à...")

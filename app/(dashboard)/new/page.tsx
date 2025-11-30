@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { NewCampaignState, ProductConfig, CampaignBrief, CampaignClip, GeneratedFirstFrames } from '@/types'
 import { StepIndicator } from '@/components/steps/step-indicator'
@@ -41,9 +41,18 @@ export default function NewCampaignPage() {
   // Récupérer l'acteur sélectionné
   const selectedActor = state.actor_id ? getActorById(state.actor_id) : undefined
 
-  const updateState = (updates: Partial<NewCampaignState>) => {
+  const updateState = useCallback((updates: Partial<NewCampaignState>) => {
     setState(prev => ({ ...prev, ...updates }))
-  }
+  }, [])
+  
+  // Callbacks stables pour éviter les boucles infinies dans les useEffect enfants
+  const handleClipsGenerated = useCallback((clips: CampaignClip[]) => {
+    setState(prev => ({ ...prev, generated_clips: clips }))
+  }, [])
+  
+  const handleFirstFramesUpdate = useCallback((frames: GeneratedFirstFrames) => {
+    setState(prev => ({ ...prev, generated_first_frames: frames }))
+  }, [])
 
   const nextStep = () => {
     if (state.step < 6) {
@@ -132,16 +141,16 @@ export default function NewCampaignPage() {
             actor={selectedActor}
             preset={currentPreset}
             product={state.product}
-            onClipsGenerated={(clips) => updateState({ generated_clips: clips })}
-            onFirstFramesUpdate={(frames) => updateState({ generated_first_frames: frames })}
+            onClipsGenerated={handleClipsGenerated}
+            onFirstFramesUpdate={handleFirstFramesUpdate}
           />
         )
       case 5:
         return (
           <Step5Plan
             state={state}
-            onClipsGenerated={(clips) => updateState({ generated_clips: clips })}
-            onFirstFramesUpdate={(frames) => updateState({ generated_first_frames: frames })}
+            onClipsGenerated={handleClipsGenerated}
+            onFirstFramesUpdate={handleFirstFramesUpdate}
             onNext={nextStep}
             onBack={prevStep}
           />
@@ -150,6 +159,7 @@ export default function NewCampaignPage() {
         return (
           <Step6Generate
             state={state}
+            onClipsUpdate={handleClipsGenerated}
             onComplete={(campaignId) => router.push(`/campaign/${campaignId}`)}
             onBack={prevStep}
           />
