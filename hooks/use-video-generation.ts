@@ -50,7 +50,7 @@ export function useVideoGeneration() {
         updateProgress('generating_frame', 15, 'First frame existant ✓')
       } else {
         // Pas de first frame, on le génère
-        updateProgress('generating_frame', 10, 'Génération de l\'image...')
+        updateProgress('generating_frame', 10, 'Création du premier plan...')
         
         const intentionMedia = presetId && actor.intention_media?.[presetId]
         const intentionImageUrl = intentionMedia?.image_url
@@ -77,9 +77,9 @@ export function useVideoGeneration() {
       }
       
       // ────────────────────────────────────────────────────────────
-      // ÉTAPE 2 : Vidéo (Veo3.1) - LE PLUS COÛTEUX
+      // ÉTAPE 2 : Vidéo - LE PLUS COÛTEUX
       // ────────────────────────────────────────────────────────────
-      updateProgress('generating_video', 25, 'Génération de la vidéo Veo3.1...')
+      updateProgress('generating_video', 25, 'Génération de la vidéo...')
 
       console.log('[Generation] Video params:', {
         frameUrl: frameUrl?.slice(0, 80),

@@ -79,12 +79,26 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     const tempCampaignId = `temp-${Date.now()}`
     setCampaignId(tempCampaignId)
 
+    // Enrichir les clips avec les first frames générées à l'étape Plan
+    const clipsWithFirstFrames = clips.map((clip, index) => {
+      const generatedFrame = state.generated_first_frames?.[index]
+      // Si on a un first frame généré et que le clip n'en a pas encore
+      if (generatedFrame?.url && !clip.first_frame?.image_url) {
+        return {
+          ...clip,
+          first_frame: {
+            ...clip.first_frame,
+            image_url: generatedFrame.url
+          }
+        }
+      }
+      return clip
+    })
+
     // Filtrer les clips qui n'ont pas encore de vidéo générée
-    const clipsWithoutVideo = clips.filter(c => !c.video?.raw_url)
+    const clipsWithoutVideo = clipsWithFirstFrames.filter(c => !c.video?.raw_url)
     
-    // ⚠️ MODE TEST : Génère uniquement le premier clip sans vidéo
-    const clipsToGenerate = clipsWithoutVideo.slice(0, 1) // TODO: retirer .slice(0, 1) pour générer tous les clips
-    console.log('🧪 MODE TEST: Génération du premier clip uniquement', clipsToGenerate.length)
+    const clipsToGenerate = clipsWithoutVideo
 
     if (clipsToGenerate.length === 0) {
       console.log('Tous les clips ont déjà des vidéos')
@@ -101,7 +115,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
 
     // Fusionner avec les clips existants - on utilise l'order comme clé unique
     // IMPORTANT: On ne compare pas les id car ils peuvent être undefined
-    const updatedClips = clips.map((clip, index) => {
+    const updatedClips = clipsWithFirstFrames.map((clip, index) => {
       // Chercher par order (qui est unique et défini par Claude)
       const generated = results.find(r => r.order !== undefined && clip.order !== undefined && r.order === clip.order)
       return generated || clip
@@ -269,68 +283,70 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
               const firstFrameUrl = clip.first_frame?.image_url || state.generated_first_frames?.[index]?.url
               
               return (
-                <Card 
+                <div 
                   key={clip.id || index} 
-                  className={`rounded-2xl overflow-hidden transition-all ${
+                  className={`rounded-2xl overflow-hidden border bg-card transition-all grid grid-cols-[160px_1fr] ${
                     isCompleted ? 'ring-2 ring-green-500/30' : 
                     isFailed ? 'ring-2 ring-red-500/30' : ''
                   }`}
                 >
-                  <div className="flex">
-                    {/* Left: Video/Image Preview - Sans padding */}
-                    <div className="w-40 flex-shrink-0 relative group">
-                      {videoUrl ? (
-                        <>
-                          <video 
-                            src={videoUrl} 
-                            className="w-full h-full object-cover"
-                            controls
-                            poster={firstFrameUrl}
-                          />
-                          {/* Bouton plein écran */}
-                          <button
-                            onClick={() => setFullscreenVideo(videoUrl)}
-                            className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <Maximize2 className="w-3.5 h-3.5 text-white" />
-                          </button>
-                        </>
-                      ) : firstFrameUrl ? (
-                        <>
-                          <img 
-                            src={firstFrameUrl} 
-                            alt={`Clip ${index + 1}`}
-                            className="w-full h-full object-cover"
-                          />
-                          {isGenerating && (
-                            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
-                              <Loader2 className="w-8 h-8 animate-spin text-white mb-2" />
-                              <span className="text-white text-xs font-medium">
-                                {currentStatus === 'generating_video' ? 'Vidéo...' : 
-                                 currentStatus === 'generating_voice' ? 'Voix...' : 
-                                 currentStatus === 'generating_ambient' ? 'Ambiance...' : ''}
-                              </span>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <div className="w-full h-full min-h-[120px] flex items-center justify-center bg-muted">
-                          <Play className="w-8 h-8 text-muted-foreground" />
-                        </div>
-                      )}
-                      
-                      {/* Badge Completed */}
-                      {isCompleted && (
-                        <div className="absolute top-2 right-2 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                          <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                      )}
-                    </div>
+                  {/* Left: Video/Image - Collé aux bords, pas de padding */}
+                  <div className="relative group bg-black">
+                    {videoUrl ? (
+                      <>
+                        <video 
+                          src={videoUrl} 
+                          className="w-full h-full object-cover"
+                          poster={firstFrameUrl}
+                          autoPlay
+                          muted
+                          loop
+                          playsInline
+                        />
+                        {/* Bouton plein écran au hover */}
+                        <button
+                          onClick={() => setFullscreenVideo(videoUrl)}
+                          className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/30 transition-colors"
+                        >
+                          <Play className="w-10 h-10 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </button>
+                      </>
+                    ) : firstFrameUrl ? (
+                      <>
+                        <img 
+                          src={firstFrameUrl} 
+                          alt={`Clip ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        {isGenerating && (
+                          <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
+                            <Loader2 className="w-8 h-8 animate-spin text-white mb-2" />
+                            <span className="text-white text-xs font-medium">
+                              {currentStatus === 'generating_video' ? 'Vidéo...' : 
+                               currentStatus === 'generating_voice' ? 'Voix...' : 
+                               currentStatus === 'generating_ambient' ? 'Ambiance...' : ''}
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="w-full h-full min-h-[140px] flex items-center justify-center bg-muted">
+                        <Play className="w-8 h-8 text-muted-foreground" />
+                      </div>
+                    )}
+                    
+                    {/* Badge Completed */}
+                    {isCompleted && (
+                      <div className="absolute top-2 right-2 z-10 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                        <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
 
                     {/* Right: Content */}
-                    <div className="flex-1 p-4 flex flex-col">
+                    <div className="p-4 flex flex-col">
                       {/* Header */}
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1">
@@ -454,8 +470,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                         </div>
                       )}
                     </div>
-                  </div>
-                </Card>
+                </div>
               )
             })}
           </div>
