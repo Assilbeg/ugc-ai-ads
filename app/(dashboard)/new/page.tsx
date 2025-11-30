@@ -10,6 +10,7 @@ import { Step3Preset } from '@/components/steps/step3-preset'
 import { Step4Brief } from '@/components/steps/step4-brief'
 import { Step5Plan } from '@/components/steps/step5-plan'
 import { Step6Generate } from '@/components/steps/step6-generate'
+import { useActors } from '@/hooks/use-actors'
 
 const STEPS = [
   { number: 1, title: 'Acteur', description: 'Choisis ton créateur IA' },
@@ -22,11 +23,15 @@ const STEPS = [
 
 export default function NewCampaignPage() {
   const router = useRouter()
+  const { getActorById } = useActors()
   const [state, setState] = useState<NewCampaignState>({
     step: 1,
     product: { has_product: false },
     brief: {},
   })
+  
+  // Récupérer l'acteur sélectionné
+  const selectedActor = state.actor_id ? getActorById(state.actor_id) : undefined
 
   const updateState = (updates: Partial<NewCampaignState>) => {
     setState(prev => ({ ...prev, ...updates }))
@@ -73,6 +78,7 @@ export default function NewCampaignPage() {
         return (
           <Step3Preset
             selectedPresetId={state.preset_id}
+            selectedActor={selectedActor}
             onSelect={(presetId) => updateState({ preset_id: presetId })}
             onNext={nextStep}
             onBack={prevStep}

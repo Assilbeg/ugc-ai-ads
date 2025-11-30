@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { ArrowRight, Sparkles } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -38,25 +38,77 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 p-4">
-      <Card className="w-full max-w-md bg-zinc-900/50 border-zinc-800">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
-            UGC AI Generator
-          </CardTitle>
-          <CardDescription className="text-center text-zinc-400">
-            Connecte-toi pour créer tes pubs UGC
-          </CardDescription>
-        </CardHeader>
-        <form onSubmit={handleLogin}>
-          <CardContent className="space-y-4">
+    <div className="min-h-screen flex bg-background">
+      {/* Left side - Branding */}
+      <div className="hidden lg:flex lg:w-1/2 bg-foreground text-background p-12 flex-col justify-between relative overflow-hidden">
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-foreground via-foreground to-neutral-800" />
+        
+        {/* Decorative elements */}
+        <div className="absolute top-20 right-20 w-72 h-72 bg-white/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-20 left-10 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
+        
+        <div className="relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center">
+              <span className="text-foreground font-bold">U</span>
+            </div>
+            <span className="font-semibold text-xl">UGC AI</span>
+          </div>
+        </div>
+        
+        <div className="relative z-10 space-y-6">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full text-sm backdrop-blur-sm">
+            <Sparkles className="w-4 h-4" />
+            <span>Propulsé par l'IA</span>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-semibold leading-tight tracking-tight">
+            Créez des pubs UGC<br />
+            <span className="text-white/60">en quelques clics</span>
+          </h1>
+          <p className="text-white/60 text-lg max-w-md">
+            Générez des vidéos publicitaires authentiques avec des acteurs virtuels, 
+            optimisées pour TikTok, Instagram et YouTube.
+          </p>
+        </div>
+        
+        <div className="relative z-10 flex items-center gap-6 text-sm text-white/40">
+          <span>© 2024 UGC AI</span>
+          <span>•</span>
+          <span>Tous droits réservés</span>
+        </div>
+      </div>
+
+      {/* Right side - Form */}
+      <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
+        <div className="w-full max-w-sm">
+          {/* Mobile Logo */}
+          <div className="lg:hidden text-center mb-10">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-foreground mb-4">
+              <span className="text-background font-bold text-xl">U</span>
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight">UGC AI</h1>
+          </div>
+
+          <div className="mb-8">
+            <h2 className="text-2xl font-semibold tracking-tight">Connexion</h2>
+            <p className="text-muted-foreground mt-2">
+              Entre tes identifiants pour accéder à ton espace
+            </p>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-5">
             {error && (
-              <div className="p-3 text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg">
+              <div className="p-4 text-sm text-destructive bg-destructive/5 border border-destructive/10 rounded-xl flex items-start gap-3">
+                <div className="w-5 h-5 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-destructive text-xs">!</span>
+                </div>
                 {error}
               </div>
             )}
+            
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-zinc-300">Email</Label>
+              <Label htmlFor="email" className="text-sm font-medium">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -64,11 +116,12 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="bg-zinc-800/50 border-zinc-700 text-white placeholder:text-zinc-500"
+                className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-foreground focus:bg-background transition-all"
               />
             </div>
+            
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-zinc-300">Mot de passe</Label>
+              <Label htmlFor="password" className="text-sm font-medium">Mot de passe</Label>
               <Input
                 id="password"
                 type="password"
@@ -76,28 +129,42 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="bg-zinc-800/50 border-zinc-700 text-white placeholder:text-zinc-500"
+                className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-foreground focus:bg-background transition-all"
               />
             </div>
-          </CardContent>
-          <CardFooter className="flex flex-col space-y-4">
+
             <Button 
               type="submit" 
-              className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500"
+              className="w-full h-12 rounded-xl font-medium text-base group"
               disabled={loading}
             >
-              {loading ? 'Connexion...' : 'Se connecter'}
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Connexion...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  Se connecter
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </span>
+              )}
             </Button>
-            <p className="text-sm text-zinc-400 text-center">
+          </form>
+          
+          <div className="mt-8 pt-6 border-t border-border">
+            <p className="text-sm text-muted-foreground text-center">
               Pas encore de compte ?{' '}
-              <Link href="/register" className="text-violet-400 hover:text-violet-300 underline">
+              <Link href="/register" className="text-foreground font-medium hover:underline underline-offset-4">
                 Créer un compte
               </Link>
             </p>
-          </CardFooter>
-        </form>
-      </Card>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
-

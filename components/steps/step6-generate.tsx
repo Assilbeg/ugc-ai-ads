@@ -66,7 +66,8 @@ export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps)
       clips,
       actor,
       tempCampaignId,
-      preset.ambient_audio.prompt
+      preset.ambient_audio.prompt,
+      preset.id
     )
 
     setGeneratedClips(results)
@@ -81,7 +82,8 @@ export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps)
       actor,
       campaignId || 'temp',
       preset.ambient_audio.prompt,
-      'all'
+      'all',
+      preset.id
     )
 
     if (result) {
@@ -105,8 +107,8 @@ export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps)
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-foreground">Génération en cours</h2>
+      <div className="text-center max-w-lg mx-auto">
+        <h2 className="text-2xl font-semibold tracking-tight">Génération en cours</h2>
         <p className="text-muted-foreground mt-2">
           {!started 
             ? 'Prêt à générer tes vidéos UGC' 
@@ -123,25 +125,25 @@ export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps)
 
       {/* Not started state */}
       {!started && (
-        <Card className="bg-card border-border">
-          <CardContent className="p-8 text-center">
-            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-primary/10 flex items-center justify-center">
+        <Card className="rounded-2xl">
+          <CardContent className="p-10 text-center">
+            <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-muted flex items-center justify-center">
               <span className="text-4xl">🎬</span>
             </div>
-            <h3 className="text-xl font-semibold text-foreground mb-2">
+            <h3 className="text-xl font-semibold mb-2">
               Prêt à générer {clips.length} clips
             </h3>
-            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+            <p className="text-muted-foreground mb-8 max-w-md mx-auto">
               La génération peut prendre plusieurs minutes. 
               Chaque clip passera par : image → vidéo → voix → ambiance.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button variant="ghost" onClick={onBack}>
+              <Button variant="ghost" onClick={onBack} className="h-11 px-5 rounded-xl">
                 ← Modifier le plan
               </Button>
               <Button 
                 onClick={handleStartGeneration}
-                className="bg-primary hover:bg-primary/90"
+                className="h-12 px-8 rounded-xl font-medium"
                 size="lg"
               >
                 🚀 Lancer la génération
@@ -155,10 +157,10 @@ export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps)
       {started && (
         <div className="space-y-4">
           {/* Overall progress */}
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-foreground">
+          <Card className="rounded-xl">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium">
                   Progression globale
                 </span>
                 <span className="text-sm text-muted-foreground">
@@ -179,9 +181,9 @@ export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps)
               return (
                 <Card 
                   key={clip.id || index}
-                  className="bg-card border-border"
+                  className="rounded-xl"
                 >
-                  <CardContent className="p-4">
+                  <CardContent className="p-5">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <span className="text-lg font-bold text-muted-foreground">
@@ -252,13 +254,13 @@ export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps)
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-between pt-4">
+          <div className="flex items-center justify-between pt-6">
             {generating ? (
-              <Button variant="destructive" onClick={cancel}>
+              <Button variant="destructive" onClick={cancel} className="h-11 px-5 rounded-xl">
                 ✕ Annuler
               </Button>
             ) : (
-              <Button variant="ghost" onClick={onBack}>
+              <Button variant="ghost" onClick={onBack} className="h-11 px-5 rounded-xl">
                 ← Retour au plan
               </Button>
             )}
@@ -267,7 +269,7 @@ export function Step6Generate({ state, onComplete, onBack }: Step6GenerateProps)
               <Button 
                 onClick={handleFinish}
                 disabled={saving}
-                className="bg-green-600 hover:bg-green-500"
+                className="h-11 px-6 rounded-xl font-medium bg-green-600 hover:bg-green-500"
               >
                 {saving ? 'Sauvegarde...' : '✓ Terminer et sauvegarder'}
               </Button>

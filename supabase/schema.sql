@@ -19,6 +19,9 @@ CREATE TABLE actors (
   -- voice: { reference_audio_url: string, voice_style: string }
   appearance JSONB NOT NULL DEFAULT '{}',
   -- appearance: { gender, age_range, ethnicity, hair, distinctive_features }
+  intention_media JSONB DEFAULT '{}',
+  -- intention_media: { "preset-id": { image_url: "url", video_url: "url" }, ... }
+  -- Médias de l'acteur pré-générés pour chaque intention/preset
   is_custom BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

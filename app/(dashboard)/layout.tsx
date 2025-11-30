@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { LogoutButton } from '@/components/logout-button'
+import { isAdmin } from '@/lib/admin'
 
 export default async function DashboardLayout({
   children,
@@ -15,32 +16,58 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
+  const userIsAdmin = isAdmin(user.email)
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">U</span>
-            </div>
-            <span className="font-bold text-lg bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
-              UGC AI
-            </span>
-          </Link>
+      <header className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-50">
+        <div className="container mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-8">
+            <Link href="/dashboard" className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-foreground flex items-center justify-center">
+                <span className="text-background font-bold text-sm">U</span>
+              </div>
+              <span className="font-semibold text-lg text-foreground">
+                UGC AI
+              </span>
+            </Link>
+            
+            <nav className="hidden md:flex items-center gap-6">
+              <Link 
+                href="/dashboard" 
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Campagnes
+              </Link>
+              <Link 
+                href="/new" 
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Nouvelle
+              </Link>
+              {userIsAdmin && (
+                <Link 
+                  href="/admin" 
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Admin
+                </Link>
+              )}
+            </nav>
+          </div>
           
           <div className="flex items-center gap-4">
-            <span className="text-sm text-zinc-400">{user.email}</span>
+            <span className="text-sm text-muted-foreground hidden sm:block">{user.email}</span>
             <LogoutButton />
           </div>
         </div>
       </header>
 
       {/* Main content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-6 py-10">
         {children}
       </main>
     </div>
   )
 }
-

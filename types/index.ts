@@ -45,6 +45,27 @@ export type ExpressionType =
   | "confident"
   | "surprised";
 
+export type GestureType =
+  | "neutral"           // Mains naturelles, pas de geste particulier
+  | "pointing_camera"   // Pointe vers la caméra / spectateur
+  | "pointing_self"     // Se pointe elle-même
+  | "open_palm"         // Main ouverte, geste d'explication
+  | "thumbs_up"         // Pouce levé
+  | "counting_fingers"  // Compte sur ses doigts
+  | "holding_product"   // Tient/montre un produit
+  | "showing_phone"     // Montre son téléphone
+  | "thinking_pose"     // Menton sur main, réflexive
+  | "shrug"             // Hausse les épaules (confusion/surprise)
+  | "hand_on_chest"     // Main sur le coeur (sincérité)
+  | "waving";           // Fait coucou
+
+export type SceneModeType = "single_location" | "multi_location";
+
+export type CameraStyleType =
+  | "handheld_shaky"    // Très dynamique, mouvement visible (street hype, FOMO)
+  | "handheld_subtle"   // Légères micro-vibrations naturelles (confession, authentique)
+  | "stable";           // Stable, peu de mouvement (product focus, professionnel)
+
 export type ToneType =
   | "vulnerable"
   | "energetic"
@@ -84,6 +105,11 @@ export interface ActorVoice {
   voice_style: string;
 }
 
+export interface ActorIntentionMedia {
+  image_url?: string;   // Image de l'acteur dans cette intention
+  video_url?: string;   // Vidéo preview de l'acteur dans cette intention
+}
+
 export interface Actor {
   id: string;
   user_id: string;
@@ -94,6 +120,8 @@ export interface Actor {
   appearance: ActorAppearance;
   is_custom: boolean;
   created_at: string;
+  // Médias de l'acteur par intention/preset (image + vidéo)
+  intention_media?: Record<string, ActorIntentionMedia>; // clé = preset_id
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -106,6 +134,12 @@ export interface FirstFrameConfig {
   base_expression: ExpressionType;
   camera_angle: "selfie_front" | "selfie_slight_angle";
   extra_prompt: string;
+  // Configuration multi-lieux
+  scene_mode: SceneModeType;
+  location_by_beat?: Partial<Record<ScriptBeat, LocationType>>; // Si multi_location
+  // Style de caméra
+  camera_style: CameraStyleType;
+  camera_style_by_beat?: Partial<Record<ScriptBeat, CameraStyleType>>; // Override par beat
 }
 
 export interface ScriptConfig {
@@ -161,6 +195,8 @@ export interface ClipFirstFrame {
   prompt: string;
   image_url?: string;
   expression: ExpressionType;
+  gesture: GestureType;           // Geste/pose de l'actrice pour ce clip
+  location: LocationType;         // Lieu spécifique à ce clip
 }
 
 export interface ClipScript {
@@ -173,6 +209,7 @@ export interface ClipVideo {
   duration: 4 | 6 | 8 | 12;
   prompt: string;
   url?: string;
+  camera_style: CameraStyleType; // Style de caméra pour ce clip
 }
 
 export interface ClipAudio {

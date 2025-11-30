@@ -219,14 +219,14 @@ Tu retournes UNIQUEMENT du JSON valide.`,
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">Gestion des Prompts</h1>
-          <p className="text-zinc-400 mt-1">Éditer les prompts système (Claude, NanoBanana, etc.)</p>
+          <h1 className="text-3xl font-semibold tracking-tight">Gestion des Prompts</h1>
+          <p className="text-muted-foreground mt-2">Éditer les prompts système (Claude, NanoBanana, etc.)</p>
         </div>
         {prompts.length === 0 && (
           <Button 
             onClick={initializePrompts}
             disabled={initializing}
-            className="bg-orange-600 hover:bg-orange-500"
+            className="rounded-xl"
           >
             {initializing ? 'Initialisation...' : '📥 Initialiser les prompts'}
           </Button>
@@ -234,9 +234,9 @@ Tu retournes UNIQUEMENT du JSON valide.`,
       </div>
 
       {/* Warning */}
-      <Card className="bg-amber-900/20 border-amber-700">
+      <Card className="bg-amber-50 border-amber-200 rounded-xl">
         <CardContent className="p-4">
-          <p className="text-amber-400 text-sm">
+          <p className="text-amber-800 text-sm">
             ⚠️ <strong>Attention :</strong> Modifier ces prompts affecte directement la qualité des scripts et vidéos générés. 
             Testez toujours après modification.
           </p>
@@ -245,56 +245,56 @@ Tu retournes UNIQUEMENT du JSON valide.`,
 
       {/* Edit Form */}
       {editing && (
-        <Card className="bg-zinc-900/50 border-zinc-800">
+        <Card className="rounded-2xl">
           <CardHeader>
-            <CardTitle className="text-white">Modifier : {editing.name}</CardTitle>
+            <CardTitle>Modifier : {editing.name}</CardTitle>
             <CardDescription>{editing.description}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label className="text-zinc-300">Nom</Label>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Nom</Label>
                 <Input
                   value={form.name}
                   onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
-                  className="bg-zinc-800 border-zinc-700 text-white"
+                  className="h-11 rounded-xl bg-muted/50 border-transparent focus:border-foreground"
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-zinc-300">ID (non modifiable)</Label>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">ID (non modifiable)</Label>
                 <Input
                   value={form.id}
                   disabled
-                  className="bg-zinc-800 border-zinc-700 text-zinc-500"
+                  className="h-11 rounded-xl bg-muted/50 border-transparent"
                 />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-zinc-300">Description</Label>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Description</Label>
               <Input
                 value={form.description}
                 onChange={(e) => setForm(prev => ({ ...prev, description: e.target.value }))}
-                className="bg-zinc-800 border-zinc-700 text-white"
+                className="h-11 rounded-xl bg-muted/50 border-transparent focus:border-foreground"
               />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-zinc-300">Prompt</Label>
-                <span className="text-xs text-zinc-500">
+                <Label className="text-sm font-medium">Prompt</Label>
+                <span className="text-xs text-muted-foreground">
                   {countWords(form.prompt)} mots • {countLines(form.prompt)} lignes
                 </span>
               </div>
               <Textarea
                 value={form.prompt}
                 onChange={(e) => setForm(prev => ({ ...prev, prompt: e.target.value }))}
-                className="bg-zinc-800 border-zinc-700 text-white font-mono text-sm min-h-[400px]"
+                className="font-mono text-sm min-h-[400px] rounded-xl bg-muted/50 border-transparent focus:border-foreground resize-none"
               />
             </div>
-            <div className="flex gap-4">
-              <Button onClick={handleSave} disabled={saving} className="bg-green-600 hover:bg-green-500">
+            <div className="flex gap-4 pt-4">
+              <Button onClick={handleSave} disabled={saving} className="rounded-xl h-11 px-6">
                 {saving ? 'Enregistrement...' : 'Enregistrer'}
               </Button>
-              <Button onClick={cancelEdit} variant="ghost" className="text-zinc-400">
+              <Button onClick={cancelEdit} variant="ghost" className="rounded-xl h-11">
                 Annuler
               </Button>
             </div>
@@ -304,20 +304,20 @@ Tu retournes UNIQUEMENT du JSON valide.`,
 
       {/* Prompts List */}
       {loading ? (
-        <div className="text-center py-12 text-zinc-400">Chargement...</div>
+        <div className="text-center py-12 text-muted-foreground">Chargement...</div>
       ) : prompts.length === 0 ? (
-        <Card className="bg-zinc-900/50 border-zinc-800 border-dashed">
+        <Card className="border-dashed rounded-2xl">
           <CardContent className="py-12 text-center">
-            <p className="text-zinc-400 mb-4">
+            <p className="text-muted-foreground mb-4">
               La table system_prompts n'existe pas encore ou est vide.
             </p>
-            <p className="text-zinc-500 text-sm mb-4">
-              Exécutez d'abord le SQL dans <code className="bg-zinc-800 px-1 rounded">supabase/system_prompts.sql</code>
+            <p className="text-muted-foreground/60 text-sm mb-4">
+              Exécutez d'abord le SQL dans <code className="bg-muted px-2 py-0.5 rounded">supabase/system_prompts.sql</code>
             </p>
             <Button 
               onClick={initializePrompts}
               disabled={initializing}
-              className="bg-orange-600 hover:bg-orange-500"
+              className="rounded-xl"
             >
               {initializing ? 'Initialisation...' : 'Initialiser les prompts'}
             </Button>
@@ -326,13 +326,13 @@ Tu retournes UNIQUEMENT du JSON valide.`,
       ) : (
         <div className="grid gap-6">
           {prompts.map((prompt) => (
-            <Card key={prompt.id} className="bg-zinc-900/50 border-zinc-800">
+            <Card key={prompt.id} className="rounded-2xl hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div>
-                    <CardTitle className="text-white flex items-center gap-2">
+                    <CardTitle className="flex items-center gap-2">
                       {prompt.name}
-                      <Badge variant="secondary" className="bg-zinc-800 text-xs">
+                      <Badge variant="secondary" className="text-xs">
                         {prompt.id}
                       </Badge>
                     </CardTitle>
@@ -342,19 +342,20 @@ Tu retournes UNIQUEMENT du JSON valide.`,
                     onClick={() => startEdit(prompt)}
                     variant="outline"
                     size="sm"
+                    className="rounded-lg"
                   >
                     Éditer
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="bg-zinc-800 rounded-lg p-4 max-h-[200px] overflow-y-auto">
-                  <pre className="text-xs text-zinc-300 whitespace-pre-wrap font-mono">
+                <div className="bg-muted rounded-xl p-4 max-h-[200px] overflow-y-auto">
+                  <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">
                     {prompt.prompt.slice(0, 500)}
                     {prompt.prompt.length > 500 && '...'}
                   </pre>
                 </div>
-                <div className="flex items-center gap-4 mt-3 text-xs text-zinc-500">
+                <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
                   <span>{countWords(prompt.prompt)} mots</span>
                   <span>•</span>
                   <span>{countLines(prompt.prompt)} lignes</span>

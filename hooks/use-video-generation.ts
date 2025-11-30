@@ -20,7 +20,8 @@ export function useVideoGeneration() {
     clip: CampaignClip,
     actor: Actor,
     campaignId: string,
-    ambientPrompt: string
+    ambientPrompt: string,
+    presetId?: string
   ): Promise<CampaignClip | null> => {
     const clipId = clip.id || `clip-${clip.order}`
 
@@ -35,12 +36,18 @@ export function useVideoGeneration() {
       // Step 1: Generate first frame (25%)
       updateProgress('generating_frame', 10, 'Génération de l\'image...')
       
+      // Utiliser l'intention_media si disponible pour cette intention
+      const intentionMedia = presetId && actor.intention_media?.[presetId]
+      const intentionImageUrl = intentionMedia?.image_url
+      
       const frameResponse = await fetch('/api/generate/first-frame', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           soulImageUrl: actor.soul_image_url,
           prompt: clip.first_frame.prompt,
+          presetId: presetId,
+          intentionImageUrl: intentionImageUrl, // Image de l'acteur dans cette intention
         }),
         signal: abortControllerRef.current?.signal,
       })
@@ -132,23 +139,20 @@ export function useVideoGeneration() {
     clips: CampaignClip[],
     actor: Actor,
     campaignId: string,
-    ambientPrompt: string
+    ambientPrompt: string,
+    presetId?: string
   ): Promise<CampaignClip[]> => {
     setGenerating(true)
     setError(null)
     abortControllerRef.current = new AbortController()
 
-    const results: CampaignClip[] = []
+    // Génération parallèle de tous les clips
+    const promises = clips.map(clip => 
+      generateClipAssets(clip, actor, campaignId, ambientPrompt, presetId)
+        .then(result => result || { ...clip, status: 'failed' as const })
+    )
 
-    for (const clip of clips) {
-      const result = await generateClipAssets(clip, actor, campaignId, ambientPrompt)
-      if (result) {
-        results.push(result)
-      } else {
-        // Continue with other clips even if one fails
-        results.push({ ...clip, status: 'failed' })
-      }
-    }
+    const results = await Promise.all(promises)
 
     setGenerating(false)
     return results
@@ -159,7 +163,8 @@ export function useVideoGeneration() {
     actor: Actor,
     campaignId: string,
     ambientPrompt: string,
-    what: 'frame' | 'video' | 'voice' | 'ambient' | 'all'
+    what: 'frame' | 'video' | 'voice' | 'ambient' | 'all',
+    presetId?: string
   ): Promise<CampaignClip | null> => {
     setGenerating(true)
     setError(null)
@@ -168,10 +173,10 @@ export function useVideoGeneration() {
     let result: CampaignClip | null = null
 
     if (what === 'all') {
-      result = await generateClipAssets(clip, actor, campaignId, ambientPrompt)
+      result = await generateClipAssets(clip, actor, campaignId, ambientPrompt, presetId)
     } else {
       // Partial regeneration - TODO: implement individual asset regeneration
-      result = await generateClipAssets(clip, actor, campaignId, ambientPrompt)
+      result = await generateClipAssets(clip, actor, campaignId, ambientPrompt, presetId)
     }
 
     setGenerating(false)

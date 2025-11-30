@@ -191,8 +191,10 @@ Tu dois rédiger le champ "video.prompt" en suivant STRICTEMENT ce template dans
 
 1. Scene Overview (1–2 phrases visuelles simples)
 
-2. UGC Authenticity keywords (TOUJOURS INCLURE) :
-   "vertical 9:16 smartphone selfie, iPhone front camera, handheld micro-jitters, natural lighting, authentic amateur feel, slight grain, casual setting, realistic skin texture, natural imperfections"
+2. UGC Authenticity keywords (ADAPTER AU CAMERA_STYLE) :
+   - handheld_shaky: "vertical 9:16 smartphone selfie, iPhone front camera, noticeable handheld shake, walking movement, dynamic camera, authentic amateur feel, slight grain, realistic skin texture"
+   - handheld_subtle: "vertical 9:16 smartphone selfie, iPhone front camera, subtle micro-jitters, natural handheld feel, authentic amateur vibes, slight grain, casual setting, realistic skin texture"
+   - stable: "vertical 9:16 smartphone selfie, iPhone front camera, steady handheld, minimal movement, stable framing, natural lighting, professional UGC feel, realistic skin texture"
 
 3. Descriptive Scene :
    - Lieu précis (bedroom, kitchen, street, car interior, etc.)
@@ -200,9 +202,12 @@ Tu dois rédiger le champ "video.prompt" en suivant STRICTEMENT ce template dans
    - Posture (sitting on bed, standing, walking, etc.)
    - Lumière (soft warm light, natural daylight, golden hour, etc.)
 
-4. Cinematography :
+4. Cinematography + Camera Style :
    - Cadrage (medium close-up, selfie angle)
-   - Mouvement caméra (static with micro-jitters, slight movement)
+   - Mouvement caméra SELON camera_style :
+     * handheld_shaky: "noticeable handheld shake, walking movement, dynamic unstable camera"
+     * handheld_subtle: "subtle micro-jitters, gentle handheld motion, natural slight movement"
+     * stable: "steady handheld, minimal shake, stable framing throughout"
 
 5. Actions :
    - 2–4 beats synchronisés au script
@@ -236,35 +241,65 @@ Tu décris EN ANGLAIS :
 - Sa posture/position (sitting on bed, standing casually, leaning on counter, walking...)  
 - Son expression (looking excited, thoughtful, confident, curious, vulnerable...)
 - La lumière (soft lamp light, bright morning light, natural daylight, golden hour...)
+- Le GESTE/POSE (pointing at camera, hand on chest, open palm gesture, etc.)
 - Détails d'ambiance optionnels (coffee mug visible, cozy atmosphere, messy bed...)
 
 ══════════════════════════════════════════════════════════════════
-⚠️ RÈGLE CRITIQUE : TOUS LES CLIPS = MÊME FIRST_FRAME.PROMPT ⚠️
+5.1 GESTES / POSES PAR CLIP (OBLIGATOIRE)
 ══════════════════════════════════════════════════════════════════
 
-Chaque image first frame est générée INDÉPENDAMMENT par l'IA.
-L'IA ne voit PAS les autres images - elle n'a AUCUN contexte partagé.
+Chaque clip DOIT avoir un "gesture" cohérent avec le script.
+Tu dois choisir parmi : neutral, pointing_camera, pointing_self, open_palm, thumbs_up, 
+counting_fingers, holding_product, showing_phone, thinking_pose, shrug, hand_on_chest, waving
 
-DONC : Tu DOIS utiliser EXACTEMENT LE MÊME first_frame.prompt pour TOUS les clips.
-Copie-colle le même texte. Seule l'expression peut légèrement varier.
+MAPPING GESTE → SCRIPT :
+- "Stop scroll" / "Écoute" / "Regarde ça" → pointing_camera
+- "J'ai découvert" / "Moi j'ai..." / "Personnellement" → pointing_self
+- "Laisse-moi t'expliquer" / "Voilà pourquoi" → open_palm
+- "3 raisons" / "Premièrement" → counting_fingers
+- "Ce produit" / "Cette app" (avec produit visible) → holding_product ou showing_phone
+- "Franchement" / "Je te jure" / "Sincèrement" → hand_on_chest
+- "Je comprends pas" / "C'est ouf" → shrug
+- "C'est top" / "Je recommande" → thumbs_up
+- "J'y croyais pas" / "Je me demandais" → thinking_pose
+- "Salut" / "Coucou" (début casual) → waving
+- Sinon → neutral
 
-INTERDIT ABSOLUMENT :
-- "In the SAME kitchen" ← L'IA ne sait pas quelle cuisine !
-- "coffee mug STILL visible" ← L'IA ne sait pas ce qui était avant !
-- "SAME morning energy" ← Référence incompréhensible pour l'IA !
+Le geste doit être INTÉGRÉ dans le prompt first_frame :
+EXEMPLE : "pointing at camera with one finger, looking excited"
+EXEMPLE : "hand on chest in sincere gesture, looking vulnerable"
 
-EXEMPLE BON (TOUS LES CLIPS IDENTIQUES) :
-- Clip 1 (HOOK): "In a bright modern kitchen, standing by the counter, looking excited, morning sunlight through window, coffee mug on counter"
-- Clip 2 (SOLUTION): "In a bright modern kitchen, standing by the counter, looking thoughtful, morning sunlight through window, coffee mug on counter"
-- Clip 3 (PROOF): "In a bright modern kitchen, standing by the counter, looking confident, morning sunlight through window, coffee mug on counter"
-- Clip 4 (CTA): "In a bright modern kitchen, standing by the counter, looking excited, morning sunlight through window, coffee mug on counter"
+══════════════════════════════════════════════════════════════════
+5.2 MODE DE SCÈNE : SINGLE vs MULTI LOCATION
+══════════════════════════════════════════════════════════════════
 
-EXEMPLE MAUVAIS (RÉFÉRENCES CASSÉES) :
-- Clip 2: "In the same bright kitchen..." ← NON ! L'IA ne connaît pas "the same"
-- Clip 3: "...coffee mug still visible..." ← NON ! L'IA ne sait pas ce qui était "still"
+Le preset définit un "scene_mode" :
 
-EXEMPLE MAUVAIS (MENTIONNE LES VÊTEMENTS) :
-"...wearing an oversized sweater..." ← NON ! On garde les mêmes vêtements que la photo de référence
+MODE "single_location" (défaut) :
+- TOUS les clips ont le MÊME lieu
+- Tu COPIES le même lieu dans tous les first_frame.prompt
+- Seuls expression et gesture varient
+
+MODE "multi_location" :
+- Chaque beat a un lieu différent (défini par location_by_beat)
+- Tu utilises le lieu approprié pour chaque clip
+- Chaque prompt est autonome (pas de référence aux autres)
+
+⚠️ RÈGLE CRITIQUE : PROMPTS AUTONOMES ⚠️
+Chaque image est générée INDÉPENDAMMENT. L'IA ne voit PAS les autres images.
+INTERDIT :
+- "In the SAME kitchen" ← L'IA ne connaît pas "the same"
+- "coffee mug STILL visible" ← L'IA ne sait pas ce qui était "still"
+
+EXEMPLE SINGLE_LOCATION (tous identiques sauf expression/geste) :
+- Clip 1: "In a bright modern kitchen, pointing at camera, looking excited, morning light"
+- Clip 2: "In a bright modern kitchen, hand on chest, looking thoughtful, morning light"
+- Clip 3: "In a bright modern kitchen, thumbs up, looking confident, morning light"
+
+EXEMPLE MULTI_LOCATION (lieux différents, prompts autonomes) :
+- Clip 1 (bedroom): "In her cozy bedroom, sitting on bed, waving at camera, looking excited, soft lamp light"
+- Clip 2 (street): "On a busy city street, walking, open palm gesture, looking confident, natural daylight"
+- Clip 3 (kitchen): "In a bright kitchen, standing by counter, pointing at self, looking relieved, morning light"
 
 ══════════════════════════════════════════════════════════════════
 6. COHÉRENCE TENUE DANS VIDEO.PROMPT (MULTI-CLIPS)
@@ -303,8 +338,10 @@ Structure attendue :
       "order": 1,
       "beat": "hook",
       "first_frame": {
-        "prompt": "In her cozy bedroom, sitting on her bed looking thoughtful, soft warm lamp light, intimate atmosphere, holding phone in selfie position",
-        "expression": "curious"
+        "prompt": "In her cozy bedroom, sitting on her bed, pointing at camera with one finger, looking curious, soft warm lamp light, intimate atmosphere",
+        "expression": "curious",
+        "gesture": "pointing_camera",
+        "location": "bedroom"
       },
       "script": {
         "text": "Le texte exact à dire, en respectant les règles de prononciation.",
@@ -313,7 +350,8 @@ Structure attendue :
       "video": {
         "engine": "veo3.1",
         "duration": 6,
-        "prompt": "Prompt complet suivant le template ci-dessus, avec UGC keywords et NEGATIVES à la fin."
+        "prompt": "Prompt complet suivant le template ci-dessus, avec UGC keywords ADAPTÉS au camera_style et NEGATIVES à la fin.",
+        "camera_style": "handheld_subtle"
       },
       "status": "pending"
     }
@@ -339,7 +377,15 @@ PRESET D'INTENTION : ${preset.name}
 ════════════════════════════════════════
 - Ton : ${preset.script.tone}
 - Structure narrative : ${preset.script.structure.join(' → ')}
-- Lieu : ${preset.first_frame.location}
+- Mode de scène : ${preset.first_frame.scene_mode || 'single_location'}
+- Lieu par défaut : ${preset.first_frame.location}
+${preset.first_frame.scene_mode === 'multi_location' && preset.first_frame.location_by_beat 
+  ? `- Lieux par beat : ${Object.entries(preset.first_frame.location_by_beat).map(([beat, loc]) => `${beat}=${loc}`).join(', ')}` 
+  : ''}
+- Style caméra : ${preset.first_frame.camera_style || 'handheld_subtle'}
+${preset.first_frame.camera_style_by_beat 
+  ? `- Caméra par beat : ${Object.entries(preset.first_frame.camera_style_by_beat).map(([beat, style]) => `${beat}=${style}`).join(', ')}` 
+  : ''}
 - Posture : ${preset.first_frame.posture}
 - Lumière : ${preset.first_frame.lighting}
 - Expression de base : ${preset.first_frame.base_expression}
@@ -386,7 +432,12 @@ INSTRUCTIONS FINALES
 5. Le prompt first_frame doit décrire l'acteur dans la pose de départ
 6. Le script audio doit respecter les bornes de mots
 7. Le prompt vidéo doit suivre le template avec les NEGATIVES à la fin
-8. CRITIQUE - COHÉRENCE TENUE : Décris la MÊME tenue dans TOUS les clips (y compris le HOOK). Ex: "wearing the same oversized grey sweater" - C'est une vidéo filmée en une session, pas de changement de vêtements !`
+8. CRITIQUE - COHÉRENCE TENUE : Décris la MÊME tenue dans TOUS les clips (y compris le HOOK). Ex: "wearing the same oversized grey sweater" - C'est une vidéo filmée en une session, pas de changement de vêtements !
+9. GESTES OBLIGATOIRES : Chaque clip DOIT avoir un "gesture" cohérent avec ce que dit le script
+10. MODE SCÈNE : ${preset.first_frame.scene_mode === 'multi_location' ? 'MULTI-LIEUX - utilise les lieux définis par beat' : 'LIEU UNIQUE - tous les clips ont le même lieu'}
+11. Chaque first_frame DOIT inclure : prompt, expression, gesture, location
+12. CAMERA STYLE : Utilise "${preset.first_frame.camera_style || 'handheld_subtle'}" par défaut. ${preset.first_frame.camera_style_by_beat ? 'Override par beat si défini.' : ''} Adapte les UGC keywords dans le prompt vidéo.
+13. Chaque video DOIT inclure : engine, duration, prompt, camera_style`
 
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',

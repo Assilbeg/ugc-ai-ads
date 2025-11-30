@@ -14,6 +14,8 @@ export const INTENTION_PRESETS: IntentionPreset[] = [
       base_expression: 'thoughtful',
       camera_angle: 'selfie_front',
       extra_prompt: 'cozy atmosphere, soft shadows, intimate setting, casual home clothes, warm tones',
+      scene_mode: 'single_location',
+      camera_style: 'handheld_subtle',
     },
     script: {
       tone: 'vulnerable',
@@ -48,6 +50,8 @@ export const INTENTION_PRESETS: IntentionPreset[] = [
       base_expression: 'excited',
       camera_angle: 'selfie_front',
       extra_prompt: 'morning light through window, coffee mug visible, fresh awake look, casual morning outfit',
+      scene_mode: 'single_location',
+      camera_style: 'handheld_subtle',
     },
     script: {
       tone: 'energetic',
@@ -82,6 +86,8 @@ export const INTENTION_PRESETS: IntentionPreset[] = [
       base_expression: 'confident',
       camera_angle: 'selfie_slight_angle',
       extra_prompt: 'urban background blurred, casual streetwear, dynamic movement feel, city vibes',
+      scene_mode: 'single_location',
+      camera_style: 'handheld_shaky',
     },
     script: {
       tone: 'urgent',
@@ -116,6 +122,8 @@ export const INTENTION_PRESETS: IntentionPreset[] = [
       base_expression: 'neutral_relaxed',
       camera_angle: 'selfie_front',
       extra_prompt: 'comfortable couch, relaxed posture, home interior visible, casual vibes, cozy lighting',
+      scene_mode: 'single_location',
+      camera_style: 'handheld_subtle',
     },
     script: {
       tone: 'conversational',
@@ -150,6 +158,8 @@ export const INTENTION_PRESETS: IntentionPreset[] = [
       base_expression: 'thoughtful',
       camera_angle: 'selfie_slight_angle',
       extra_prompt: 'car interior visible, seatbelt on, parked car, natural light through windows',
+      scene_mode: 'single_location',
+      camera_style: 'handheld_subtle',
     },
     script: {
       tone: 'conversational',
@@ -184,6 +194,8 @@ export const INTENTION_PRESETS: IntentionPreset[] = [
       base_expression: 'excited',
       camera_angle: 'selfie_front',
       extra_prompt: 'clean background, product packaging visible, good lighting on face and hands, professional setup',
+      scene_mode: 'single_location',
+      camera_style: 'stable',
     },
     script: {
       tone: 'energetic',
@@ -204,6 +216,56 @@ export const INTENTION_PRESETS: IntentionPreset[] = [
     },
     suggested_total_duration: 30,
     suggested_clip_count: 4,
+  },
+  {
+    id: 'story-journey',
+    name: 'Story Journey',
+    slug: 'story-journey',
+    description: 'Narration multi-lieux : tu racontes ton parcours avec le produit à travers différents moments de ta journée',
+    thumbnail_url: '/presets/story-journey.jpg',
+    first_frame: {
+      location: 'bedroom', // Lieu par défaut / premier clip
+      posture: 'sitting_bed',
+      lighting: 'soft_warm',
+      base_expression: 'thoughtful',
+      camera_angle: 'selfie_front',
+      extra_prompt: 'authentic UGC vibes, different locations throughout the day',
+      scene_mode: 'multi_location',
+      location_by_beat: {
+        hook: 'bedroom',           // Réveil, confession matinale
+        problem: 'street_urban',   // En déplacement, stress quotidien
+        solution: 'kitchen',       // Moment de découverte
+        proof: 'living_room',      // Chill, résultats
+        cta: 'bedroom',            // Retour intimité, sincérité
+      },
+      camera_style: 'handheld_subtle',
+      camera_style_by_beat: {
+        hook: 'handheld_subtle',   // Intimité
+        problem: 'handheld_shaky', // Stress, urgence en déplacement
+        solution: 'handheld_subtle',
+        proof: 'stable',           // Crédibilité, résultats
+        cta: 'handheld_subtle',    // Retour sincérité
+      },
+    },
+    script: {
+      tone: 'conversational',
+      structure: ['hook', 'problem', 'solution', 'proof', 'cta'],
+      hook_templates: [
+        'Je dois vous raconter un truc qui m\'est arrivé...',
+        'Laissez-moi vous partager mon parcours avec...',
+        'Avant je galérais vraiment avec ça...',
+      ],
+      cta_templates: [
+        'Si t\'es comme moi, le lien est en bio',
+        'Franchement teste, tu verras la différence',
+      ],
+    },
+    ambient_audio: {
+      prompt: 'varied ambient sounds matching location changes, subtle transitions',
+      intensity: 'moderate',
+    },
+    suggested_total_duration: 45,
+    suggested_clip_count: 5,
   },
 ]
 

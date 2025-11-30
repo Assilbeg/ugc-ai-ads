@@ -1,5 +1,7 @@
 'use client'
 
+import { Check } from 'lucide-react'
+
 interface Step {
   number: number
   title: string
@@ -16,9 +18,9 @@ export function StepIndicator({ steps, currentStep, onStepClick }: StepIndicator
   return (
     <div className="relative">
       {/* Progress line */}
-      <div className="absolute top-5 left-0 right-0 h-0.5 bg-zinc-800">
+      <div className="absolute top-5 left-0 right-0 h-0.5 bg-border">
         <div 
-          className="h-full bg-gradient-to-r from-violet-600 to-fuchsia-600 transition-all duration-500"
+          className="h-full bg-foreground transition-all duration-500"
           style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }}
         />
       </div>
@@ -43,28 +45,26 @@ export function StepIndicator({ steps, currentStep, onStepClick }: StepIndicator
                   w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium
                   transition-all duration-300 border-2
                   ${isCompleted 
-                    ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 border-transparent text-white' 
+                    ? 'bg-foreground border-foreground text-background' 
                     : isCurrent
-                      ? 'bg-zinc-900 border-violet-500 text-violet-400'
-                      : 'bg-zinc-900 border-zinc-700 text-zinc-500'
+                      ? 'bg-background border-foreground text-foreground'
+                      : 'bg-background border-border text-muted-foreground'
                   }
                 `}
               >
                 {isCompleted ? (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
+                  <Check className="w-5 h-5" />
                 ) : (
                   step.number
                 )}
               </div>
 
               {/* Label */}
-              <div className="mt-2 text-center">
-                <div className={`text-sm font-medium ${isCurrent ? 'text-white' : 'text-zinc-500'}`}>
+              <div className="mt-3 text-center">
+                <div className={`text-sm font-medium ${isCurrent ? 'text-foreground' : 'text-muted-foreground'}`}>
                   {step.title}
                 </div>
-                <div className="text-xs text-zinc-600 hidden sm:block">
+                <div className="text-xs text-muted-foreground/60 hidden sm:block mt-0.5">
                   {step.description}
                 </div>
               </div>
@@ -75,4 +75,3 @@ export function StepIndicator({ steps, currentStep, onStepClick }: StepIndicator
     </div>
   )
 }
-

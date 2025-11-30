@@ -43,6 +43,8 @@ export default function AdminPresetsPage() {
       base_expression: 'neutral_relaxed',
       camera_angle: 'selfie_front',
       extra_prompt: '',
+      scene_mode: 'single_location',
+      camera_style: 'handheld_subtle',
     },
     script: {
       tone: 'conversational',
@@ -120,6 +122,8 @@ export default function AdminPresetsPage() {
         base_expression: 'neutral_relaxed',
         camera_angle: 'selfie_front',
         extra_prompt: '',
+        scene_mode: 'single_location',
+        camera_style: 'handheld_subtle',
       },
       script: {
         tone: 'conversational',
@@ -250,8 +254,8 @@ export default function AdminPresetsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">Gestion des Presets</h1>
-          <p className="text-zinc-400 mt-1">Templates d'intention pour les campagnes</p>
+          <h1 className="text-3xl font-semibold tracking-tight">Gestion des Presets</h1>
+          <p className="text-muted-foreground mt-2">Templates d'intention pour les campagnes</p>
         </div>
         <div className="flex gap-2">
           {presets.length === 0 && (
@@ -259,13 +263,13 @@ export default function AdminPresetsPage() {
               onClick={migrateFromCode} 
               disabled={migrating}
               variant="outline"
-              className="border-orange-600 text-orange-400 hover:bg-orange-600/10"
+              className="rounded-xl"
             >
               {migrating ? 'Migration...' : '📥 Importer depuis le code'}
             </Button>
           )}
           {!isNew && !editing && (
-            <Button onClick={startNew} className="bg-fuchsia-600 hover:bg-fuchsia-500">
+            <Button onClick={startNew} className="rounded-xl h-11 px-5">
               + Nouveau preset
             </Button>
           )}
@@ -274,15 +278,15 @@ export default function AdminPresetsPage() {
 
       {/* Edit/New Form */}
       {(isNew || editing) && (
-        <Card className="bg-zinc-900/50 border-zinc-800">
+        <Card className="rounded-2xl">
           <CardHeader>
-            <CardTitle className="text-white">
+            <CardTitle>
               {isNew ? 'Nouveau preset' : `Modifier ${editing?.name}`}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="basic" className="space-y-6">
-              <TabsList className="bg-zinc-800">
+              <TabsList>
                 <TabsTrigger value="basic">Infos de base</TabsTrigger>
                 <TabsTrigger value="visual">Visuel</TabsTrigger>
                 <TabsTrigger value="script">Script</TabsTrigger>
@@ -515,15 +519,15 @@ Clique sur le lien, tu me remercieras"
 
       {/* Presets List */}
       {loading ? (
-        <div className="text-center py-12 text-zinc-400">Chargement...</div>
+        <div className="text-center py-12 text-muted-foreground">Chargement...</div>
       ) : presets.length === 0 ? (
-        <Card className="bg-zinc-900/50 border-zinc-800 border-dashed">
+        <Card className="border-dashed rounded-2xl">
           <CardContent className="py-12 text-center">
-            <p className="text-zinc-400 mb-4">Aucun preset dans Supabase</p>
+            <p className="text-muted-foreground mb-4">Aucun preset dans Supabase</p>
             <Button 
               onClick={migrateFromCode} 
               disabled={migrating}
-              className="bg-orange-600 hover:bg-orange-500"
+              className="rounded-xl"
             >
               {migrating ? 'Migration...' : '📥 Importer les 6 presets depuis le code'}
             </Button>
@@ -532,23 +536,23 @@ Clique sur le lien, tu me remercieras"
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {presets.map((preset) => (
-            <Card key={preset.id} className="bg-zinc-900/50 border-zinc-800">
+            <Card key={preset.id} className="rounded-2xl hover:shadow-lg transition-shadow">
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between">
-                  <CardTitle className="text-white">{preset.name}</CardTitle>
-                  <Badge variant="secondary" className="bg-zinc-800">
+                  <CardTitle className="text-base font-medium">{preset.name}</CardTitle>
+                  <Badge variant="secondary">
                     {preset.script.tone}
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-zinc-400 mb-3 line-clamp-2">{preset.description}</p>
+                <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{preset.description}</p>
                 <div className="flex flex-wrap gap-1 mb-3">
                   {preset.script.structure.map(beat => (
-                    <Badge key={beat} variant="outline" className="text-xs">{beat}</Badge>
+                    <Badge key={beat} variant="outline" className="text-xs rounded-full">{beat}</Badge>
                   ))}
                 </div>
-                <p className="text-xs text-zinc-500 mb-3">
+                <p className="text-xs text-muted-foreground mb-3">
                   {preset.suggested_total_duration}s • {preset.suggested_clip_count} clips
                 </p>
                 <div className="flex gap-2">
@@ -556,7 +560,7 @@ Clique sur le lien, tu me remercieras"
                     size="sm"
                     variant="outline"
                     onClick={() => startEdit(preset)}
-                    className="text-xs"
+                    className="text-xs rounded-lg"
                   >
                     Éditer
                   </Button>
@@ -564,7 +568,7 @@ Clique sur le lien, tu me remercieras"
                     size="sm"
                     variant="ghost"
                     onClick={() => handleDelete(preset)}
-                    className="text-xs text-red-400 hover:text-red-300"
+                    className="text-xs text-destructive hover:text-destructive/80"
                   >
                     Supprimer
                   </Button>

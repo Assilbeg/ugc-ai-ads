@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Slider } from '@/components/ui/slider'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
+import { ArrowLeft, Sparkles, Check, Clock, Target, Gift, ShoppingBag } from 'lucide-react'
 
 interface Step4BriefProps {
   brief: Partial<CampaignBrief>
@@ -32,8 +32,6 @@ export function Step4Brief({ brief, onChange, onNext, onBack }: Step4BriefProps)
   }
 
   const handleBenefitsChange = (value: string) => {
-    // Stocke comme array avec un seul élément pour garder le texte brut
-    // Le split par virgule sera fait côté API si besoin
     onChange({ ...brief, key_benefits: value ? [value] : [] })
   }
 
@@ -44,97 +42,131 @@ export function Step4Brief({ brief, onChange, onNext, onBack }: Step4BriefProps)
   const canContinue = brief.what_selling && brief.what_selling.length > 10 && brief.target_duration
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-white">Brief rapide</h2>
-        <p className="text-zinc-400 mt-2">
+      <div className="text-center max-w-lg mx-auto">
+        <h2 className="text-2xl font-semibold tracking-tight">Brief rapide</h2>
+        <p className="text-muted-foreground mt-2">
           Décris ton offre pour que l'IA génère le meilleur script
         </p>
       </div>
 
       {/* Brief form */}
-      <div className="max-w-xl mx-auto space-y-6">
+      <div className="max-w-2xl mx-auto space-y-6">
         {/* What are you selling */}
-        <div className="space-y-2">
-          <Label className="text-zinc-300 text-base">
-            Qu'est-ce que tu vends ? <span className="text-red-400">*</span>
-          </Label>
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-foreground/5 flex items-center justify-center">
+              <ShoppingBag className="w-4 h-4 text-foreground/70" />
+            </div>
+            <Label className="text-base font-medium">
+              Qu'est-ce que tu vends ? <span className="text-destructive">*</span>
+            </Label>
+          </div>
           <Textarea
             placeholder="Ex: Une formation en ligne pour apprendre à coder en Python en 30 jours, idéale pour les débutants qui veulent se reconvertir dans la tech..."
             value={brief.what_selling || ''}
             onChange={(e) => handleWhatSellingChange(e.target.value)}
-            className="bg-zinc-800/50 border-zinc-700 text-white placeholder:text-zinc-500 min-h-[100px]"
+            className="min-h-[140px] rounded-xl border-border bg-background focus:border-foreground focus:ring-1 focus:ring-foreground/20 resize-none text-base"
           />
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-muted-foreground">
             Plus tu es précis, meilleur sera le script généré
           </p>
         </div>
 
-        {/* Target audience (optional) */}
-        <div className="space-y-2">
-          <Label className="text-zinc-300">Audience cible (optionnel)</Label>
-          <Input
-            placeholder="Ex: Freelances, entrepreneurs, étudiants en reconversion..."
-            value={brief.target_audience || ''}
-            onChange={(e) => handleTargetAudienceChange(e.target.value)}
-            className="bg-zinc-800/50 border-zinc-700 text-white placeholder:text-zinc-500"
-          />
-        </div>
+        {/* Two columns for optional fields */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Target audience (optional) */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-foreground/5 flex items-center justify-center">
+                <Target className="w-4 h-4 text-foreground/70" />
+              </div>
+              <Label className="text-base font-medium">Audience cible</Label>
+            </div>
+            <Input
+              placeholder="Freelances, entrepreneurs..."
+              value={brief.target_audience || ''}
+              onChange={(e) => handleTargetAudienceChange(e.target.value)}
+              className="h-12 rounded-xl border-border bg-background focus:border-foreground focus:ring-1 focus:ring-foreground/20 text-base"
+            />
+          </div>
 
-        {/* Key benefits (optional) */}
-        <div className="space-y-2">
-          <Label className="text-zinc-300">Bénéfices clés (optionnel)</Label>
-          <Input
-            placeholder="Ex: Gain de temps, plus de clients, simplicité d'utilisation..."
-            value={brief.key_benefits?.[0] || ''}
-            onChange={(e) => handleBenefitsChange(e.target.value)}
-            className="bg-zinc-800/50 border-zinc-700 text-white placeholder:text-zinc-500"
-          />
+          {/* Key benefits (optional) */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-foreground/5 flex items-center justify-center">
+                <Gift className="w-4 h-4 text-foreground/70" />
+              </div>
+              <Label className="text-base font-medium">Bénéfices clés</Label>
+            </div>
+            <Input
+              placeholder="Gain de temps, simplicité..."
+              value={brief.key_benefits?.[0] || ''}
+              onChange={(e) => handleBenefitsChange(e.target.value)}
+              className="h-12 rounded-xl border-border bg-background focus:border-foreground focus:ring-1 focus:ring-foreground/20 text-base"
+            />
+          </div>
         </div>
 
         {/* Duration selection */}
-        <div className="space-y-4">
-          <Label className="text-zinc-300 text-base">
-            Durée finale souhaitée <span className="text-red-400">*</span>
-          </Label>
+        <div className="space-y-4 pt-2">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-foreground/5 flex items-center justify-center">
+              <Clock className="w-4 h-4 text-foreground/70" />
+            </div>
+            <Label className="text-base font-medium">
+              Durée souhaitée <span className="text-destructive">*</span>
+            </Label>
+          </div>
           <div className="grid grid-cols-4 gap-3">
-            {DURATION_OPTIONS.map((option) => (
-              <Card
-                key={option.value}
-                className={`
-                  cursor-pointer transition-all duration-200
-                  ${brief.target_duration === option.value
-                    ? 'ring-2 ring-violet-500 bg-violet-500/10 border-violet-500'
-                    : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700'
-                  }
-                `}
-                onClick={() => handleDurationChange(option.value as 15 | 30 | 45 | 60)}
-              >
-                <CardContent className="p-4 text-center">
-                  <div className="text-xl font-bold text-white">{option.label}</div>
-                  <div className="text-xs text-zinc-500 mt-1">{option.clips}</div>
-                </CardContent>
-              </Card>
-            ))}
+            {DURATION_OPTIONS.map((option) => {
+              const isSelected = brief.target_duration === option.value
+              return (
+                <Card
+                  key={option.value}
+                  className={`
+                    cursor-pointer transition-all duration-200 rounded-xl p-0 gap-0
+                    ${isSelected
+                      ? 'ring-2 ring-foreground bg-foreground text-background shadow-md'
+                      : 'border-border hover:border-foreground/30 bg-background'
+                    }
+                  `}
+                  onClick={() => handleDurationChange(option.value as 15 | 30 | 45 | 60)}
+                >
+                  <div className="p-4 text-center relative">
+                    <div className="text-2xl font-bold">{option.label}</div>
+                    <div className={`text-xs mt-1 ${isSelected ? 'text-background/70' : 'text-muted-foreground'}`}>
+                      {option.clips}
+                    </div>
+                    {isSelected && (
+                      <div className="absolute top-2 right-2 w-5 h-5 bg-background rounded-full flex items-center justify-center">
+                        <Check className="w-3 h-3 text-foreground" />
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )
+            })}
           </div>
         </div>
       </div>
 
       {/* Navigation buttons */}
-      <div className="flex justify-between max-w-xl mx-auto">
-        <Button variant="ghost" onClick={onBack} className="text-zinc-400 hover:text-white">
-          ← Retour
+      <div className="flex justify-between max-w-2xl mx-auto pt-4">
+        <Button variant="ghost" onClick={onBack} className="h-11 px-5 rounded-xl">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Retour
         </Button>
         <Button
           onClick={onNext}
           disabled={!canContinue}
-          className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 disabled:opacity-50"
+          className="h-11 px-6 rounded-xl font-medium group"
         >
+          <Sparkles className="w-4 h-4 mr-2" />
           Générer le plan
         </Button>
       </div>
     </div>
   )
 }
-
