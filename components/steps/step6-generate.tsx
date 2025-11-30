@@ -73,6 +73,40 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   const [generatedClips, setGeneratedClips] = useState<CampaignClip[]>(() => {
     return hasExistingVideos ? clips : []
   })
+  
+  // Resynchroniser generatedClips quand state.generated_clips change
+  // (ex: quand on revient de step5 avec des first frames modifiées)
+  useEffect(() => {
+    if (clips.length > 0) {
+      // Fusionner les nouvelles données (first frames) avec les vidéos générées existantes
+      const mergedClips = clips.map((clip, index) => {
+        const existingGenerated = generatedClips[index]
+        // Si on a une vidéo générée, garder les données de génération
+        // mais mettre à jour la first frame si elle a changé
+        if (existingGenerated?.video?.raw_url) {
+          return {
+            ...existingGenerated,
+            first_frame: clip.first_frame, // Toujours prendre la first frame la plus récente
+            script: clip.script, // Prendre le script mis à jour aussi
+          }
+        }
+        return clip
+      })
+      
+      // Ne mettre à jour que si quelque chose a changé
+      const hasChanges = mergedClips.some((clip, index) => {
+        const existing = generatedClips[index]
+        return !existing || 
+               clip.first_frame?.image_url !== existing.first_frame?.image_url ||
+               clip.script?.text !== existing.script?.text
+      })
+      
+      if (hasChanges) {
+        console.log('[Step6] Resync clips from state:', mergedClips.length, 'clips')
+        setGeneratedClips(mergedClips)
+      }
+    }
+  }, [clips])
   const [campaignId, setCampaignId] = useState<string | null>(state.campaign_id || null)
   const [started, setStarted] = useState(hasExistingVideos) // Déjà "started" si on a des vidéos
   const [fullscreenVideo, setFullscreenVideo] = useState<string | null>(null)
