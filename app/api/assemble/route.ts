@@ -139,11 +139,13 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('[Assemble] Starting assembly of', clipsToProcess.length, 'clips')
+    console.log('[Assemble] Raw clips data:', JSON.stringify(clipsToProcess, null, 2))
 
     // Traiter chaque clip : upload Cloudinary si nécessaire + appliquer transformations
     const processedClips: { url: string; duration: number; clipOrder: number }[] = []
     
-    for (const clip of clipsToProcess) {
+    for (let i = 0; i < clipsToProcess.length; i++) {
+      const clip = clipsToProcess[i]
       // Déterminer l'URL brute (nouveau ou ancien format)
       const rawUrl = 'rawUrl' in clip ? clip.rawUrl : clip.url
       const trimStart = clip.trimStart ?? 0
@@ -151,12 +153,26 @@ export async function POST(request: NextRequest) {
       const speed = clip.speed ?? 1.0
       const originalDuration = 'originalDuration' in clip ? clip.originalDuration : clip.duration
       
+      console.log(`[Assemble] Clip ${i + 1} analysis:`, {
+        rawUrl: rawUrl?.slice(0, 60),
+        trimStart,
+        trimEnd,
+        originalDuration,
+        speed,
+        finalDuration: clip.duration,
+        hasTrimStartChange: trimStart !== 0,
+        hasTrimEndChange: trimEnd !== originalDuration,
+        hasSpeedChange: speed !== 1.0,
+      })
+      
       // Vérifier si des ajustements sont nécessaires
       const hasAdjustments = (
         trimStart !== 0 ||
         trimEnd !== originalDuration ||
         speed !== 1.0
       )
+      
+      console.log(`[Assemble] Clip ${i + 1} hasAdjustments:`, hasAdjustments)
       
       let finalUrl = rawUrl
       
@@ -172,10 +188,12 @@ export async function POST(request: NextRequest) {
             trimEnd,
             speed
           })
-          console.log(`[Assemble] Clip with adjustments: trim=${trimStart}-${trimEnd}s, speed=${speed}x`)
+          console.log(`[Assemble] Clip ${i + 1} transformed URL:`, finalUrl.slice(0, 100))
         } else {
           console.warn('[Assemble] Cloudinary upload failed, using raw video')
         }
+      } else {
+        console.log(`[Assemble] Clip ${i + 1} no adjustments, using raw URL`)
       }
       
       processedClips.push({

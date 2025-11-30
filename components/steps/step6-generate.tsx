@@ -381,6 +381,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         })
       
       console.log('[Assemble] Total clips:', clipsForAssembly.length)
+      console.log('[Assemble] Adjustments state:', JSON.stringify(adjustments, null, 2))
+      console.log('[Assemble] Clips for assembly:', JSON.stringify(clipsForAssembly, null, 2))
       console.log('[Assemble] Sending to API and waiting for response...')
       
       // 1. Mettre le status à "assembling" AVANT tout
