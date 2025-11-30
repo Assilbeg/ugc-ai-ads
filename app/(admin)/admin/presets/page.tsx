@@ -175,8 +175,8 @@ export default function AdminPresetsPage() {
     }
 
     if (isNew) {
-      const { error } = await supabase
-        .from('intention_presets')
+      const { error } = await (supabase
+        .from('intention_presets') as any)
         .insert(presetData)
 
       if (error) {
@@ -186,8 +186,8 @@ export default function AdminPresetsPage() {
         cancelEdit()
       }
     } else if (editing) {
-      const { error } = await supabase
-        .from('intention_presets')
+      const { error } = await (supabase
+        .from('intention_presets') as any)
         .update(presetData)
         .eq('id', editing.id)
 
@@ -205,8 +205,8 @@ export default function AdminPresetsPage() {
   const handleDelete = async (preset: IntentionPreset) => {
     if (!confirm(`Supprimer le preset "${preset.name}" ?`)) return
 
-    const { error } = await supabase
-      .from('intention_presets')
+    const { error } = await (supabase
+      .from('intention_presets') as any)
       .delete()
       .eq('id', preset.id)
 
