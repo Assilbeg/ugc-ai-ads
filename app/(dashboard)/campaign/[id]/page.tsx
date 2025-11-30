@@ -4,13 +4,16 @@ import { getPresetById } from '@/lib/presets'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { AssemblingAnimation } from './assembling-animation'
 
 interface CampaignPageProps {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ assembling?: string }>
 }
 
-export default async function CampaignPage({ params }: CampaignPageProps) {
+export default async function CampaignPage({ params, searchParams }: CampaignPageProps) {
   const { id } = await params
+  const { assembling: assemblingParam } = await searchParams
   const supabase = await createClient()
 
   // Fetch campaign with clips
@@ -42,7 +45,7 @@ export default async function CampaignPage({ params }: CampaignPageProps) {
   const latestAssembly = assemblies?.[0]
   
   // Utiliser l'URL du dernier assemblage si disponible, sinon celle de la campagne
-  const finalVideoUrl = latestAssembly?.final_video_url || finalVideoUrl
+  const finalVideoUrl = latestAssembly?.final_video_url || campaign.final_video_url
 
   const preset = campaign.preset_id ? getPresetById(campaign.preset_id) : null
   const brief = campaign.brief as { what_selling?: string; target_duration?: number }
@@ -66,6 +69,7 @@ export default async function CampaignPage({ params }: CampaignPageProps) {
   const statusConfig: Record<string, { bg: string; text: string; dot: string }> = {
     draft: { bg: 'bg-zinc-100', text: 'text-zinc-600', dot: 'bg-zinc-400' },
     generating: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500 animate-pulse' },
+    assembling: { bg: 'bg-violet-50', text: 'text-violet-700', dot: 'bg-violet-500 animate-pulse' },
     completed: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
     failed: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' },
   }
@@ -73,11 +77,38 @@ export default async function CampaignPage({ params }: CampaignPageProps) {
   const statusLabels: Record<string, string> = {
     draft: 'Brouillon',
     generating: 'En cours',
+    assembling: 'Assemblage...',
     completed: 'Terminé',
     failed: 'Échec',
   }
 
   const status = statusConfig[campaign.status] || statusConfig.draft
+
+  // Si en cours d'assemblage OU si on vient de cliquer sur "Assembler", afficher l'animation
+  const showAssemblingAnimation = campaign.status === 'assembling' || assemblingParam === '1'
+  
+  if (showAssemblingAnimation) {
+    return (
+      <div className="max-w-6xl mx-auto">
+        <Link 
+          href="/dashboard" 
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Campagnes
+        </Link>
+        
+        <AssemblingAnimation 
+          campaignId={id}
+          title={title}
+          clipCount={clips?.length || 0}
+          presetName={preset?.name}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-6xl mx-auto">

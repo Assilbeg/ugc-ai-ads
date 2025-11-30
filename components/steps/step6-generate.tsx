@@ -203,128 +203,64 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   }, [adjustments, generatedClips, clips, onClipsUpdate])
 
   // Assembler la vidéo finale (applique les ajustements automatiquement)
+  // Redirige IMMÉDIATEMENT et lance l'assemblage en arrière-plan
   const assembleVideo = useCallback(async () => {
     if (!campaignId) return
     
     setAssembling(true)
     
     try {
-      // Construire les clips avec durées et ajustements pour l'assemblage
-      interface ClipForAssembly {
-        url: string
-        duration: number
-        clipOrder: number
-        trimStart: number
-        trimEnd: number
-        speed: number
-        cloudinaryId?: string
-      }
-      const clipsForAssembly: ClipForAssembly[] = []
-      
-      for (let index = 0; index < generatedClips.length; index++) {
-        const clip = generatedClips[index]
-        const adj = adjustments[index]
-        
-        if (!clip?.video?.raw_url) continue
-        
-        // Valeurs par défaut
-        const trimStart = adj?.trimStart ?? 0
-        const trimEnd = adj?.trimEnd ?? clip.video.duration
-        const speed = adj?.speed ?? 1.0
-        
-        // Vérifier si des ajustements ont été faits
-        const hasAdjustments = (
-          trimStart !== 0 ||
-          trimEnd !== clip.video.duration ||
-          speed !== 1.0
-        )
-        
-        let url = clip.video.raw_url
-        let cloudinaryId = adj?.cloudinaryId
-        
-        // Calculer la durée ajustée
-        const trimmedDuration = trimEnd - trimStart
-        const duration = trimmedDuration / speed
-        
-        if (hasAdjustments) {
-          // Upload vers Cloudinary si pas encore fait
-          if (!cloudinaryId) {
-            console.log(`[Assemble] Uploading clip ${index + 1} to Cloudinary for transformations...`)
-            try {
-              const uploadResponse = await fetch('/api/cloudinary/upload', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ videoUrl: clip.video.raw_url })
-              })
-              
-              if (uploadResponse.ok) {
-                const uploadData = await uploadResponse.json()
-                cloudinaryId = uploadData.publicId
-                console.log(`[Assemble] Clip ${index + 1} uploaded:`, cloudinaryId)
-                
-                // Sauvegarder le cloudinaryId pour éviter de re-uploader
-                setAdjustments(prev => ({
-                  ...prev,
-                  [index]: { ...prev[index], cloudinaryId }
-                }))
-              } else {
-                const errorData = await uploadResponse.text()
-                console.error(`[Assemble] Failed to upload clip ${index + 1}:`, errorData)
-              }
-            } catch (uploadErr) {
-              console.error(`[Assemble] Upload error for clip ${index + 1}:`, uploadErr)
-            }
-          }
+      // Préparer les données RAPIDEMENT (sans upload Cloudinary ici)
+      // L'API fera les uploads si nécessaire
+      const clipsForAssembly = generatedClips
+        .filter(clip => clip?.video?.raw_url)
+        .map((clip, index) => {
+          const adj = adjustments[index]
+          const trimStart = adj?.trimStart ?? 0
+          const trimEnd = adj?.trimEnd ?? clip.video.duration
+          const speed = adj?.speed ?? 1.0
+          const trimmedDuration = trimEnd - trimStart
+          const duration = trimmedDuration / speed
           
-          // Construire l'URL avec transformations si on a un cloudinaryId
-          if (cloudinaryId) {
-            const cloudinaryUrl = `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/video/upload/${cloudinaryId}.mp4`
-            url = buildPreviewUrl(cloudinaryUrl, {
-              trimStart,
-              trimEnd,
-              speed
-            })
-            console.log(`[Assemble] Clip ${index + 1} with adjustments: trim=${trimStart}-${trimEnd}s, speed=${speed}x`)
-          } else {
-            console.warn(`[Assemble] Clip ${index + 1} has adjustments but Cloudinary upload failed, using raw video`)
+          return {
+            rawUrl: clip.video.raw_url, // URL brute (l'API uploadera si besoin)
+            duration,
+            clipOrder: clip.order,
+            trimStart,
+            trimEnd,
+            speed,
+            cloudinaryId: adj?.cloudinaryId, // Peut être undefined
+            originalDuration: clip.video.duration,
           }
-        }
-        
-        clipsForAssembly.push({ 
-          url, 
-          duration,
-          clipOrder: clip.order,
-          trimStart,
-          trimEnd,
-          speed,
-          cloudinaryId
         })
-      }
       
-      console.log('[Assemble] Final clips:', clipsForAssembly.length, 'clips ready')
+      // 1. Mettre le status à "assembling" AVANT de rediriger (await nécessaire!)
+      await (supabase.from('campaigns') as any)
+        .update({ status: 'assembling' })
+        .eq('id', campaignId)
       
-      const response = await fetch('/api/assemble', {
+      // 2. Rediriger vers la page campagne avec le flag assembling
+      // Le query param force l'affichage de l'animation même si le status n'est pas encore à jour
+      window.location.href = `/campaign/${campaignId}?assembling=1`
+      
+      // 3. Lancer l'assemblage en arrière-plan (sans await)
+      // L'API fera les uploads Cloudinary si nécessaire
+      fetch('/api/assemble', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clips: clipsForAssembly,
           campaignId
         })
+      }).catch(err => {
+        console.error('[Assemble] Background error:', err)
       })
       
-      if (!response.ok) throw new Error('Assemblage failed')
-      
-      const data = await response.json()
-      console.log('[Assemble] Success:', data)
-      
-      // Rediriger immédiatement vers la campagne (l'animation sera sur la page)
-      onComplete(campaignId)
     } catch (err) {
       console.error('Assemble error:', err)
-      setAssembling(false) // Reset seulement en cas d'erreur
+      setAssembling(false)
     }
-    // Note: on ne reset pas setAssembling(false) en cas de succès car on redirige
-  }, [campaignId, generatedClips, adjustments, onComplete])
+  }, [campaignId, generatedClips, adjustments, onComplete, supabase])
 
   // ══════════════════════════════════════════════════════════════
   // SAUVEGARDE AUTOMATIQUE EN BASE
@@ -545,6 +481,21 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       updatedClips[clipIndex] = result
       setGeneratedClips(updatedClips)
       onClipsUpdate(updatedClips) // Sauvegarder dans le state parent
+      
+      // Déclencher la sauvegarde automatique en base
+      setHasNewlyGeneratedClips(true)
+      
+      // Reset les ajustements pour ce clip (la vidéo a changé)
+      setAdjustments(prev => ({
+        ...prev,
+        [clipIndex]: {
+          trimStart: 0,
+          trimEnd: result.video.duration,
+          speed: 1.0,
+          isApplied: false,
+          cloudinaryId: undefined, // Reset le cloudinaryId car nouvelle vidéo
+        }
+      }))
     }
   }
 
@@ -693,6 +644,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                     {videoUrl ? (
                       <>
                         <video 
+                          key={videoUrl} // Force remount when URL changes (after regeneration)
                           src={videoUrl} 
                           className="w-full h-full object-cover"
                           poster={firstFrameUrl}
@@ -1070,6 +1022,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           )}
           
           <video 
+            key={fullscreenVideo} // Force remount when URL changes
             src={fullscreenVideo} 
             className="max-h-[85vh] max-w-full rounded-xl"
             controls

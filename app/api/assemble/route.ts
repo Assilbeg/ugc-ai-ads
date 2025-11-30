@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { buildPreviewUrl } from '@/lib/api/cloudinary'
+import { v2 as cloudinary } from 'cloudinary'
 
 // fal.ai configuration
 const FAL_KEY = process.env.FAL_KEY
+
+// Cloudinary configuration
+cloudinary.config({
+  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+})
 
 interface Keyframe {
   url: string
@@ -26,16 +35,71 @@ interface ComposeOutput {
 }
 
 /**
- * Input pour chaque clip avec ses ajustements
+ * Input pour chaque clip avec ses ajustements (nouveau format)
  */
-interface ClipInput {
-  url: string
+interface ClipInputNew {
+  rawUrl: string          // URL brute de la vidéo
   duration: number        // Durée finale en secondes (après ajustements)
   clipOrder?: number      // Ordre du clip dans la campagne
   trimStart?: number      // Début du trim (secondes)
   trimEnd?: number        // Fin du trim (secondes)
   speed?: number          // Vitesse (0.8 à 1.2)
-  cloudinaryId?: string   // ID Cloudinary si uploadé
+  cloudinaryId?: string   // ID Cloudinary si déjà uploadé
+  originalDuration?: number // Durée originale du clip
+}
+
+/**
+ * Ancien format (compatibilité)
+ */
+interface ClipInputOld {
+  url: string
+  duration: number
+  clipOrder?: number
+  trimStart?: number
+  trimEnd?: number
+  speed?: number
+  cloudinaryId?: string
+}
+
+type ClipInput = ClipInputNew | ClipInputOld
+
+/**
+ * Upload une vidéo vers Cloudinary si nécessaire
+ */
+async function uploadToCloudinaryIfNeeded(
+  rawUrl: string, 
+  cloudinaryId?: string
+): Promise<string | null> {
+  if (cloudinaryId) {
+    return cloudinaryId
+  }
+  
+  try {
+    console.log('[Assemble] Uploading to Cloudinary:', rawUrl.slice(0, 50))
+    const result = await cloudinary.uploader.upload(rawUrl, {
+      resource_type: 'video',
+      folder: 'ugc-clips',
+    })
+    console.log('[Assemble] Uploaded:', result.public_id)
+    return result.public_id
+  } catch (err) {
+    console.error('[Assemble] Cloudinary upload failed:', err)
+    return null
+  }
+}
+
+/**
+ * Helper pour mettre à jour le status de la campagne
+ */
+async function updateCampaignStatus(supabase: any, campaignId: string, status: string) {
+  try {
+    await supabase
+      .from('campaigns')
+      .update({ status })
+      .eq('id', campaignId)
+  } catch (err) {
+    console.error('[Assemble] Failed to update campaign status:', err)
+  }
 }
 
 /**
@@ -43,18 +107,23 @@ interface ClipInput {
  * Sauvegarde dans campaign_assemblies pour garder l'historique (versioning)
  */
 export async function POST(request: NextRequest) {
+  const supabase = await createClient()
+  let campaignId: string | undefined
+  
   try {
     const body = await request.json()
-    const { clips, campaignId, videoUrls } = body as {
-      clips?: ClipInput[]  // Nouveau format avec durées et ajustements
+    campaignId = body.campaignId
+    const { clips, videoUrls } = body as {
+      clips?: ClipInput[]
       videoUrls?: string[] // Ancien format (fallback)
       campaignId: string
     }
 
-    // Support ancien format (videoUrls) ou nouveau format (clips avec durées)
-    const clipsToProcess: ClipInput[] = clips || (videoUrls?.map(url => ({ url, duration: 6 })) ?? [])
+    // Support ancien format (videoUrls) ou nouveau format (clips)
+    let clipsToProcess: ClipInput[] = clips || (videoUrls?.map(url => ({ url, duration: 6 })) ?? [])
 
     if (clipsToProcess.length === 0) {
+      if (campaignId) await updateCampaignStatus(supabase, campaignId, 'failed')
       return NextResponse.json(
         { error: 'clips ou videoUrls est requis' },
         { status: 400 }
@@ -62,6 +131,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!FAL_KEY) {
+      if (campaignId) await updateCampaignStatus(supabase, campaignId, 'failed')
       return NextResponse.json(
         { error: 'FAL_KEY non configuré' },
         { status: 500 }
@@ -70,9 +140,54 @@ export async function POST(request: NextRequest) {
 
     console.log('[Assemble] Starting assembly of', clipsToProcess.length, 'clips')
 
+    // Traiter chaque clip : upload Cloudinary si nécessaire + appliquer transformations
+    const processedClips: { url: string; duration: number; clipOrder: number }[] = []
+    
+    for (const clip of clipsToProcess) {
+      // Déterminer l'URL brute (nouveau ou ancien format)
+      const rawUrl = 'rawUrl' in clip ? clip.rawUrl : clip.url
+      const trimStart = clip.trimStart ?? 0
+      const trimEnd = clip.trimEnd ?? ('originalDuration' in clip ? clip.originalDuration : clip.duration) ?? clip.duration
+      const speed = clip.speed ?? 1.0
+      const originalDuration = 'originalDuration' in clip ? clip.originalDuration : clip.duration
+      
+      // Vérifier si des ajustements sont nécessaires
+      const hasAdjustments = (
+        trimStart !== 0 ||
+        trimEnd !== originalDuration ||
+        speed !== 1.0
+      )
+      
+      let finalUrl = rawUrl
+      
+      if (hasAdjustments) {
+        // Upload vers Cloudinary si pas encore fait
+        const cloudinaryId = await uploadToCloudinaryIfNeeded(rawUrl, clip.cloudinaryId)
+        
+        if (cloudinaryId) {
+          // Construire l'URL avec transformations
+          const cloudinaryUrl = `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/video/upload/${cloudinaryId}.mp4`
+          finalUrl = buildPreviewUrl(cloudinaryUrl, {
+            trimStart,
+            trimEnd,
+            speed
+          })
+          console.log(`[Assemble] Clip with adjustments: trim=${trimStart}-${trimEnd}s, speed=${speed}x`)
+        } else {
+          console.warn('[Assemble] Cloudinary upload failed, using raw video')
+        }
+      }
+      
+      processedClips.push({
+        url: finalUrl,
+        duration: clip.duration,
+        clipOrder: clip.clipOrder ?? processedClips.length + 1
+      })
+    }
+
     // Construire les keyframes avec timestamp cumulatif
     let currentTimestamp = 0
-    const keyframes: Keyframe[] = clipsToProcess.map((clip) => {
+    const keyframes: Keyframe[] = processedClips.map((clip) => {
       const keyframe: Keyframe = {
         url: clip.url,
         timestamp: currentTimestamp,
@@ -116,15 +231,18 @@ export async function POST(request: NextRequest) {
     console.log('[Assemble] Video assembled:', result.video_url?.slice(0, 50))
 
     // Préparer les ajustements pour la sauvegarde
-    const clipAdjustments = clipsToProcess.map((clip, index) => ({
-      clip_order: clip.clipOrder ?? index + 1,
-      trim_start: clip.trimStart ?? 0,
-      trim_end: clip.trimEnd ?? clip.duration,
-      speed: clip.speed ?? 1.0,
-      cloudinary_id: clip.cloudinaryId ?? null,
-      original_url: clip.url,
-      final_duration: clip.duration
-    }))
+    const clipAdjustments = clipsToProcess.map((clip, index) => {
+      const rawUrl = 'rawUrl' in clip ? clip.rawUrl : clip.url
+      return {
+        clip_order: clip.clipOrder ?? index + 1,
+        trim_start: clip.trimStart ?? 0,
+        trim_end: clip.trimEnd ?? clip.duration,
+        speed: clip.speed ?? 1.0,
+        cloudinary_id: clip.cloudinaryId ?? null,
+        original_url: rawUrl,
+        final_duration: clip.duration
+      }
+    })
 
     // Sauvegarder dans campaign_assemblies (versioning)
     if (campaignId && result.video_url) {
@@ -180,6 +298,12 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('[Assemble] Error:', error)
+    
+    // Mettre le status en 'failed' en cas d'erreur
+    if (campaignId) {
+      await updateCampaignStatus(supabase, campaignId, 'failed')
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Erreur assemblage' },
       { status: 500 }

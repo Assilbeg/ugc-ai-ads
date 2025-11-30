@@ -355,7 +355,8 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
   }, [state.generated_clips, state.generated_first_frames, clips.length, hasRestoredClips, setClips])
 
   // Generate first frame for a single clip
-  const generateFirstFrame = useCallback(async (clipIndex: number, clip: CampaignClip, previousFrameUrl?: string) => {
+  // invalidateVideo = true quand c'est une régénération manuelle (pas la génération initiale)
+  const generateFirstFrame = useCallback(async (clipIndex: number, clip: CampaignClip, previousFrameUrl?: string, invalidateVideo = false) => {
     if (!actor?.soul_image_url) {
       setFirstFrames(prev => ({
         ...prev,
@@ -376,6 +377,21 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
       ...prev,
       [clipIndex]: { loading: true }
     }))
+    
+    // Invalider la vidéo existante si demandé (régénération manuelle)
+    if (invalidateVideo && clips[clipIndex]?.video?.raw_url) {
+      const updatedClips = [...clips]
+      updatedClips[clipIndex] = {
+        ...updatedClips[clipIndex],
+        video: {
+          ...updatedClips[clipIndex].video,
+          raw_url: undefined,
+          final_url: undefined,
+        },
+        status: 'pending',
+      }
+      setClips(updatedClips)
+    }
 
     try {
       const response = await fetch('/api/generate/first-frame', {
@@ -408,7 +424,7 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
       }))
       return null
     }
-  }, [actor])
+  }, [actor, clips, setClips])
 
   // Generate all first frames after plan is ready (séquentiel avec chaînage)
   const generateAllFirstFrames = useCallback(async () => {
@@ -567,6 +583,24 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
   const saveEdit = () => {
     if (editingClip !== null) {
       updateClipScript(editingClip, editText)
+      
+      // Invalider la vidéo existante si le script a changé
+      // Pour forcer une régénération à l'étape 6
+      const currentClip = clips[editingClip]
+      if (currentClip?.video?.raw_url && currentClip.script.text !== editText) {
+        const updatedClips = [...clips]
+        updatedClips[editingClip] = {
+          ...updatedClips[editingClip],
+          video: {
+            ...updatedClips[editingClip].video,
+            raw_url: undefined, // Invalider pour forcer régénération
+            final_url: undefined,
+          },
+          status: 'pending',
+        }
+        setClips(updatedClips)
+      }
+      
       setEditingClip(null)
       setEditText('')
     }
@@ -584,13 +618,28 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
 
   const saveVisualEdit = () => {
     if (editingVisualPrompt !== null) {
+      const currentClip = clips[editingVisualPrompt]
+      const promptChanged = currentClip.first_frame.prompt !== editVisualText
+      
       const updatedClips = [...clips]
       updatedClips[editingVisualPrompt] = {
         ...updatedClips[editingVisualPrompt],
         first_frame: {
           ...updatedClips[editingVisualPrompt].first_frame,
-          prompt: editVisualText
-        }
+          prompt: editVisualText,
+          // Invalider l'image existante si le prompt a changé
+          image_url: promptChanged ? undefined : updatedClips[editingVisualPrompt].first_frame.image_url,
+        },
+        // Invalider la vidéo existante si le prompt visuel a changé
+        // Pour forcer une régénération à l'étape 6
+        ...(promptChanged && currentClip.video?.raw_url ? {
+          video: {
+            ...updatedClips[editingVisualPrompt].video,
+            raw_url: undefined,
+            final_url: undefined,
+          },
+          status: 'pending' as const,
+        } : {}),
       }
       setClips(updatedClips)
       setEditingVisualPrompt(null)
@@ -747,7 +796,7 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
                             variant="ghost" 
                             size="sm" 
                             className="mt-2 h-6 text-[10px]"
-                            onClick={() => generateFirstFrame(index, clip, index > 0 ? firstFrames[index - 1]?.url : undefined)}
+                            onClick={() => generateFirstFrame(index, clip, index > 0 ? firstFrames[index - 1]?.url : undefined, true)}
                           >
                             Réessayer
                           </Button>
@@ -764,7 +813,7 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
                         variant="secondary" 
                         size="sm" 
                         className="absolute bottom-2 left-2 right-2 h-7 text-[10px] bg-background/80 hover:bg-background backdrop-blur-sm rounded-lg"
-                        onClick={() => generateFirstFrame(index, clip, index > 0 ? firstFrames[index - 1]?.url : undefined)}
+                        onClick={() => generateFirstFrame(index, clip, index > 0 ? firstFrames[index - 1]?.url : undefined, true)}
                       >
                         <RefreshCw className="w-3 h-3 mr-1" />
                         Regénérer
@@ -885,7 +934,7 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
                                 </Button>
                                 <Button size="sm" className="h-7 text-xs rounded-lg" onClick={() => {
                                   saveVisualEdit()
-                                  generateFirstFrame(index, { ...clip, first_frame: { ...clip.first_frame, prompt: editVisualText } }, index > 0 ? firstFrames[index - 1]?.url : undefined)
+                                  generateFirstFrame(index, { ...clip, first_frame: { ...clip.first_frame, prompt: editVisualText } }, index > 0 ? firstFrames[index - 1]?.url : undefined, true)
                                 }}>
                                   Sauvegarder & Regénérer
                                 </Button>
