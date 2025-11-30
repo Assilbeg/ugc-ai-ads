@@ -17,8 +17,8 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
   const supabase = await createClient()
 
   // Fetch campaign with clips
-  const { data: campaign, error } = await supabase
-    .from('campaigns')
+  const { data: campaign, error } = await (supabase
+    .from('campaigns') as any)
     .select('*')
     .eq('id', id)
     .single()
@@ -27,22 +27,22 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
     notFound()
   }
 
-  const { data: clips } = await supabase
-    .from('campaign_clips')
+  const { data: clips } = await (supabase
+    .from('campaign_clips') as any)
     .select('*')
     .eq('campaign_id', id)
     .order('order', { ascending: true })
 
   // Récupérer l'historique des assemblages (si la table existe)
-  const { data: assemblies } = await supabase
-    .from('campaign_assemblies')
+  const { data: assemblies } = await (supabase
+    .from('campaign_assemblies') as any)
     .select('*')
     .eq('campaign_id', id)
     .order('created_at', { ascending: false })
     .limit(10)
 
   // Le dernier assemblage (version la plus récente)
-  const latestAssembly = assemblies?.[0]
+  const latestAssembly = assemblies?.[0] as any
   
   // Utiliser l'URL du dernier assemblage si disponible, sinon celle de la campagne
   const finalVideoUrl = latestAssembly?.final_video_url || campaign.final_video_url
