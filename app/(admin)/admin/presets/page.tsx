@@ -83,8 +83,8 @@ export default function AdminPresetsPage() {
     setMigrating(true)
     
     for (const preset of INTENTION_PRESETS) {
-      const { error } = await supabase
-        .from('intention_presets')
+      const { error } = await (supabase
+        .from('intention_presets') as any)
         .upsert({
           id: preset.id,
           name: preset.name,

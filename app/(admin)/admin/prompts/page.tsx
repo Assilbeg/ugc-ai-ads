@@ -155,8 +155,8 @@ Tu retournes UNIQUEMENT du JSON valide.`,
     ]
 
     for (const p of defaultPrompts) {
-      const { error } = await supabase
-        .from('system_prompts')
+      const { error } = await (supabase
+        .from('system_prompts') as any)
         .upsert(p)
       
       if (error) {
@@ -187,8 +187,8 @@ Tu retournes UNIQUEMENT du JSON valide.`,
   const handleSave = async () => {
     setSaving(true)
 
-    const { error } = await supabase
-      .from('system_prompts')
+    const { error } = await (supabase
+      .from('system_prompts') as any)
       .update({
         name: form.name,
         description: form.description,
