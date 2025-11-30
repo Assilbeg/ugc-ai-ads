@@ -304,8 +304,8 @@ export default function AdminActorsPage() {
 
     if (isNew) {
       const { data: { user } } = await supabase.auth.getUser()
-      const { data: newActor, error } = await supabase
-        .from('actors')
+      const { data: newActor, error } = await (supabase
+        .from('actors') as any)
         .insert({ ...actorData, user_id: user?.id })
         .select()
         .single()
