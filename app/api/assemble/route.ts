@@ -234,25 +234,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Construire les keyframes avec timestamp cumulatif
+    // IMPORTANT: fal.ai attend timestamp et duration en MILLISECONDES, pas en secondes !
     let currentTimestamp = 0
     const keyframes: Keyframe[] = processedClips.map((clip) => {
+      const durationMs = clip.duration * 1000  // Convertir secondes → millisecondes
       const keyframe: Keyframe = {
         url: clip.url,
         timestamp: currentTimestamp,
-        duration: clip.duration
+        duration: durationMs
       }
-      currentTimestamp += clip.duration
+      currentTimestamp += durationMs
       return keyframe
     })
 
-    const totalDuration = currentTimestamp
+    const totalDurationMs = currentTimestamp
     console.log('[Assemble] ═══════════════════════════════════════')
-    console.log('[Assemble] FINAL KEYFRAMES FOR FAL.AI:')
+    console.log('[Assemble] FINAL KEYFRAMES FOR FAL.AI (in milliseconds):')
     keyframes.forEach((k, i) => {
       console.log(`[Assemble]   Clip ${i + 1}: ${k.url.slice(0, 80)}...`)
-      console.log(`[Assemble]            timestamp: ${k.timestamp}s, duration: ${k.duration}s`)
+      console.log(`[Assemble]            timestamp: ${k.timestamp}ms, duration: ${k.duration}ms`)
     })
-    console.log('[Assemble] Total duration:', totalDuration, 'seconds')
+    console.log('[Assemble] Total duration:', totalDurationMs, 'ms (', totalDurationMs / 1000, 's)')
     console.log('[Assemble] ═══════════════════════════════════════')
 
     const videoTrack: Track = {
@@ -309,7 +311,7 @@ export async function POST(request: NextRequest) {
           campaign_id: campaignId,
           final_video_url: result.video_url,
           thumbnail_url: result.thumbnail_url || null,
-          duration_seconds: totalDuration,
+          duration_seconds: totalDurationMs / 1000, // Stocker en secondes
           clip_adjustments: clipAdjustments
         })
         .select()
@@ -347,7 +349,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       videoUrl: result.video_url,
       thumbnailUrl: result.thumbnail_url,
-      duration: totalDuration,
+      duration: totalDurationMs / 1000, // Convertir ms → secondes pour le client
       clipCount: clipsToProcess.length,
       // Debug: URLs utilisées pour l'assemblage
       debug: {
