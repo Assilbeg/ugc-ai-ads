@@ -49,8 +49,8 @@ export function AssemblingAnimation({ campaignId, title, clipCount, presetName }
     const checkStatus = async () => {
       if (!isPolling) return
       
-      const { data: campaign, error } = await supabase
-        .from('campaigns')
+      const { data: campaign, error } = await (supabase
+        .from('campaigns') as any)
         .select('status, final_video_url')
         .eq('id', campaignId)
         .single()
