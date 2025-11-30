@@ -321,8 +321,8 @@ export default function AdminActorsPage() {
         autoGenerateIntentionMedia(newActor.id, form.soul_image_url, form.name)
       }
     } else if (editing) {
-      const { error } = await supabase
-        .from('actors')
+      const { error } = await (supabase
+        .from('actors') as any)
         .update(actorData)
         .eq('id', editing.id)
 
@@ -340,8 +340,8 @@ export default function AdminActorsPage() {
   const handleDelete = async (actor: Actor) => {
     if (!confirm(`Supprimer l'acteur "${actor.name}" ?`)) return
 
-    const { error } = await supabase
-      .from('actors')
+    const { error } = await (supabase
+      .from('actors') as any)
       .delete()
       .eq('id', actor.id)
 
@@ -484,8 +484,8 @@ export default function AdminActorsPage() {
       }
     }
 
-    const { error } = await supabase
-      .from('actors')
+    const { error } = await (supabase
+      .from('actors') as any)
       .update({ intention_media: updatedMedia })
       .eq('id', actor.id)
 
@@ -520,8 +520,8 @@ export default function AdminActorsPage() {
       }
     }
 
-    const { error } = await supabase
-      .from('actors')
+    const { error } = await (supabase
+      .from('actors') as any)
       .update({ intention_media: updatedMedia })
       .eq('id', actor.id)
 
