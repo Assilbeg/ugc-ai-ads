@@ -348,10 +348,13 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     
     try {
       // Préparer les données avec les ajustements trim/speed
+      // IMPORTANT: on garde l'index original pour récupérer les bons adjustments
       const clipsForAssembly = generatedClips
-        .filter(clip => clip?.video?.raw_url)
-        .map((clip, index) => {
-          const adj = adjustments[index]
+        .map((clip, originalIndex) => ({ clip, originalIndex }))
+        .filter(({ clip }) => clip?.video?.raw_url)
+        .map(({ clip, originalIndex }) => {
+          // Utiliser l'index ORIGINAL pour les adjustments, pas l'index filtré
+          const adj = adjustments[originalIndex]
           const originalDuration = clip.video.duration || 6
           const trimStart = adj?.trimStart ?? 0
           const trimEnd = adj?.trimEnd ?? originalDuration
@@ -359,13 +362,14 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           const trimmedDuration = trimEnd - trimStart
           const duration = trimmedDuration / speed
           
-          console.log(`[Assemble] Clip ${index + 1}:`, {
+          console.log(`[Assemble] Clip ${originalIndex + 1} (order ${clip.order}):`, {
             rawUrl: clip.video.raw_url?.slice(0, 50),
             originalDuration,
             trimStart,
             trimEnd,
             speed,
-            finalDuration: duration
+            finalDuration: duration,
+            adjustmentFound: !!adj,
           })
           
           return {
