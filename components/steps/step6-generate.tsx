@@ -14,7 +14,110 @@ import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
-import { Loader2, Play, X, Video, Mic, Music, Maximize2, Clock, Scissors, Gauge, Eye, Check, RefreshCw, Film } from 'lucide-react'
+import { Loader2, Play, X, Video, Mic, Music, Maximize2, Clock, Scissors, Gauge, Eye, Check, RefreshCw, Film, Sparkles } from 'lucide-react'
+
+// Messages rotatifs pour l'assemblage
+const ASSEMBLY_MESSAGES = [
+  "Upload des clips vers le cloud...",
+  "Application des ajustements trim/vitesse...",
+  "Fusion des pistes vidéo...",
+  "Optimisation de la qualité...",
+  "Finalisation de l'assemblage...",
+]
+
+// Composant Modale d'assemblage
+function AssemblyModal({ isOpen, clipCount }: { isOpen: boolean; clipCount: number }) {
+  const [messageIndex, setMessageIndex] = useState(0)
+  const [dots, setDots] = useState('')
+
+  useEffect(() => {
+    if (!isOpen) return
+    const interval = setInterval(() => {
+      setMessageIndex(prev => (prev + 1) % ASSEMBLY_MESSAGES.length)
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const interval = setInterval(() => {
+      setDots(prev => prev.length >= 3 ? '' : prev + '.')
+    }, 500)
+    return () => clearInterval(interval)
+  }, [isOpen])
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      
+      {/* Modal */}
+      <div className="relative bg-background rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl border border-border">
+        {/* Animation */}
+        <div className="flex justify-center mb-6">
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-24 h-24 rounded-full border-4 border-violet-200 animate-ping opacity-20" />
+            </div>
+            <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-xl shadow-violet-500/30">
+              <Film className="w-10 h-10 text-white animate-pulse" />
+            </div>
+          </div>
+        </div>
+
+        {/* Titre */}
+        <h2 className="text-xl font-bold text-center text-foreground mb-2">
+          🎬 Assemblage en cours
+        </h2>
+
+        {/* Message rotatif */}
+        <p className="text-center text-muted-foreground mb-6 h-6">
+          {ASSEMBLY_MESSAGES[messageIndex]}{dots}
+        </p>
+
+        {/* Info */}
+        <div className="bg-muted/50 rounded-xl p-4 mb-6">
+          <div className="flex items-center justify-center gap-4 text-sm">
+            <div className="flex items-center gap-2">
+              <Video className="w-4 h-4 text-violet-500" />
+              <span>{clipCount} clips</span>
+            </div>
+            <div className="text-muted-foreground">•</div>
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              <span>Avec ajustements</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Barre de progression */}
+        <div className="w-full">
+          <div className="h-2 bg-muted rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full"
+              style={{
+                animation: 'assemblyProgress 2s ease-in-out infinite',
+              }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground text-center mt-3">
+            Ça peut prendre jusqu'à 30 secondes...
+          </p>
+        </div>
+
+        <style jsx>{`
+          @keyframes assemblyProgress {
+            0% { width: 0%; margin-left: 0%; }
+            50% { width: 60%; margin-left: 20%; }
+            100% { width: 0%; margin-left: 100%; }
+          }
+        `}</style>
+      </div>
+    </div>
+  )
+}
 
 // Vitesses disponibles
 const SPEED_OPTIONS = [
@@ -1038,6 +1141,12 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           </div>
         </div>
       )}
+
+      {/* Modal d'assemblage */}
+      <AssemblyModal 
+        isOpen={assembling} 
+        clipCount={generatedClips.filter(c => c?.video?.raw_url).length} 
+      />
 
       {/* Modal confirmation régénération */}
       <ConfirmModal
