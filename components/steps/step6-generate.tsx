@@ -8,6 +8,7 @@ import { useCampaignCreation } from '@/hooks/use-campaign-creation'
 import { getPresetById } from '@/lib/presets'
 import { createClient } from '@/lib/supabase/client'
 import { buildPreviewUrl, calculateAdjustedDuration } from '@/lib/api/cloudinary'
+import { processVideoWithSync, isFFmpegSupported } from '@/lib/ffmpeg-utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -349,11 +350,10 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     try {
       // Préparer les données avec les ajustements trim/speed
       // IMPORTANT: on garde l'index original pour récupérer les bons adjustments
-      const clipsForAssembly = generatedClips
+      const clipsData = generatedClips
         .map((clip, originalIndex) => ({ clip, originalIndex }))
         .filter(({ clip }) => clip?.video?.raw_url)
         .map(({ clip, originalIndex }) => {
-          // Utiliser l'index ORIGINAL pour les adjustments, pas l'index filtré
           const adj = adjustments[originalIndex]
           const originalDuration = clip.video.duration || 6
           const trimStart = adj?.trimStart ?? 0
@@ -361,19 +361,12 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           const speed = adj?.speed ?? 1.0
           const trimmedDuration = trimEnd - trimStart
           const duration = trimmedDuration / speed
-          
-          console.log(`[Assemble] Clip ${originalIndex + 1} (order ${clip.order}):`, {
-            rawUrl: clip.video.raw_url?.slice(0, 50),
-            originalDuration,
-            trimStart,
-            trimEnd,
-            speed,
-            finalDuration: duration,
-            adjustmentFound: !!adj,
-          })
+          const hasMixedAudio = !!clip.video.final_url
+          const needsFFmpegProcessing = hasMixedAudio && speed !== 1.0
           
           return {
-            // Utiliser final_url (vidéo mixée avec audio) en priorité, sinon raw_url
+            clip,
+            originalIndex,
             rawUrl: clip.video.final_url || clip.video.raw_url,
             duration,
             clipOrder: clip.order,
@@ -382,10 +375,72 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
             speed,
             cloudinaryId: adj?.cloudinaryId,
             originalDuration,
-            // Indiquer si c'est une vidéo mixée (pour gérer le speed différemment)
-            hasMixedAudio: !!clip.video.final_url,
+            hasMixedAudio,
+            needsFFmpegProcessing,
           }
         })
+      
+      // Pré-traiter les clips qui ont speed + audio mixé via FFmpeg WASM
+      const ffmpegSupported = isFFmpegSupported()
+      const clipsNeedingFFmpeg = clipsData.filter(c => c.needsFFmpegProcessing)
+      
+      if (clipsNeedingFFmpeg.length > 0 && ffmpegSupported) {
+        console.log('[Assemble] 🎬 Processing', clipsNeedingFFmpeg.length, 'clips with FFmpeg WASM for speed + audio sync...')
+        
+        for (const clipData of clipsNeedingFFmpeg) {
+          try {
+            console.log(`[Assemble] FFmpeg processing clip ${clipData.clipOrder}...`)
+            
+            // Traiter avec FFmpeg WASM
+            const processedBlob = await processVideoWithSync({
+              videoUrl: clipData.rawUrl!,
+              trimStart: clipData.trimStart,
+              trimEnd: clipData.trimEnd,
+              speed: clipData.speed,
+            })
+            
+            // Upload vers Cloudinary
+            const formData = new FormData()
+            formData.append('file', processedBlob, `clip-${clipData.clipOrder}-processed.mp4`)
+            
+            const uploadResponse = await fetch('/api/cloudinary/upload', {
+              method: 'POST',
+              body: formData,
+            })
+            
+            if (uploadResponse.ok) {
+              const uploadData = await uploadResponse.json()
+              console.log(`[Assemble] ✓ Clip ${clipData.clipOrder} processed and uploaded:`, uploadData.url?.slice(0, 50))
+              
+              // Mettre à jour l'URL - trim/speed déjà appliqués
+              clipData.rawUrl = uploadData.url
+              clipData.trimStart = 0
+              clipData.trimEnd = clipData.duration // Durée après speed
+              clipData.speed = 1.0 // Speed déjà appliqué
+              clipData.needsFFmpegProcessing = false
+            } else {
+              console.warn(`[Assemble] ⚠️ Upload failed for clip ${clipData.clipOrder}, will use original`)
+            }
+          } catch (ffmpegError) {
+            console.warn(`[Assemble] ⚠️ FFmpeg processing failed for clip ${clipData.clipOrder}:`, ffmpegError)
+          }
+        }
+      } else if (clipsNeedingFFmpeg.length > 0) {
+        console.warn('[Assemble] ⚠️ FFmpeg WASM not supported - speed changes will be ignored for clips with audio')
+      }
+      
+      // Préparer les clips pour l'assemblage
+      const clipsForAssembly = clipsData.map(({ rawUrl, duration, clipOrder, trimStart, trimEnd, speed, cloudinaryId, originalDuration, hasMixedAudio }) => ({
+        rawUrl,
+        duration,
+        clipOrder,
+        trimStart,
+        trimEnd,
+        speed,
+        cloudinaryId,
+        originalDuration,
+        hasMixedAudio,
+      }))
       
       console.log('[Assemble] Total clips:', clipsForAssembly.length)
       console.log('[Assemble] Adjustments state:', JSON.stringify(adjustments, null, 2))

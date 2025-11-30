@@ -10,24 +10,58 @@ cloudinary.config({
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { videoUrl, folder } = body as {
-      videoUrl: string
-      folder?: string
+    const contentType = request.headers.get('content-type') || ''
+    
+    let uploadSource: string
+    let folder = 'ugc-clips'
+    
+    // Support FormData (fichier blob) ou JSON (URL)
+    if (contentType.includes('multipart/form-data')) {
+      // Upload de fichier blob
+      const formData = await request.formData()
+      const file = formData.get('file') as File | null
+      const folderParam = formData.get('folder') as string | null
+      
+      if (!file) {
+        return NextResponse.json(
+          { error: 'file est requis dans FormData' },
+          { status: 400 }
+        )
+      }
+      
+      if (folderParam) folder = folderParam
+      
+      // Convertir le fichier en base64 data URI
+      const arrayBuffer = await file.arrayBuffer()
+      const base64 = Buffer.from(arrayBuffer).toString('base64')
+      const mimeType = file.type || 'video/mp4'
+      uploadSource = `data:${mimeType};base64,${base64}`
+      
+      console.log('[Cloudinary Upload] Uploading blob file:', file.name, 'size:', file.size)
+    } else {
+      // Upload via URL
+      const body = await request.json()
+      const { videoUrl, folder: folderParam } = body as {
+        videoUrl: string
+        folder?: string
+      }
+
+      if (!videoUrl) {
+        return NextResponse.json(
+          { error: 'videoUrl est requis' },
+          { status: 400 }
+        )
+      }
+      
+      if (folderParam) folder = folderParam
+      uploadSource = videoUrl
+      
+      console.log('[Cloudinary Upload] Uploading from URL:', videoUrl.slice(0, 50))
     }
 
-    if (!videoUrl) {
-      return NextResponse.json(
-        { error: 'videoUrl est requis' },
-        { status: 400 }
-      )
-    }
-
-    console.log('[Cloudinary Upload] Starting upload:', videoUrl.slice(0, 50))
-
-    const result = await cloudinary.uploader.upload(videoUrl, {
+    const result = await cloudinary.uploader.upload(uploadSource, {
       resource_type: 'video',
-      folder: folder || 'ugc-clips',
+      folder,
       public_id: `clip_${Date.now()}`,
     })
 
