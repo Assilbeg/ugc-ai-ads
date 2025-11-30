@@ -416,6 +416,19 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
         [clipIndex]: { loading: false, url: data.url }
       }))
       
+      // Mettre à jour aussi le clip lui-même pour que ça persiste
+      const updatedClips = [...clips]
+      if (updatedClips[clipIndex]) {
+        updatedClips[clipIndex] = {
+          ...updatedClips[clipIndex],
+          first_frame: {
+            ...updatedClips[clipIndex].first_frame,
+            image_url: data.url
+          }
+        }
+        setClips(updatedClips)
+      }
+      
       return data.url // Retourner l'URL pour le clip suivant
     } catch (err) {
       setFirstFrames(prev => ({

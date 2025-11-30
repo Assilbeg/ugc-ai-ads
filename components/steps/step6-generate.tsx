@@ -399,10 +399,11 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     }
 
     // Enrichir les clips avec les first frames générées à l'étape Plan
+    // On utilise TOUJOURS la first frame de generated_first_frames si elle existe
+    // car c'est la plus récente (peut avoir été régénérée)
     const clipsWithFirstFrames = clips.map((clip, index) => {
       const generatedFrame = state.generated_first_frames?.[index]
-      // Si on a un first frame généré et que le clip n'en a pas encore
-      if (generatedFrame?.url && !clip.first_frame?.image_url) {
+      if (generatedFrame?.url) {
         return {
           ...clip,
           first_frame: {
