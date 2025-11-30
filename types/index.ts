@@ -286,6 +286,17 @@ export interface GeneratedFirstFrames {
   };
 }
 
+// Ajustements vidéo (trim + vitesse) par clip
+export interface ClipAdjustments {
+  trimStart: number;      // Secondes depuis le début
+  trimEnd: number;        // Secondes depuis le début (fin du clip)
+  speed: number;          // 0.8, 0.9, 1.0, 1.1, 1.2
+  cloudinaryId?: string;  // Public ID après upload sur Cloudinary
+  adjustedUrl?: string;   // URL avec transformations appliquées
+  isUploading?: boolean;  // En cours d'upload vers Cloudinary
+  isApplied?: boolean;    // Ajustements appliqués et sauvegardés
+}
+
 export interface NewCampaignState {
   step: 1 | 2 | 3 | 4 | 5 | 6;
   actor_id?: string;

@@ -1,18 +1,29 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { NewCampaignState, CampaignClip, ClipStatus } from '@/types'
+import { NewCampaignState, CampaignClip, ClipStatus, ClipAdjustments } from '@/types'
 import { useVideoGeneration, RegenerateWhat } from '@/hooks/use-video-generation'
 import { useActors } from '@/hooks/use-actors'
 import { useCampaignCreation } from '@/hooks/use-campaign-creation'
 import { getPresetById } from '@/lib/presets'
 import { createClient } from '@/lib/supabase/client'
+import { buildPreviewUrl, calculateAdjustedDuration } from '@/lib/api/cloudinary'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
+import { Slider } from '@/components/ui/slider'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
-import { Loader2, Play, X, Video, Mic, Music, Maximize2, Clock } from 'lucide-react'
+import { Loader2, Play, X, Video, Mic, Music, Maximize2, Clock, Scissors, Gauge, Eye, Check, RefreshCw, Film } from 'lucide-react'
+
+// Vitesses disponibles
+const SPEED_OPTIONS = [
+  { value: 0.8, label: '0.8x' },
+  { value: 0.9, label: '0.9x' },
+  { value: 1.0, label: '1x' },
+  { value: 1.1, label: '1.1x' },
+  { value: 1.2, label: '1.2x' },
+]
 
 interface Step6GenerateProps {
   state: NewCampaignState
@@ -67,6 +78,11 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   const [fullscreenVideo, setFullscreenVideo] = useState<string | null>(null)
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   
+  // Ajustements vidéo (trim + vitesse) par clip
+  const [adjustments, setAdjustments] = useState<Record<number, ClipAdjustments>>({})
+  const [previewingClip, setPreviewingClip] = useState<number | null>(null)
+  const [assembling, setAssembling] = useState(false)
+  
   // Modal de confirmation pour régénération
   const [confirmRegen, setConfirmRegen] = useState<{
     clipIndex: number
@@ -74,6 +90,167 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     label: string
     warning?: string
   } | null>(null)
+
+  // Initialiser les ajustements quand les clips changent
+  useEffect(() => {
+    const newAdjustments: Record<number, ClipAdjustments> = {}
+    clips.forEach((clip, index) => {
+      if (!adjustments[index]) {
+        newAdjustments[index] = {
+          trimStart: 0,
+          trimEnd: clip.video.duration,
+          speed: 1.0,
+        }
+      } else {
+        newAdjustments[index] = adjustments[index]
+      }
+    })
+    if (Object.keys(newAdjustments).length > 0) {
+      setAdjustments(prev => ({ ...prev, ...newAdjustments }))
+    }
+  }, [clips.length])
+
+  // Mettre à jour un ajustement
+  const updateAdjustment = useCallback((index: number, update: Partial<ClipAdjustments>) => {
+    setAdjustments(prev => ({
+      ...prev,
+      [index]: { ...prev[index], ...update, isApplied: false }
+    }))
+  }, [])
+
+  // Prévisualiser avec les ajustements (via Cloudinary URL)
+  const previewWithAdjustments = useCallback(async (index: number) => {
+    const clip = generatedClips[index] || clips[index]
+    const adj = adjustments[index]
+    
+    if (!clip?.video?.raw_url || !adj) return
+    
+    // Si pas encore uploadé sur Cloudinary, on doit d'abord uploader
+    if (!adj.cloudinaryId) {
+      setAdjustments(prev => ({
+        ...prev,
+        [index]: { ...prev[index], isUploading: true }
+      }))
+      
+      try {
+        const response = await fetch('/api/cloudinary/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ videoUrl: clip.video.raw_url })
+        })
+        
+        if (!response.ok) throw new Error('Upload failed')
+        
+        const data = await response.json()
+        setAdjustments(prev => ({
+          ...prev,
+          [index]: { 
+            ...prev[index], 
+            cloudinaryId: data.publicId,
+            isUploading: false 
+          }
+        }))
+        
+        // Construire l'URL de preview
+        const previewUrl = buildPreviewUrl(data.url, {
+          trimStart: adj.trimStart,
+          trimEnd: adj.trimEnd,
+          speed: adj.speed
+        })
+        
+        setFullscreenVideo(previewUrl)
+        setPreviewingClip(index)
+      } catch (err) {
+        console.error('Upload error:', err)
+        setAdjustments(prev => ({
+          ...prev,
+          [index]: { ...prev[index], isUploading: false }
+        }))
+      }
+    } else {
+      // Déjà sur Cloudinary, juste construire l'URL
+      const cloudinaryUrl = `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/video/upload/${adj.cloudinaryId}.mp4`
+      const previewUrl = buildPreviewUrl(cloudinaryUrl, {
+        trimStart: adj.trimStart,
+        trimEnd: adj.trimEnd,
+        speed: adj.speed
+      })
+      
+      setFullscreenVideo(previewUrl)
+      setPreviewingClip(index)
+    }
+  }, [generatedClips, clips, adjustments])
+
+  // Appliquer les ajustements (sauvegarder l'URL transformée)
+  const applyAdjustments = useCallback(async (index: number) => {
+    const adj = adjustments[index]
+    if (!adj?.cloudinaryId) {
+      // D'abord prévisualiser pour uploader
+      await previewWithAdjustments(index)
+      return
+    }
+    
+    const cloudinaryUrl = `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/video/upload/${adj.cloudinaryId}.mp4`
+    const adjustedUrl = buildPreviewUrl(cloudinaryUrl, {
+      trimStart: adj.trimStart,
+      trimEnd: adj.trimEnd,
+      speed: adj.speed
+    })
+    
+    setAdjustments(prev => ({
+      ...prev,
+      [index]: { ...prev[index], adjustedUrl, isApplied: true }
+    }))
+    
+    // Mettre à jour le clip avec l'URL ajustée
+    const updatedClips = [...generatedClips]
+    if (updatedClips[index]) {
+      updatedClips[index] = {
+        ...updatedClips[index],
+        video: {
+          ...updatedClips[index].video,
+          final_url: adjustedUrl
+        }
+      }
+      setGeneratedClips(updatedClips)
+      onClipsUpdate(updatedClips)
+    }
+  }, [adjustments, generatedClips, onClipsUpdate, previewWithAdjustments])
+
+  // Assembler la vidéo finale
+  const assembleVideo = useCallback(async () => {
+    if (!campaignId) return
+    
+    setAssembling(true)
+    
+    try {
+      // Collecter les URLs des clips (ajustées si disponibles, sinon raw)
+      const videoUrls = generatedClips.map((clip, index) => {
+        const adj = adjustments[index]
+        return adj?.adjustedUrl || clip.video?.raw_url
+      }).filter(Boolean)
+      
+      const response = await fetch('/api/assemble', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          videoUrls,
+          campaignId
+        })
+      })
+      
+      if (!response.ok) throw new Error('Assemblage failed')
+      
+      const data = await response.json()
+      
+      // Rediriger vers la campagne
+      onComplete(campaignId)
+    } catch (err) {
+      console.error('Assemble error:', err)
+    } finally {
+      setAssembling(false)
+    }
+  }, [campaignId, generatedClips, adjustments, onComplete])
 
   // ══════════════════════════════════════════════════════════════
   // SAUVEGARDE AUTOMATIQUE EN BASE
@@ -561,41 +738,151 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                         </div>
                       )}
 
-                      {/* Completed: Regenerate buttons only */}
+                      {/* Completed: Sections Ajuster + Régénérer */}
                       {isCompleted && generatedClip && (
-                        <div className="mt-auto pt-4 border-t border-border">
-                          <div className="flex items-center gap-3">
-                            <span className="text-sm text-muted-foreground">Régénérer :</span>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              className="h-9 text-sm px-4 rounded-lg border-orange-500/40 text-orange-600 hover:bg-orange-50 hover:border-orange-500"
-                              onClick={() => askRegenerate(index, 'video')}
-                              disabled={generating}
-                            >
-                              <Video className="w-4 h-4 mr-2" />
-                              Vidéo
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              className="h-9 text-sm px-4 rounded-lg"
-                              onClick={() => askRegenerate(index, 'voice')}
-                              disabled={generating}
-                            >
-                              <Mic className="w-4 h-4 mr-2" />
-                              Voix
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              className="h-9 text-sm px-4 rounded-lg"
-                              onClick={() => askRegenerate(index, 'ambient')}
-                              disabled={generating}
-                            >
-                              <Music className="w-4 h-4 mr-2" />
-                              Ambiance
-                            </Button>
+                        <div className="mt-auto pt-3 space-y-3">
+                          {/* Section AJUSTER (gratuit) */}
+                          <div className="p-3 rounded-lg border border-border bg-muted/30">
+                            <div className="flex items-center gap-2 mb-3">
+                              <Scissors className="w-4 h-4 text-muted-foreground" />
+                              <span className="text-sm font-medium">Ajuster ce clip</span>
+                              <Badge variant="outline" className="text-xs ml-auto">gratuit</Badge>
+                            </div>
+                            
+                            {/* Trim Slider */}
+                            <div className="mb-3">
+                              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                                <span>Trim</span>
+                                <span>
+                                  {adjustments[index]?.trimStart?.toFixed(1) || '0.0'}s → {adjustments[index]?.trimEnd?.toFixed(1) || clip.video.duration}s
+                                </span>
+                              </div>
+                              <Slider
+                                value={[
+                                  adjustments[index]?.trimStart || 0,
+                                  adjustments[index]?.trimEnd || clip.video.duration
+                                ]}
+                                min={0}
+                                max={clip.video.duration}
+                                step={0.1}
+                                onValueChange={([start, end]) => {
+                                  updateAdjustment(index, { trimStart: start, trimEnd: end })
+                                }}
+                                className="w-full"
+                              />
+                            </div>
+                            
+                            {/* Speed Buttons */}
+                            <div className="mb-3">
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                                <Gauge className="w-3 h-3" />
+                                <span>Vitesse</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                {SPEED_OPTIONS.map((opt) => (
+                                  <button
+                                    key={opt.value}
+                                    onClick={() => updateAdjustment(index, { speed: opt.value })}
+                                    className={`px-2 py-1 text-xs rounded-md transition-colors ${
+                                      (adjustments[index]?.speed || 1.0) === opt.value
+                                        ? 'bg-foreground text-background font-medium'
+                                        : 'bg-muted hover:bg-muted/80'
+                                    }`}
+                                  >
+                                    {opt.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            
+                            {/* Durée ajustée */}
+                            {adjustments[index] && (
+                              <div className="text-xs text-muted-foreground mb-3">
+                                Durée finale : {calculateAdjustedDuration(
+                                  clip.video.duration,
+                                  adjustments[index].trimStart,
+                                  adjustments[index].trimEnd,
+                                  adjustments[index].speed
+                                ).toFixed(1)}s
+                              </div>
+                            )}
+                            
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-xs rounded-lg flex-1"
+                                onClick={() => previewWithAdjustments(index)}
+                                disabled={adjustments[index]?.isUploading}
+                              >
+                                {adjustments[index]?.isUploading ? (
+                                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                ) : (
+                                  <Eye className="w-3 h-3 mr-1" />
+                                )}
+                                Prévisualiser
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="h-8 text-xs rounded-lg flex-1"
+                                onClick={() => applyAdjustments(index)}
+                                disabled={adjustments[index]?.isUploading || adjustments[index]?.isApplied}
+                              >
+                                {adjustments[index]?.isApplied ? (
+                                  <>
+                                    <Check className="w-3 h-3 mr-1" />
+                                    Appliqué
+                                  </>
+                                ) : (
+                                  <>
+                                    <Check className="w-3 h-3 mr-1" />
+                                    Appliquer
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                          
+                          {/* Section RÉGÉNÉRER (coûteux) */}
+                          <div className="p-3 rounded-lg border border-orange-500/30 bg-orange-500/5">
+                            <div className="flex items-center gap-2 mb-2">
+                              <RefreshCw className="w-4 h-4 text-orange-500" />
+                              <span className="text-sm font-medium text-orange-600">Régénérer</span>
+                              <Badge variant="outline" className="text-xs ml-auto border-orange-500/50 text-orange-600">~1-2€</Badge>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                className="h-8 text-xs rounded-lg border-orange-500/40 text-orange-600 hover:bg-orange-50 hover:border-orange-500"
+                                onClick={() => askRegenerate(index, 'video')}
+                                disabled={generating}
+                              >
+                                <Video className="w-3 h-3 mr-1" />
+                                Vidéo
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                className="h-8 text-xs rounded-lg"
+                                onClick={() => askRegenerate(index, 'voice')}
+                                disabled={generating}
+                              >
+                                <Mic className="w-3 h-3 mr-1" />
+                                Voix
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                className="h-8 text-xs rounded-lg"
+                                onClick={() => askRegenerate(index, 'ambient')}
+                                disabled={generating}
+                              >
+                                <Music className="w-3 h-3 mr-1" />
+                                Ambiance
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -630,11 +917,21 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
 
               {allCompleted && (
                 <Button 
-                  onClick={handleFinish}
-                  disabled={saving}
+                  onClick={assembleVideo}
+                  disabled={assembling}
                   className="h-12 px-8 rounded-xl font-medium text-base bg-green-600 hover:bg-green-500"
                 >
-                  {saving ? 'Sauvegarde...' : '✓ Terminer et sauvegarder'}
+                  {assembling ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Assemblage...
+                    </>
+                  ) : (
+                    <>
+                      <Film className="w-4 h-4 mr-2" />
+                      Assembler la vidéo finale
+                    </>
+                  )}
                 </Button>
               )}
             </div>
