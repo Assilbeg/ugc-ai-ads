@@ -408,9 +408,30 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       const result = await response.json()
       console.log('[Assemble] API response:', response.status, result)
       
+      // Afficher les infos de debug AVANT redirection
+      if (result.debug?.processedClips) {
+        console.log('[Assemble] ═══════════════════════════════════════')
+        console.log('[Assemble] RÉSULTAT DES TRANSFORMATIONS:')
+        result.debug.processedClips.forEach((clip: { clipOrder: number; urlUsed: string; hasTransforms: boolean }) => {
+          console.log(`[Assemble]   Clip ${clip.clipOrder}: hasTransforms=${clip.hasTransforms}`)
+          console.log(`[Assemble]   URL: ${clip.urlUsed}`)
+        })
+        console.log('[Assemble] ═══════════════════════════════════════')
+        
+        // Stocker dans localStorage pour debug sur la page suivante
+        localStorage.setItem('lastAssemblyDebug', JSON.stringify({
+          timestamp: new Date().toISOString(),
+          videoUrl: result.videoUrl,
+          clips: result.debug.processedClips
+        }))
+      }
+      
       if (!response.ok) {
         throw new Error(result.error || 'Erreur assemblage')
       }
+      
+      // Petite pause pour laisser le temps de voir les logs
+      await new Promise(resolve => setTimeout(resolve, 500))
       
       // 3. Assemblage terminé ! Rediriger vers la page campagne
       console.log('[Assemble] Success! Redirecting...')
