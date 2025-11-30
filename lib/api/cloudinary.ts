@@ -1,50 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
-// CLOUDINARY API - Video Transformations (Trim + Speed)
+// CLOUDINARY - Video Transformations (Trim + Speed)
+// Client-safe: pas d'import du SDK Node.js ici
+// L'upload se fait via l'API route /api/cloudinary/upload
 // ═══════════════════════════════════════════════════════════════
-
-import { v2 as cloudinary } from 'cloudinary'
-
-// Configuration Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-})
 
 export interface VideoTransformOptions {
   trimStart?: number  // Secondes depuis le début
   trimEnd?: number    // Secondes depuis le début (fin du clip)
   speed?: number      // 0.8, 0.9, 1.0, 1.1, 1.2
-}
-
-/**
- * Upload une vidéo depuis une URL vers Cloudinary
- * @param videoUrl URL de la vidéo source
- * @param folder Dossier de destination (optionnel)
- * @returns public_id de la vidéo uploadée
- */
-export async function uploadVideoToCloudinary(
-  videoUrl: string,
-  folder: string = 'ugc-clips'
-): Promise<{ publicId: string; url: string }> {
-  try {
-    const result = await cloudinary.uploader.upload(videoUrl, {
-      resource_type: 'video',
-      folder,
-      // Génère un ID unique
-      public_id: `clip_${Date.now()}`,
-    })
-
-    console.log('[Cloudinary] Video uploaded:', result.public_id)
-    
-    return {
-      publicId: result.public_id,
-      url: result.secure_url,
-    }
-  } catch (error) {
-    console.error('[Cloudinary] Upload error:', error)
-    throw new Error('Erreur upload Cloudinary')
-  }
 }
 
 /**

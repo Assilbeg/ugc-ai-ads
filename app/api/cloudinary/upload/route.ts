@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { uploadVideoToCloudinary } from '@/lib/api/cloudinary'
+import { v2 as cloudinary } from 'cloudinary'
+
+// Configuration Cloudinary (côté serveur uniquement)
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+})
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,11 +25,17 @@ export async function POST(request: NextRequest) {
 
     console.log('[Cloudinary Upload] Starting upload:', videoUrl.slice(0, 50))
 
-    const result = await uploadVideoToCloudinary(videoUrl, folder || 'ugc-clips')
+    const result = await cloudinary.uploader.upload(videoUrl, {
+      resource_type: 'video',
+      folder: folder || 'ugc-clips',
+      public_id: `clip_${Date.now()}`,
+    })
+
+    console.log('[Cloudinary] Video uploaded:', result.public_id)
 
     return NextResponse.json({
-      publicId: result.publicId,
-      url: result.url,
+      publicId: result.public_id,
+      url: result.secure_url,
     })
   } catch (error) {
     console.error('[Cloudinary Upload] Error:', error)
