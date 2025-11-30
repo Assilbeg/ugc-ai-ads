@@ -208,11 +208,55 @@ export function useVideoGeneration() {
       }
 
       // ────────────────────────────────────────────────────────────
-      // RETOUR DU CLIP - Completed si tout OK, sinon partial
+      // ÉTAPE 5 : Mixage vidéo + audio (voiceover + ambiance)
       // ────────────────────────────────────────────────────────────
       const hasVoice = !!voiceUrl
       const hasAmbient = !!ambientUrl
       
+      if (hasVoice || hasAmbient) {
+        updateProgress('generating_ambient', 92, 'Mixage audio...')
+        
+        try {
+          const mixResponse = await fetch('/api/generate/mix-video', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              videoUrl: rawVideoUrl,
+              voiceUrl: voiceUrl,
+              ambientUrl: ambientUrl,
+              voiceVolume: updatedClip.audio?.voice_volume ?? 100,
+              ambientVolume: updatedClip.audio?.ambient_volume ?? 20,
+              duration: clip.video.duration,
+            }),
+            signal: abortControllerRef.current?.signal,
+          })
+
+          if (!mixResponse.ok) {
+            const err = await mixResponse.json()
+            throw new Error(err.error || 'Erreur mixage vidéo')
+          }
+          
+          const mixData = await mixResponse.json()
+          if (mixData.mixed && mixData.videoUrl) {
+            console.log('[Generation] Video mixed successfully:', mixData.videoUrl.slice(0, 50))
+            updatedClip.video = { 
+              ...updatedClip.video, 
+              final_url: mixData.videoUrl 
+            }
+            updatedClip.audio = { 
+              ...updatedClip.audio, 
+              final_audio_url: mixData.videoUrl // La vidéo contient maintenant l'audio mixé
+            }
+          }
+        } catch (mixErr) {
+          console.warn('[Generation] Mix failed, using raw video:', mixErr)
+          // On continue avec la vidéo brute si le mixage échoue
+        }
+      }
+
+      // ────────────────────────────────────────────────────────────
+      // RETOUR DU CLIP - Completed
+      // ────────────────────────────────────────────────────────────
       if (hasVoice && hasAmbient) {
         updateProgress('completed', 100, 'Terminé !')
         updatedClip.status = 'completed'

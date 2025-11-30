@@ -42,7 +42,7 @@ interface ComposeOutput {
  * Input pour chaque clip avec ses ajustements (nouveau format)
  */
 interface ClipInputNew {
-  rawUrl: string          // URL brute de la vidéo
+  rawUrl: string          // URL brute de la vidéo (ou final_url si mixée)
   duration: number        // Durée finale en secondes (après ajustements)
   clipOrder?: number      // Ordre du clip dans la campagne
   trimStart?: number      // Début du trim (secondes)
@@ -50,6 +50,7 @@ interface ClipInputNew {
   speed?: number          // Vitesse (0.8 à 1.2)
   cloudinaryId?: string   // ID Cloudinary si déjà uploadé
   originalDuration?: number // Durée originale du clip
+  hasMixedAudio?: boolean // Si true, la vidéo contient déjà l'audio mixé
 }
 
 /**
@@ -175,6 +176,7 @@ export async function POST(request: NextRequest) {
       const trimEnd = clip.trimEnd ?? ('originalDuration' in clip ? clip.originalDuration : clip.duration) ?? clip.duration
       const speed = clip.speed ?? 1.0
       const originalDuration = 'originalDuration' in clip ? clip.originalDuration : clip.duration
+      const hasMixedAudio = 'hasMixedAudio' in clip ? clip.hasMixedAudio : false
       
       console.log(`[Assemble] Clip ${i + 1} analysis:`, {
         rawUrl: rawUrl?.slice(0, 60),
@@ -186,20 +188,29 @@ export async function POST(request: NextRequest) {
         hasTrimStartChange: trimStart !== 0,
         hasTrimEndChange: trimEnd !== originalDuration,
         hasSpeedChange: speed !== 1.0,
+        hasMixedAudio,
       })
       
       // Vérifier si des ajustements sont nécessaires
-      const hasAdjustments = (
-        trimStart !== 0 ||
-        trimEnd !== originalDuration ||
-        speed !== 1.0
-      )
+      const hasTrimAdjustments = trimStart !== 0 || trimEnd !== originalDuration
+      const hasSpeedAdjustment = speed !== 1.0
+      const hasAdjustments = hasTrimAdjustments || hasSpeedAdjustment
       
-      console.log(`[Assemble] Clip ${i + 1} hasAdjustments:`, hasAdjustments)
+      // IMPORTANT: Si la vidéo a de l'audio mixé, on ne peut PAS utiliser e_accelerate
+      // car Cloudinary ne synchronise pas l'audio avec le changement de vitesse
+      // On applique seulement le trim dans ce cas
+      const canApplySpeed = !hasMixedAudio || speed === 1.0
+      if (hasMixedAudio && hasSpeedAdjustment) {
+        console.warn(`[Assemble] ⚠️ Clip ${i + 1} has mixed audio - speed change (${speed}x) will be IGNORED to preserve audio sync!`)
+        console.warn(`[Assemble] ⚠️ Speed changes with mixed audio require FFmpeg processing (not yet implemented)`)
+      }
+      
+      console.log(`[Assemble] Clip ${i + 1} hasAdjustments:`, hasAdjustments, '| canApplySpeed:', canApplySpeed)
       
       let finalUrl = rawUrl
       
-      if (hasAdjustments) {
+      // Appliquer les transformations seulement si nécessaire
+      if (hasTrimAdjustments || (hasSpeedAdjustment && canApplySpeed)) {
         console.log(`[Assemble] Clip ${i + 1} - Uploading to Cloudinary...`)
         // Upload vers Cloudinary si pas encore fait
         const cloudinaryId = await uploadToCloudinaryIfNeeded(rawUrl, clip.cloudinaryId)
@@ -211,24 +222,30 @@ export async function POST(request: NextRequest) {
           const cloudinaryUrl = `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/video/upload/${cloudinaryId}.mp4`
           console.log(`[Assemble] Clip ${i + 1} - Base Cloudinary URL:`, cloudinaryUrl)
           
+          // Appliquer trim toujours, speed seulement si autorisé
           finalUrl = buildPreviewUrl(cloudinaryUrl, {
             trimStart,
             trimEnd,
-            speed
+            speed: canApplySpeed ? speed : 1.0  // Ignorer speed si audio mixé
           })
           console.log(`[Assemble] Clip ${i + 1} - FINAL URL WITH TRANSFORMS:`, finalUrl)
         } else {
           console.error(`[Assemble] Clip ${i + 1} - Cloudinary upload FAILED, using raw video WITHOUT transforms!`)
         }
       } else {
-        console.log(`[Assemble] Clip ${i + 1} no adjustments, using raw URL`)
+        console.log(`[Assemble] Clip ${i + 1} no adjustments to apply, using raw URL`)
       }
       
       console.log(`[Assemble] Clip ${i + 1} - URL being sent to FAL:`, finalUrl.slice(0, 120))
       
+      // Si on a ignoré le speed, recalculer la durée correcte (durée trimmée sans accélération)
+      const effectiveDuration = hasMixedAudio && hasSpeedAdjustment 
+        ? (trimEnd - trimStart)  // Durée sans speed car speed ignoré
+        : clip.duration          // Durée calculée avec speed
+      
       processedClips.push({
         url: finalUrl,
-        duration: clip.duration,
+        duration: effectiveDuration,
         clipOrder: clip.clipOrder ?? processedClips.length + 1
       })
     }

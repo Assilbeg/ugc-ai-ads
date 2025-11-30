@@ -373,7 +373,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           })
           
           return {
-            rawUrl: clip.video.raw_url,
+            // Utiliser final_url (vidéo mixée avec audio) en priorité, sinon raw_url
+            rawUrl: clip.video.final_url || clip.video.raw_url,
             duration,
             clipOrder: clip.order,
             trimStart,
@@ -381,6 +382,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
             speed,
             cloudinaryId: adj?.cloudinaryId,
             originalDuration,
+            // Indiquer si c'est une vidéo mixée (pour gérer le speed différemment)
+            hasMixedAudio: !!clip.video.final_url,
           }
         })
       
@@ -814,7 +817,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
               const isFailed = currentStatus === 'failed'
               const isGenerating = currentStatus !== 'pending' && currentStatus !== 'completed' && currentStatus !== 'failed'
               
-              const videoUrl = generatedClip?.video?.raw_url
+              // Utiliser final_url (vidéo mixée avec audio) en priorité, sinon raw_url
+              const videoUrl = generatedClip?.video?.final_url || generatedClip?.video?.raw_url
               const firstFrameUrl = clip.first_frame?.image_url || state.generated_first_frames?.[index]?.url
               
               return (
