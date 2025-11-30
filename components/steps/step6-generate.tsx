@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { NewCampaignState, CampaignClip, ClipStatus } from '@/types'
 import { useVideoGeneration, RegenerateWhat } from '@/hooks/use-video-generation'
 import { useActors } from '@/hooks/use-actors'
 import { useCampaignCreation } from '@/hooks/use-campaign-creation'
 import { getPresetById } from '@/lib/presets'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -47,7 +48,8 @@ const STATUS_STEPS = [
 export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step6GenerateProps) {
   const { getActorById } = useActors()
   const { generating, progress, generateAllClips, regenerateSingleClip, cancel, getOverallProgress } = useVideoGeneration()
-  const { saveCampaign, saving } = useCampaignCreation()
+  const { saving } = useCampaignCreation()
+  const supabase = createClient()
   
   const actor = state.actor_id ? getActorById(state.actor_id) : undefined
   const preset = state.preset_id ? getPresetById(state.preset_id) : undefined
@@ -63,6 +65,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   const [campaignId, setCampaignId] = useState<string | null>(null)
   const [started, setStarted] = useState(hasExistingVideos) // Déjà "started" si on a des vidéos
   const [fullscreenVideo, setFullscreenVideo] = useState<string | null>(null)
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   
   // Modal de confirmation pour régénération
   const [confirmRegen, setConfirmRegen] = useState<{
@@ -72,12 +75,127 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     warning?: string
   } | null>(null)
 
+  // ══════════════════════════════════════════════════════════════
+  // SAUVEGARDE AUTOMATIQUE EN BASE
+  // ══════════════════════════════════════════════════════════════
+  
+  // Créer la campagne en base
+  const createCampaignInDb = useCallback(async (): Promise<string | null> => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        console.error('User not authenticated')
+        return null
+      }
+
+      const { data: campaign, error } = await supabase
+        .from('campaigns')
+        .insert({
+          user_id: user.id,
+          actor_id: state.actor_id,
+          preset_id: state.preset_id,
+          product: state.product,
+          brief: state.brief,
+          status: 'generating',
+        } as any)
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Error creating campaign:', error)
+        return null
+      }
+
+      console.log('✓ Campaign created:', (campaign as any).id)
+      return (campaign as any).id as string
+    } catch (err) {
+      console.error('Error creating campaign:', err)
+      return null
+    }
+  }, [supabase, state.actor_id, state.preset_id, state.product, state.brief])
+
+  // Sauvegarder les clips en base
+  const saveClipsToDb = useCallback(async (dbCampaignId: string, clipsToSave: CampaignClip[]) => {
+    if (!dbCampaignId || clipsToSave.length === 0) return
+
+    setAutoSaveStatus('saving')
+
+    try {
+      // Supprimer les anciens clips et insérer les nouveaux (upsert simplifié)
+      const { error: deleteError } = await supabase
+        .from('campaign_clips')
+        .delete()
+        .eq('campaign_id', dbCampaignId)
+
+      if (deleteError) {
+        console.warn('Error deleting old clips:', deleteError)
+      }
+
+      const clipsToInsert = clipsToSave.map(clip => ({
+        campaign_id: dbCampaignId,
+        order: clip.order,
+        beat: clip.beat,
+        first_frame: clip.first_frame,
+        script: clip.script,
+        video: clip.video,
+        audio: clip.audio || {},
+        status: clip.status || 'pending',
+      }))
+
+      const { error: insertError } = await supabase
+        .from('campaign_clips')
+        .insert(clipsToInsert as any)
+
+      if (insertError) {
+        console.error('Error saving clips:', insertError)
+        setAutoSaveStatus('error')
+        return
+      }
+
+      console.log('✓ Clips auto-saved:', clipsToSave.length)
+      setAutoSaveStatus('saved')
+    } catch (err) {
+      console.error('Error saving clips:', err)
+      setAutoSaveStatus('error')
+    }
+  }, [supabase])
+
+  // Mettre à jour le status de la campagne
+  const updateCampaignStatus = useCallback(async (dbCampaignId: string, newStatus: 'generating' | 'completed' | 'failed') => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase.from('campaigns') as any).update({ status: newStatus }).eq('id', dbCampaignId)
+      
+      console.log('✓ Campaign status updated:', newStatus)
+    } catch (err) {
+      console.error('Error updating campaign status:', err)
+    }
+  }, [supabase])
+
+  // Auto-save quand des clips sont générés
+  useEffect(() => {
+    if (campaignId && generatedClips.length > 0 && !campaignId.startsWith('temp-')) {
+      // Sauvegarder les clips avec vidéo générée
+      const clipsWithVideo = generatedClips.filter(c => c.video?.raw_url)
+      if (clipsWithVideo.length > 0) {
+        saveClipsToDb(campaignId, generatedClips)
+      }
+    }
+  }, [campaignId, generatedClips, saveClipsToDb])
+
   const handleStartGeneration = async () => {
     if (!actor || !preset || clips.length === 0) return
 
     setStarted(true)
-    const tempCampaignId = `temp-${Date.now()}`
-    setCampaignId(tempCampaignId)
+    
+    // Créer la campagne en base AVANT de générer
+    const dbCampaignId = await createCampaignInDb()
+    if (!dbCampaignId) {
+      console.error('Failed to create campaign, using temp ID')
+      setCampaignId(`temp-${Date.now()}`)
+    } else {
+      setCampaignId(dbCampaignId)
+    }
 
     // Enrichir les clips avec les first frames générées à l'étape Plan
     const clipsWithFirstFrames = clips.map((clip, index) => {
@@ -108,7 +226,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     const results = await generateAllClips(
       clipsToGenerate,
       actor,
-      tempCampaignId,
+      dbCampaignId || `temp-${Date.now()}`,
       preset.ambient_audio.prompt,
       preset.id
     )
@@ -123,6 +241,18 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
 
     setGeneratedClips(updatedClips)
     onClipsUpdate(updatedClips) // Sauvegarder dans le state parent
+
+    // Mettre à jour le status de la campagne si terminé
+    if (dbCampaignId) {
+      const allCompleted = updatedClips.every(c => c.status === 'completed')
+      const hasFailed = updatedClips.some(c => c.status === 'failed')
+      
+      if (allCompleted) {
+        await updateCampaignStatus(dbCampaignId, 'completed')
+      } else if (hasFailed) {
+        await updateCampaignStatus(dbCampaignId, 'failed')
+      }
+    }
   }
 
   const handleConfirmRegenerate = async () => {
