@@ -237,64 +237,81 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   }, [adjustments, generatedClips, clips, onClipsUpdate])
 
   // Assembler la vidéo finale (applique les ajustements automatiquement)
-  // Redirige IMMÉDIATEMENT et lance l'assemblage en arrière-plan
+  // Lance l'assemblage D'ABORD puis redirige
   const assembleVideo = useCallback(async () => {
     if (!campaignId) return
     
     setAssembling(true)
     
     try {
-      // Préparer les données RAPIDEMENT (sans upload Cloudinary ici)
-      // L'API fera les uploads si nécessaire
+      // Préparer les données avec les ajustements trim/speed
       const clipsForAssembly = generatedClips
         .filter(clip => clip?.video?.raw_url)
         .map((clip, index) => {
           const adj = adjustments[index]
+          const originalDuration = clip.video.duration || 6
           const trimStart = adj?.trimStart ?? 0
-          const trimEnd = adj?.trimEnd ?? clip.video.duration
+          const trimEnd = adj?.trimEnd ?? originalDuration
           const speed = adj?.speed ?? 1.0
           const trimmedDuration = trimEnd - trimStart
           const duration = trimmedDuration / speed
           
+          console.log(`[Assemble] Clip ${index + 1}:`, {
+            rawUrl: clip.video.raw_url?.slice(0, 50),
+            originalDuration,
+            trimStart,
+            trimEnd,
+            speed,
+            finalDuration: duration
+          })
+          
           return {
-            rawUrl: clip.video.raw_url, // URL brute (l'API uploadera si besoin)
+            rawUrl: clip.video.raw_url,
             duration,
             clipOrder: clip.order,
             trimStart,
             trimEnd,
             speed,
-            cloudinaryId: adj?.cloudinaryId, // Peut être undefined
-            originalDuration: clip.video.duration,
+            cloudinaryId: adj?.cloudinaryId,
+            originalDuration,
           }
         })
       
-      // 1. Mettre le status à "assembling" AVANT de rediriger (await nécessaire!)
+      console.log('[Assemble] Total clips:', clipsForAssembly.length)
+      
+      // 1. Mettre le status à "assembling" AVANT tout
       await (supabase.from('campaigns') as any)
         .update({ status: 'assembling' })
         .eq('id', campaignId)
       
-      // 2. Rediriger vers la page campagne avec le flag assembling
-      // Le query param force l'affichage de l'animation même si le status n'est pas encore à jour
-      window.location.href = `/campaign/${campaignId}?assembling=1`
-      
-      // 3. Lancer l'assemblage en arrière-plan (sans await)
-      // L'API fera les uploads Cloudinary si nécessaire
-      fetch('/api/assemble', {
+      // 2. Lancer l'assemblage avec keepalive pour survivre à la navigation
+      // On utilise keepalive ET on attend un peu avant de rediriger
+      const assemblePromise = fetch('/api/assemble', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clips: clipsForAssembly,
           campaignId
-        })
-      }).catch(err => {
-        console.error('[Assemble] Background error:', err)
+        }),
+        keepalive: true // Important: permet à la requête de survivre à la navigation
+      })
+      
+      // Petite attente pour s'assurer que la requête est bien partie
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // 3. Rediriger vers la page campagne
+      window.location.href = `/campaign/${campaignId}?assembling=1`
+      
+      // Note: On n'attend pas la réponse, le polling sur la page campagne s'en chargera
+      assemblePromise.catch(err => {
+        console.error('[Assemble] Error:', err)
       })
       
     } catch (err) {
       console.error('Assemble error:', err)
       setAssembling(false)
     }
-  }, [campaignId, generatedClips, adjustments, onComplete, supabase])
+  }, [campaignId, generatedClips, adjustments, supabase])
 
   // ══════════════════════════════════════════════════════════════
   // SAUVEGARDE AUTOMATIQUE EN BASE

@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import Link from 'next/link'
 
 interface AssemblingAnimationProps {
   campaignId: string
@@ -14,17 +15,20 @@ interface AssemblingAnimationProps {
 
 const MESSAGES = [
   "Assemblage des clips en cours...",
+  "Upload vers Cloudinary...",
+  "Application des ajustements trim/vitesse...",
   "Fusion des pistes vidéo...",
-  "Application des transitions...",
   "Optimisation de la qualité...",
   "Finalisation de la vidéo...",
 ]
 
 export function AssemblingAnimation({ campaignId, title, clipCount, presetName }: AssemblingAnimationProps) {
-  const router = useRouter()
   const supabase = createClient()
   const [messageIndex, setMessageIndex] = useState(0)
   const [dots, setDots] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const pollCountRef = useRef(0)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Rotation des messages
   useEffect(() => {
@@ -49,39 +53,95 @@ export function AssemblingAnimation({ campaignId, title, clipCount, presetName }
     const checkStatus = async () => {
       if (!isPolling) return
       
-      const { data: campaign, error } = await (supabase
+      pollCountRef.current += 1
+      const currentPoll = pollCountRef.current
+      
+      const { data: campaign, error: fetchError } = await (supabase
         .from('campaigns') as any)
         .select('status, final_video_url')
         .eq('id', campaignId)
         .single()
 
-      console.log('[Assembling] Poll status:', campaign?.status, 'url:', campaign?.final_video_url?.slice(0, 50))
+      console.log('[Assembling] Poll #', currentPoll, 'status:', campaign?.status, 'url:', campaign?.final_video_url?.slice(0, 50))
       
-      if (error) {
-        console.error('[Assembling] Poll error:', error)
+      if (fetchError) {
+        console.error('[Assembling] Poll error:', fetchError)
         return
       }
 
-      if (campaign && campaign.status !== 'assembling') {
-        // Assemblage terminé ! Rediriger sans le query param pour afficher la vidéo
+      // Si le status est "completed" ET on a une URL vidéo, c'est bon !
+      if (campaign?.status === 'completed' && campaign?.final_video_url) {
         console.log('[Assembling] Done! Redirecting to clean URL...')
         isPolling = false
-        // Utiliser replace pour ne pas ajouter à l'historique
+        if (intervalRef.current) clearInterval(intervalRef.current)
         window.location.replace(`/campaign/${campaignId}`)
+        return
+      }
+      
+      // Si le status est "failed", afficher l'erreur
+      if (campaign?.status === 'failed') {
+        console.error('[Assembling] Assembly failed!')
+        isPolling = false
+        if (intervalRef.current) clearInterval(intervalRef.current)
+        setError('L\'assemblage a échoué. Veuillez réessayer.')
+        return
+      }
+      
+      // Si on poll depuis plus de 2 minutes (60 polls * 2s), timeout
+      if (currentPoll > 60) {
+        console.error('[Assembling] Timeout!')
+        isPolling = false
+        if (intervalRef.current) clearInterval(intervalRef.current)
+        setError('L\'assemblage prend trop de temps. Veuillez réessayer.')
+        return
       }
     }
 
-    // Vérifier toutes les 2 secondes
-    const interval = setInterval(checkStatus, 2000)
-    
-    // Vérifier immédiatement aussi
-    checkStatus()
+    // Attendre 2 secondes avant le premier poll (laisser le temps à l'API de démarrer)
+    const initialDelay = setTimeout(() => {
+      checkStatus()
+      // Puis vérifier toutes les 2 secondes
+      intervalRef.current = setInterval(checkStatus, 2000)
+    }, 2000)
 
     return () => {
       isPolling = false
-      clearInterval(interval)
+      clearTimeout(initialDelay)
+      if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [campaignId, router, supabase])
+  }, [campaignId, supabase])
+
+  // Affichage erreur
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+        <div className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center mb-6">
+          <svg className="w-10 h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </div>
+        <h1 className="text-2xl font-bold text-foreground mb-2">
+          Échec de l'assemblage
+        </h1>
+        <p className="text-muted-foreground mb-6 max-w-md">
+          {error}
+        </p>
+        <div className="flex gap-3">
+          <Link href={`/new/${campaignId}`}>
+            <Button variant="outline" className="rounded-xl">
+              ← Retourner à l'édition
+            </Button>
+          </Link>
+          <Button 
+            onClick={() => window.location.reload()}
+            className="rounded-xl"
+          >
+            🔄 Réessayer
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
@@ -151,7 +211,7 @@ export function AssemblingAnimation({ campaignId, title, clipCount, presetName }
           />
         </div>
         <p className="text-sm text-muted-foreground mt-3">
-          Ça ne devrait prendre que quelques secondes...
+          Ça peut prendre jusqu'à 30 secondes...
         </p>
       </div>
 
