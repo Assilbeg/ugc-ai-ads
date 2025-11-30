@@ -126,7 +126,22 @@ export async function processVideoWithSync(
 
   // Lire le résultat
   const data = await ffmpegInstance.readFile('output.mp4')
-  const blob = new Blob([data], { type: 'video/mp4' })
+  // Convertir FileData en Blob (FileData peut être string ou Uint8Array)
+  let blob: Blob
+  if (typeof data === 'string') {
+    // Si c'est une string (base64), la décoder
+    const binaryString = atob(data)
+    const bytes = new Uint8Array(binaryString.length)
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i)
+    }
+    blob = new Blob([bytes], { type: 'video/mp4' })
+  } else {
+    // Copier les données dans un nouveau ArrayBuffer pour éviter les problèmes de types
+    const arrayBuffer = new ArrayBuffer(data.byteLength)
+    new Uint8Array(arrayBuffer).set(data)
+    blob = new Blob([arrayBuffer], { type: 'video/mp4' })
+  }
 
   // Cleanup
   await ffmpegInstance.deleteFile('input.mp4')
