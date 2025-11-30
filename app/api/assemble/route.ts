@@ -7,10 +7,14 @@ import { v2 as cloudinary } from 'cloudinary'
 const FAL_KEY = process.env.FAL_KEY
 
 // Cloudinary configuration
+const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_CLOUD_NAME
+const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY
+const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET
+
 cloudinary.config({
-  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  cloud_name: CLOUDINARY_CLOUD_NAME,
+  api_key: CLOUDINARY_API_KEY,
+  api_secret: CLOUDINARY_API_SECRET,
 })
 
 interface Keyframe {
@@ -71,19 +75,38 @@ async function uploadToCloudinaryIfNeeded(
   cloudinaryId?: string
 ): Promise<string | null> {
   if (cloudinaryId) {
+    console.log('[Assemble] Using existing Cloudinary ID:', cloudinaryId)
     return cloudinaryId
   }
   
+  // Vérifier les credentials
+  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
+    console.error('[Assemble] CLOUDINARY CREDENTIALS MISSING!', {
+      hasCloudName: !!CLOUDINARY_CLOUD_NAME,
+      hasApiKey: !!CLOUDINARY_API_KEY,
+      hasApiSecret: !!CLOUDINARY_API_SECRET,
+    })
+    return null
+  }
+  
   try {
-    console.log('[Assemble] Uploading to Cloudinary:', rawUrl.slice(0, 50))
+    console.log('[Assemble] Uploading to Cloudinary...', {
+      url: rawUrl.slice(0, 60),
+      cloudName: CLOUDINARY_CLOUD_NAME,
+    })
     const result = await cloudinary.uploader.upload(rawUrl, {
       resource_type: 'video',
       folder: 'ugc-clips',
     })
-    console.log('[Assemble] Uploaded:', result.public_id)
+    console.log('[Assemble] ✓ Uploaded to Cloudinary:', result.public_id)
     return result.public_id
-  } catch (err) {
-    console.error('[Assemble] Cloudinary upload failed:', err)
+  } catch (err: unknown) {
+    const error = err as Error & { http_code?: number; message?: string }
+    console.error('[Assemble] ✗ Cloudinary upload FAILED:', {
+      message: error.message,
+      httpCode: error.http_code,
+      url: rawUrl.slice(0, 60),
+    })
     return null
   }
 }
@@ -328,9 +351,11 @@ export async function POST(request: NextRequest) {
       clipCount: clipsToProcess.length,
       // Debug: URLs utilisées pour l'assemblage
       debug: {
-        processedClips: processedClips.map((c, i) => ({
+        cloudinaryConfigured: !!(CLOUDINARY_CLOUD_NAME && CLOUDINARY_API_KEY && CLOUDINARY_API_SECRET),
+        processedClips: processedClips.map((c) => ({
           clipOrder: c.clipOrder,
-          urlUsed: c.url.slice(0, 100) + '...',
+          urlUsed: c.url.slice(0, 120),
+          isCloudinary: c.url.includes('cloudinary.com'),
           hasTransforms: c.url.includes('so_') || c.url.includes('eo_') || c.url.includes('e_accelerate'),
         }))
       }
