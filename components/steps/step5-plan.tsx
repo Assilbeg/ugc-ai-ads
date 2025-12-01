@@ -379,18 +379,22 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
     }))
     
     // Invalider la vidéo existante si demandé (régénération manuelle)
-    if (invalidateVideo && clips[clipIndex]?.video?.raw_url) {
-      const updatedClips = [...clips]
-      updatedClips[clipIndex] = {
-        ...updatedClips[clipIndex],
-        video: {
-          ...updatedClips[clipIndex].video,
-          raw_url: undefined,
-          final_url: undefined,
-        },
-        status: 'pending',
-      }
-      setClips(updatedClips)
+    // Utiliser functional updater pour éviter race conditions
+    if (invalidateVideo) {
+      setClips(prevClips => {
+        if (!prevClips[clipIndex]?.video?.raw_url) return prevClips
+        const updatedClips = [...prevClips]
+        updatedClips[clipIndex] = {
+          ...updatedClips[clipIndex],
+          video: {
+            ...updatedClips[clipIndex].video,
+            raw_url: undefined,
+            final_url: undefined,
+          },
+          status: 'pending',
+        }
+        return updatedClips
+      })
     }
 
     try {
@@ -417,18 +421,20 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
       }))
       
       // Mettre à jour aussi le clip lui-même pour que ça persiste
-      // IMPORTANT: utiliser le clip passé en paramètre (qui peut avoir un prompt modifié)
-      const updatedClips = [...clips]
-      if (updatedClips[clipIndex]) {
-        updatedClips[clipIndex] = {
-          ...updatedClips[clipIndex],
-          first_frame: {
-            ...clip.first_frame, // Utiliser le clip passé en paramètre pour garder le nouveau prompt
-            image_url: data.url
+      // IMPORTANT: utiliser functional updater pour éviter race conditions avec saveVisualEdit
+      setClips(prevClips => {
+        const updatedClips = [...prevClips]
+        if (updatedClips[clipIndex]) {
+          updatedClips[clipIndex] = {
+            ...updatedClips[clipIndex],
+            first_frame: {
+              ...clip.first_frame, // Utiliser le clip passé en paramètre pour garder le nouveau prompt
+              image_url: data.url
+            }
           }
         }
-        setClips(updatedClips)
-      }
+        return updatedClips
+      })
       
       return data.url // Retourner l'URL pour le clip suivant
     } catch (err) {
@@ -438,7 +444,7 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
       }))
       return null
     }
-  }, [actor, clips, setClips])
+  }, [actor, setClips])
 
   // Generate all first frames after plan is ready (séquentiel avec chaînage)
   const generateAllFirstFrames = useCallback(async () => {
