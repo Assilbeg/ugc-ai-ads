@@ -371,29 +371,35 @@ export function useVideoGeneration() {
       }
 
       // ── RÉGÉNÉRER VOIX ── (pas cher)
-      if (what === 'voice' || what === 'all') {
+      // IMPORTANT: Aussi refaire la voix quand on régénère la vidéo car l'audio source a changé
+      if (what === 'voice' || what === 'video' || what === 'all') {
         updateProgress('generating_voice', 75, 'Régénération de la voix...')
         
         const sourceAudioUrl = updatedClip.video.raw_url || updatedClip.audio?.source_audio_url
         if (!sourceAudioUrl) throw new Error('Vidéo source requise pour transformer la voix')
 
-        const voiceResponse = await fetch('/api/generate/voice', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sourceAudioUrl,
-            targetVoiceUrl: actor.voice.reference_audio_url,
-          }),
-          signal: abortControllerRef.current?.signal,
-        })
+        // Vérifier que l'acteur a une voix de référence
+        if (!actor.voice?.reference_audio_url) {
+          console.warn('[Regenerate] No voice reference, skipping voice regeneration')
+        } else {
+          const voiceResponse = await fetch('/api/generate/voice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sourceAudioUrl,
+              targetVoiceUrl: actor.voice.reference_audio_url,
+            }),
+            signal: abortControllerRef.current?.signal,
+          })
 
-        if (!voiceResponse.ok) throw new Error('Erreur régénération voix')
-        const voiceData = await voiceResponse.json()
-        updatedClip.audio = { 
-          ...updatedClip.audio, 
-          transformed_voice_url: voiceData.audioUrl,
-          voice_volume: updatedClip.audio?.voice_volume ?? 100,
-          ambient_volume: updatedClip.audio?.ambient_volume ?? 20,
+          if (!voiceResponse.ok) throw new Error('Erreur régénération voix')
+          const voiceData = await voiceResponse.json()
+          updatedClip.audio = { 
+            ...updatedClip.audio, 
+            transformed_voice_url: voiceData.audioUrl,
+            voice_volume: updatedClip.audio?.voice_volume ?? 100,
+            ambient_volume: updatedClip.audio?.ambient_volume ?? 20,
+          }
         }
       }
 
