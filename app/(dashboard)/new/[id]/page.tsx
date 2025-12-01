@@ -166,13 +166,13 @@ export default function ExistingCampaignPage() {
       // Pour preset_id, on le stocke dans brief._preset_id (car FK peut échouer)
       if (updates.preset_id !== undefined) {
         // Vérifier si le preset existe en DB
-        const { data: presetExists } = await (supabase
+        const { data: presetData } = await (supabase
           .from('intention_presets') as any)
           .select('id')
           .eq('id', updates.preset_id)
-          .single()
+          .maybeSingle()
         
-        if (presetExists) {
+        if (presetData) {
           campaignUpdates.preset_id = updates.preset_id
         } else {
           // Stocker dans brief comme backup
