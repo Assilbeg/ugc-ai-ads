@@ -376,6 +376,14 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       
       // Préparer les clips pour l'assemblage final
       // Note: trim/speed déjà appliqués par Transloadit, donc on envoie juste les URLs
+      console.log('[Assemble] URLs comparison (original vs processed):')
+      clipsData.forEach(c => {
+        const originalUrl = c.clip.video.final_url || c.clip.video.raw_url
+        console.log(`[Assemble]   Clip ${c.clipOrder}: ${c.rawUrl === originalUrl ? '❌ SAME (not processed!)' : '✅ DIFFERENT (processed)'}`)
+        console.log(`[Assemble]     Original: ${originalUrl?.slice(0, 80)}...`)
+        console.log(`[Assemble]     Current:  ${c.rawUrl?.slice(0, 80)}...`)
+      })
+      
       const clipsForAssembly = clipsData.map(({ rawUrl, duration, clipOrder }) => ({
         rawUrl,
         duration,
