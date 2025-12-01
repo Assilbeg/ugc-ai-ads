@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { NewCampaignState, CampaignClip, ClipStatus, ClipAdjustments } from '@/types'
 import { useVideoGeneration, RegenerateWhat, VideoQuality, GenerationProgress } from '@/hooks/use-video-generation'
 import { useCredits } from '@/hooks/use-credits'
+import { triggerCreditsRefresh } from '@/components/credits-display'
 import { useActors } from '@/hooks/use-actors'
 import { useCampaignCreation } from '@/hooks/use-campaign-creation'
 import { getPresetById } from '@/lib/presets'
@@ -716,6 +717,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
 
     setGeneratedClips(updatedClips)
     onClipsUpdate(updatedClips) // Sauvegarder dans le state parent
+    
+    // Rafraîchir l'affichage des crédits dans le header
+    triggerCreditsRefresh()
 
     // Mettre à jour le status de la campagne si terminé
     if (dbCampaignId) {
@@ -759,6 +763,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       updatedClips[clipIndex] = result
       setGeneratedClips(updatedClips)
       onClipsUpdate(updatedClips) // Sauvegarder dans le state parent
+      
+      // Rafraîchir l'affichage des crédits dans le header
+      triggerCreditsRefresh()
       
       // Déclencher la sauvegarde automatique en base
       setHasNewlyGeneratedClips(true)

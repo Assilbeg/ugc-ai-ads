@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { NewCampaignState, CampaignClip, CampaignBrief, Actor } from '@/types'
 import { usePlanGeneration } from '@/hooks/use-plan-generation'
 import { useCredits } from '@/hooks/use-credits'
+import { triggerCreditsRefresh } from '@/components/credits-display'
 import { FirstPurchaseModal } from '@/components/modals/first-purchase-modal'
 import { UpgradeModal } from '@/components/modals/upgrade-modal'
 import { getPresetById } from '@/lib/presets'
@@ -322,6 +323,7 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
   const [presetLoading, setPresetLoading] = useState(true)
   const [firstFrames, setFirstFrames] = useState<FirstFrameStatus>({})
   const [generatingFrames, setGeneratingFrames] = useState(false)
+  const [hasRestoredFirstFrames, setHasRestoredFirstFrames] = useState(false)
   
   // Crédits insuffisants
   const [hasInsufficientCredits, setHasInsufficientCredits] = useState(false)
@@ -361,6 +363,10 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
       if (Object.keys(preGeneratedFrames).length > 0) {
         setFirstFrames(preGeneratedFrames)
       }
+      
+      // Marquer les first frames comme restaurées APRÈS avoir mis à jour l'état
+      // Cela évite que l'auto-génération se déclenche avant que firstFrames soit à jour
+      setHasRestoredFirstFrames(true)
     }
   }, [state.generated_clips, state.generated_first_frames, clips.length, hasRestoredClips, setClips])
 
@@ -461,6 +467,11 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
         return updatedClips
       })
       
+      // Rafraîchir l'affichage des crédits dans le header (sauf si c'était en cache)
+      if (!data.cached) {
+        triggerCreditsRefresh()
+      }
+      
       return data.url // Retourner l'URL pour le clip suivant
     } catch (err) {
       setFirstFrames(prev => ({
@@ -521,13 +532,23 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
     // Ne pas auto-générer si on a détecté un manque de crédits
     if (hasInsufficientCredits) return
     
+    // Si on a des clips restaurés depuis le state parent, attendre que les first frames soient aussi restaurées
+    // Cela évite la race condition où les clips sont restaurés mais firstFrames est encore vide
+    const hasFramesToRestore = state.generated_first_frames && Object.keys(state.generated_first_frames).length > 0
+    const hasClipsWithFrames = state.generated_clips?.some(c => c.first_frame?.image_url)
+    
+    if (hasRestoredClips && (hasFramesToRestore || hasClipsWithFrames) && !hasRestoredFirstFrames) {
+      // On attend que les first frames soient restaurées
+      return
+    }
+    
     const existingFrameCount = Object.values(firstFrames).filter(f => f.url).length
     const needsGeneration = clips.length > 0 && existingFrameCount < clips.length
     
     if (needsGeneration && actor && !generatingFrames) {
       generateAllFirstFrames()
     }
-  }, [clips, actor, firstFrames, generatingFrames, generateAllFirstFrames, hasInsufficientCredits])
+  }, [clips, actor, firstFrames, generatingFrames, generateAllFirstFrames, hasInsufficientCredits, hasRestoredClips, hasRestoredFirstFrames, state.generated_first_frames, state.generated_clips])
 
   // Sauvegarder les first frames dans le state parent pour persistance
   useEffect(() => {

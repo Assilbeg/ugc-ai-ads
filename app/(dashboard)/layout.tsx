@@ -2,8 +2,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { LogoutButton } from '@/components/logout-button'
+import { CreditsDisplay } from '@/components/credits-display'
 import { isAdmin } from '@/lib/admin'
-import { formatCredits } from '@/lib/credits'
 
 export default async function DashboardLayout({
   children,
@@ -18,17 +18,6 @@ export default async function DashboardLayout({
   }
 
   const userIsAdmin = isAdmin(user.email)
-  
-  // Get user credits (not needed for admin - they have unlimited)
-  let userBalance = 0
-  if (!userIsAdmin) {
-    const { data: userCredits } = await (supabase
-      .from('user_credits') as any)
-      .select('balance')
-      .eq('user_id', user.id)
-      .single()
-    userBalance = userCredits?.balance || 0
-  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -70,22 +59,8 @@ export default async function DashboardLayout({
           </div>
           
           <div className="flex items-center gap-4">
-            {/* Credits display */}
-            <Link 
-              href="/dashboard/billing"
-              className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors ${
-                userIsAdmin 
-                  ? 'bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20' 
-                  : 'bg-muted/50 hover:bg-muted'
-              }`}
-            >
-              <svg className={`w-4 h-4 ${userIsAdmin ? 'text-violet-500' : 'text-emerald-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className={`text-sm font-medium ${userIsAdmin ? 'text-violet-500' : ''}`}>
-                {userIsAdmin ? '∞' : formatCredits(userBalance)}
-              </span>
-            </Link>
+            {/* Credits display - Client Component with auto-refresh */}
+            <CreditsDisplay isAdmin={userIsAdmin} />
             
             <Link 
               href="/new"
