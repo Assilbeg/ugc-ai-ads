@@ -21,6 +21,9 @@ export function useVideoGeneration() {
   const [regeneratingClips, setRegeneratingClips] = useState<Set<string>>(new Set())
   const [progress, setProgress] = useState<Record<string, GenerationProgress>>({})
   const [error, setError] = useState<string | null>(null)
+  // Pour la génération de masse (generateAllClips)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  // Pour les régénérations individuelles parallèles
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map())
 
   // Vérifier si un clip spécifique est en cours de régénération
