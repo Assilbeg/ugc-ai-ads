@@ -40,12 +40,6 @@ export default async function DashboardLayout({
               >
                 Campagnes
               </Link>
-              <Link 
-                href="/new" 
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Nouvelle
-              </Link>
               {userIsAdmin && (
                 <Link 
                   href="/admin" 
@@ -58,7 +52,16 @@ export default async function DashboardLayout({
           </div>
           
           <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground hidden sm:block">{user.email}</span>
+            <Link 
+              href="/new"
+              className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-foreground text-background text-sm font-medium hover:bg-foreground/90 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Nouvelle campagne
+            </Link>
+            <span className="text-sm text-muted-foreground hidden md:block">{user.email}</span>
             <LogoutButton />
           </div>
         </div>
