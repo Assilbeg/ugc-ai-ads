@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
 
     // Créer et attendre l'assemblage
     const result = await transloadit.createAssembly({
-      params: { steps },
+      params: { steps } as any, // Cast to any to satisfy Transloadit types
       waitForCompletion: true,
     })
 

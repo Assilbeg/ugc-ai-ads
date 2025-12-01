@@ -895,6 +895,39 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       {/* Generation in progress / Completed */}
       {started && (
         <div className="space-y-6">
+          {/* Sélecteur de qualité persistant (pour régénération) */}
+          {!generating && (
+            <div className="flex items-center justify-center gap-2 py-2">
+              <span className="text-sm text-muted-foreground mr-2">Qualité vidéo :</span>
+              <div className="flex rounded-lg border border-border overflow-hidden">
+                <button
+                  onClick={() => setVideoQuality('fast')}
+                  className={`px-4 py-2 text-sm font-medium flex items-center gap-2 transition-all ${
+                    videoQuality === 'fast' 
+                      ? 'bg-green-500 text-white' 
+                      : 'bg-background hover:bg-muted text-muted-foreground'
+                  }`}
+                >
+                  <Gauge className="w-4 h-4" />
+                  Fast
+                  <span className="text-xs opacity-75">0.90$</span>
+                </button>
+                <button
+                  onClick={() => setVideoQuality('standard')}
+                  className={`px-4 py-2 text-sm font-medium flex items-center gap-2 transition-all ${
+                    videoQuality === 'standard' 
+                      ? 'bg-violet-500 text-white' 
+                      : 'bg-background hover:bg-muted text-muted-foreground'
+                  }`}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Standard
+                  <span className="text-xs opacity-75">2.40$</span>
+                </button>
+              </div>
+            </div>
+          )}
+          
           {/* Overall progress */}
           {generating && (
             <Card className="rounded-xl bg-foreground text-background">
