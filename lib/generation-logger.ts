@@ -56,74 +56,50 @@ export interface UpdateLogParams {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// ESTIMATED COSTS (based on Fal.ai pricing page)
-// Updated: 2024-12
+// MODEL PATHS (pour référence, les coûts sont dans la DB)
 // ─────────────────────────────────────────────────────────────────
 
-export const FAL_AI_COSTS = {
-  // Images
-  first_frame: {
-    model: 'fal-ai/nano-banana-pro/edit',
-    costPerUnit: 4, // $0.04 per image = 4 cents
-    unit: 'image',
-  },
-  // Videos - Veo 3.1 (with audio)
-  // Standard: $0.40/second, Fast: $0.15/second
-  video_veo31: {
-    model: 'fal-ai/veo3.1/image-to-video',
-    costPerSecond: 40, // $0.40 per second = 40 cents (Standard)
-    // 6s video = $2.40 = 240 cents
-  },
-  video_veo31_fast: {
-    model: 'fal-ai/veo3.1/fast/image-to-video',
-    costPerSecond: 15, // $0.15 per second = 15 cents (Fast)
-    // 6s video = $0.90 = 90 cents
-  },
-  // Voice - estimate based on GPU time
-  voice_chatterbox: {
-    model: 'resemble-ai/chatterboxhd/speech-to-speech',
-    costPerUnit: 15, // Estimated ~$0.15 per conversion
-    unit: 'conversion',
-  },
-  // Audio SFX - estimate
-  ambient_elevenlabs: {
-    model: 'fal-ai/elevenlabs/sound-effects/v2',
-    costPerUnit: 10, // Estimated ~$0.10 per generation
-    unit: 'generation',
-  },
+export const FAL_AI_MODELS = {
+  first_frame: 'fal-ai/nano-banana-pro/edit',
+  video_veo31: 'fal-ai/veo3/image-to-video',
+  video_veo31_4s: 'fal-ai/veo3/image-to-video',
+  video_veo31_6s: 'fal-ai/veo3/image-to-video',
+  video_veo31_8s: 'fal-ai/veo3/image-to-video',
+  voice_chatterbox: 'resemble-ai/chatterboxhd/speech-to-speech',
+  ambient_elevenlabs: 'fal-ai/elevenlabs/sound-effects/v2',
 } as const
 
 // ─────────────────────────────────────────────────────────────────
-// ESTIMATE COST
+// GET REAL COST FROM DB (pour les stats)
 // ─────────────────────────────────────────────────────────────────
 
-export type VideoQuality = 'standard' | 'fast'
-
-export function estimateCost(
-  generationType: GenerationType,
-  params?: { durationSeconds?: number; quality?: VideoQuality }
-): number {
-  switch (generationType) {
-    case 'first_frame':
-      return FAL_AI_COSTS.first_frame.costPerUnit
-    
-    case 'video_veo31':
-      const duration = params?.durationSeconds || 6
-      const quality = params?.quality || 'standard'
-      const costPerSecond = quality === 'fast' 
-        ? FAL_AI_COSTS.video_veo31_fast.costPerSecond 
-        : FAL_AI_COSTS.video_veo31.costPerSecond
-      return costPerSecond * duration
-    
-    case 'voice_chatterbox':
-      return FAL_AI_COSTS.voice_chatterbox.costPerUnit
-    
-    case 'ambient_elevenlabs':
-      return FAL_AI_COSTS.ambient_elevenlabs.costPerUnit
-    
-    default:
-      return 0
+export async function getRealCostFromDB(generationType: GenerationType): Promise<number> {
+  const supabase = await createClient()
+  
+  const { data, error } = await (supabase
+    .from('generation_costs') as any)
+    .select('real_cost_cents')
+    .eq('id', generationType)
+    .eq('is_active', true)
+    .single()
+  
+  if (error || !data) {
+    console.warn(`[GenerationLogger] Coût réel non trouvé pour ${generationType}`)
+    return 0
   }
+  
+  return (data as { real_cost_cents: number | null }).real_cost_cents || 0
+}
+
+// ─────────────────────────────────────────────────────────────────
+// ESTIMATE COST (lit depuis la DB)
+// ─────────────────────────────────────────────────────────────────
+
+export async function estimateCost(
+  generationType: GenerationType
+): Promise<number> {
+  // Lit le coût réel depuis la DB pour les stats
+  return getRealCostFromDB(generationType)
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -136,10 +112,8 @@ export async function createGenerationLog(
   const supabase = await createClient()
   
   const modelPath = getModelPath(params.generationType)
-  const estimatedCost = params.estimatedCostCents ?? estimateCost(
-    params.generationType,
-    { durationSeconds: (params.inputParams?.duration as number) }
-  )
+  // Lit le coût réel depuis la DB (plus de valeurs hardcodées)
+  const estimatedCost = params.estimatedCostCents ?? await estimateCost(params.generationType)
   
   const { data, error } = await (supabase
     .from('generation_logs') as any)
@@ -357,19 +331,6 @@ export async function getGenerationStats(
 // ─────────────────────────────────────────────────────────────────
 
 function getModelPath(generationType: GenerationType): string {
-  switch (generationType) {
-    case 'first_frame':
-      return FAL_AI_COSTS.first_frame.model
-    case 'video_veo31':
-      return FAL_AI_COSTS.video_veo31.model
-    case 'video_veo31_fast':
-      return FAL_AI_COSTS.video_veo31_fast.model
-    case 'voice_chatterbox':
-      return FAL_AI_COSTS.voice_chatterbox.model
-    case 'ambient_elevenlabs':
-      return FAL_AI_COSTS.ambient_elevenlabs.model
-    default:
-      return 'unknown'
-  }
+  return FAL_AI_MODELS[generationType] || 'unknown'
 }
 

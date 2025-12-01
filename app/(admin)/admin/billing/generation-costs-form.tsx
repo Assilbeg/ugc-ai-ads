@@ -25,13 +25,11 @@ export function GenerationCostsForm({ costs: initialCosts }: GenerationCostsForm
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const getCostIcon = (id: string) => {
-    switch (id) {
-      case 'first_frame': return <Image className="w-5 h-5 text-blue-500" />
-      case 'video_veo31': return <Video className="w-5 h-5 text-purple-500" />
-      case 'voice_chatterbox': return <Mic className="w-5 h-5 text-green-500" />
-      case 'ambient_elevenlabs': return <Music className="w-5 h-5 text-amber-500" />
-      default: return <DollarSign className="w-5 h-5" />
-    }
+    if (id === 'first_frame') return <Image className="w-5 h-5 text-blue-500" />
+    if (id.startsWith('video_')) return <Video className="w-5 h-5 text-purple-500" />
+    if (id === 'voice_chatterbox') return <Mic className="w-5 h-5 text-green-500" />
+    if (id === 'ambient_elevenlabs') return <Music className="w-5 h-5 text-amber-500" />
+    return <DollarSign className="w-5 h-5" />
   }
 
   const formatPrice = (cents: number) => {

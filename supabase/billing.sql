@@ -341,14 +341,26 @@ ON CONFLICT (id) DO UPDATE SET
 
 -- Coûts de génération par défaut
 -- ATTENTION: Les coûts réels sont basés sur les prix Fal.ai (décembre 2024)
--- Veo 3.1 Standard: $0.40/seconde (avec audio) - 6s = $2.40 = 240 cents
--- Veo 3.1 Fast: $0.15/seconde (avec audio) - 6s = $0.90 = 90 cents
+-- Sources vérifiées sur fal.ai/pricing :
+-- - Nano Banana Pro Edit: $0.15/image
+-- - Veo 3: $0.40/seconde
+-- - Chatterbox Speech-to-Speech: $0.02/minute (~$0.01 pour 30s)
+-- - ElevenLabs Sound Effects v2: $0.002/seconde (~$0.02 pour 10s)
 INSERT INTO generation_costs (id, name, description, cost_cents, real_cost_cents) VALUES
-  ('first_frame', 'First Frame', 'Image NanoBanana Pro ($0.04/image)', 10, 4),
-  ('video_veo31', 'Vidéo Veo 3.1 Standard', 'Vidéo 6s qualité max ($0.40/s = $2.40)', 300, 240),
-  ('video_veo31_fast', 'Vidéo Veo 3.1 Fast', 'Vidéo 6s économique ($0.15/s = $0.90)', 120, 90),
-  ('voice_chatterbox', 'Voice Conversion', 'Chatterbox HD S2S (~$0.15)', 20, 15),
-  ('ambient_elevenlabs', 'Ambient Audio', 'ElevenLabs Sound Effects (~$0.10)', 15, 10)
+  -- Image (First Frame)
+  ('first_frame', 'First Frame', 'Image Nano Banana Pro Edit ($0.15/image)', 25, 15),
+  
+  -- Vidéos par durée (Veo 3 @ $0.40/s)
+  ('video_veo31_4s', 'Vidéo Veo 3 (4s)', 'Vidéo 4 secondes ($0.40/s = $1.60)', 250, 160),
+  ('video_veo31_6s', 'Vidéo Veo 3 (6s)', 'Vidéo 6 secondes ($0.40/s = $2.40)', 350, 240),
+  ('video_veo31_8s', 'Vidéo Veo 3 (8s)', 'Vidéo 8 secondes ($0.40/s = $3.20)', 450, 320),
+  
+  -- Alias pour compatibilité (pointe vers 6s par défaut)
+  ('video_veo31', 'Vidéo Veo 3.1 Standard', 'Vidéo 6s qualité max ($0.40/s = $2.40)', 350, 240),
+  
+  -- Voice & Audio
+  ('voice_chatterbox', 'Voice Conversion', 'Chatterbox HD S2S ($0.02/min ≈ $0.01)', 20, 1),
+  ('ambient_elevenlabs', 'Ambient Audio', 'ElevenLabs Sound Effects ($0.002/s ≈ $0.02)', 15, 2)
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
   description = EXCLUDED.description,

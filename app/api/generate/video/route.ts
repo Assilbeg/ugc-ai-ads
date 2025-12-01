@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateVideo, getVeo31Endpoint, VEO31_PRICING, VideoQuality } from '@/lib/api/falai'
 import { checkCredits, deductCredits, getGenerationCost, GenerationType } from '@/lib/credits'
-import { createGenerationLog, markGenerationCompleted, markGenerationFailed, estimateCost } from '@/lib/generation-logger'
+import { createGenerationLog, markGenerationCompleted, markGenerationFailed } from '@/lib/generation-logger'
 import { VideoEngine } from '@/types'
 
-// Map quality to generation type for credits
-function getGenerationTypeForQuality(quality: VideoQuality): GenerationType {
-  return quality === 'fast' ? 'video_veo31_fast' : 'video_veo31'
+// Map duration to generation type for credits
+function getGenerationTypeForDuration(duration: number): GenerationType {
+  if (duration <= 4) return 'video_veo31_4s'
+  if (duration <= 6) return 'video_veo31_6s'
+  return 'video_veo31_8s'
 }
 
 export async function POST(request: NextRequest) {
@@ -49,9 +51,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Determine generation type based on quality
-    const generationType = getGenerationTypeForQuality(videoQuality)
-    const qualityLabel = videoQuality === 'fast' ? 'Fast' : 'Standard'
+    // Determine generation type based on duration (4s, 6s, or 8s)
+    const generationType = getGenerationTypeForDuration(duration)
 
     // Check credits (unless skipped for testing)
     if (!skipCredits) {
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest) {
         engine,
         quality: videoQuality,
       },
-      estimatedCostCents: estimateCost('video_veo31', { durationSeconds: duration, quality: videoQuality }),
+      // Le coût estimé est lu depuis la DB automatiquement dans createGenerationLog
       campaignId,
       clipId,
     })
@@ -108,7 +109,7 @@ export async function POST(request: NextRequest) {
       const deductResult = await deductCredits(
         user.id,
         generationType,
-        `Vidéo Veo 3.1 ${qualityLabel} (${duration}s)`,
+        `Vidéo Veo 3 (${duration}s)`,
         campaignId,
         clipId,
         user.email

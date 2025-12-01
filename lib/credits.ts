@@ -17,8 +17,10 @@ export function isAdminEmail(email: string | undefined): boolean {
 
 export type GenerationType = 
   | 'first_frame' 
-  | 'video_veo31' 
-  | 'video_veo31_fast'
+  | 'video_veo31'      // Alias pour compatibilité (= 6s)
+  | 'video_veo31_4s'   // Vidéo 4 secondes
+  | 'video_veo31_6s'   // Vidéo 6 secondes  
+  | 'video_veo31_8s'   // Vidéo 8 secondes
   | 'voice_chatterbox' 
   | 'ambient_elevenlabs'
 
@@ -114,15 +116,10 @@ export async function getGenerationCost(
     .single()
   
   if (error || !data) {
-    // Fallback to default costs if not found (match billing.sql values)
-    const defaultCosts: Record<GenerationType, number> = {
-      first_frame: 10,       // 0.10€
-      video_veo31: 300,      // 3.00€ (Standard: coût réel $2.40 + marge)
-      video_veo31_fast: 120, // 1.20€ (Fast: coût réel $0.90 + marge)
-      voice_chatterbox: 20,  // 0.20€
-      ambient_elevenlabs: 15, // 0.15€
-    }
-    return defaultCosts[generationType]
+    // IMPORTANT: Tous les prix doivent être configurés dans l'admin
+    // Si on arrive ici, c'est un problème de config
+    console.error(`[Credits] Prix non trouvé pour ${generationType} - vérifier la table generation_costs`)
+    throw new Error(`Prix non configuré pour ${generationType}. Configurer dans Admin > Billing.`)
   }
   
   return (data as { cost_cents: number }).cost_cents
@@ -132,7 +129,7 @@ export async function getGenerationCost(
 // GET ALL GENERATION COSTS
 // ─────────────────────────────────────────────────────────────────
 
-export async function getAllGenerationCosts(): Promise<Record<GenerationType, number>> {
+export async function getAllGenerationCosts(): Promise<Record<string, number>> {
   const supabase = await createClient()
   
   const { data, error } = await (supabase
@@ -140,24 +137,15 @@ export async function getAllGenerationCosts(): Promise<Record<GenerationType, nu
     .select('id, cost_cents')
     .eq('is_active', true)
   
-  // Fallback costs (match billing.sql values)
-  const defaultCosts: Record<GenerationType, number> = {
-    first_frame: 10,       // 0.10€
-    video_veo31: 300,      // 3.00€ (Standard)
-    video_veo31_fast: 120, // 1.20€ (Fast)
-    voice_chatterbox: 20,  // 0.20€
-    ambient_elevenlabs: 15, // 0.15€
+  if (error || !data || data.length === 0) {
+    // IMPORTANT: Tous les prix doivent être configurés dans l'admin
+    console.error('[Credits] Aucun prix trouvé - vérifier la table generation_costs')
+    throw new Error('Prix non configurés. Exécuter billing.sql ou configurer dans Admin > Billing.')
   }
   
-  if (error || !data) {
-    return defaultCosts
-  }
-  
-  const costs = { ...defaultCosts }
+  const costs: Record<string, number> = {}
   for (const item of data as { id: string; cost_cents: number }[]) {
-    if (item.id in costs) {
-      costs[item.id as GenerationType] = item.cost_cents
-    }
+    costs[item.id] = item.cost_cents
   }
   
   return costs

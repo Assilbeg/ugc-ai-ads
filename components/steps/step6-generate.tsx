@@ -630,11 +630,11 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     
     try {
       // Calculer le coût total : vidéo + voix + ambiance pour chaque clip
-      const generationType = videoQuality === 'fast' ? 'video_veo31_fast' : 'video_veo31'
+      // On utilise video_veo31_6s par défaut (la durée standard)
       const generations = [
-        { type: generationType as any, count: clipsToGenerate.length },
-        { type: 'voice_chatterbox' as any, count: clipsToGenerate.length },
-        { type: 'ambient_elevenlabs' as any, count: clipsToGenerate.length },
+        { type: 'video_veo31_6s' as const, count: clipsToGenerate.length },
+        { type: 'voice_chatterbox' as const, count: clipsToGenerate.length },
+        { type: 'ambient_elevenlabs' as const, count: clipsToGenerate.length },
       ]
       
       const creditsCheck = await checkMultipleCredits(generations)
