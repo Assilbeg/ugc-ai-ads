@@ -324,8 +324,14 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       // Applique trim + speed avec audio synchronisé (100% fiable, pas de Cloudinary)
       const clipsNeedingProcessing = clipsData.filter(c => c.needsProcessing)
       
+      // DEBUG: Voir les ajustements bruts avant utilisation
+      console.log('[Assemble] DEBUG - Raw adjustments state:', JSON.stringify(adjustments, null, 2))
+      console.log('[Assemble] DEBUG - clips.length:', clips.length, 'generatedClips.length:', generatedClips.length)
+      
       console.log('[Assemble] Adjustments check:', clipsData.map(c => ({
         clipOrder: c.clipOrder,
+        originalIndex: c.originalIndex,
+        adjustmentFound: !!adjustments[c.originalIndex],
         trimStart: c.trimStart,
         trimEnd: c.trimEnd,
         speed: c.speed,
