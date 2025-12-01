@@ -61,10 +61,8 @@ export interface UpdateLogParams {
 
 export const FAL_AI_MODELS = {
   first_frame: 'fal-ai/nano-banana-pro/edit',
-  video_veo31: 'fal-ai/veo3/image-to-video',
-  video_veo31_4s: 'fal-ai/veo3/image-to-video',
-  video_veo31_6s: 'fal-ai/veo3/image-to-video',
-  video_veo31_8s: 'fal-ai/veo3/image-to-video',
+  video_veo31_standard: 'fal-ai/veo3.1/image-to-video',
+  video_veo31_fast: 'fal-ai/veo3.1/fast/image-to-video',
   voice_chatterbox: 'resemble-ai/chatterboxhd/speech-to-speech',
   ambient_elevenlabs: 'fal-ai/elevenlabs/sound-effects/v2',
 } as const

@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { generateVideo, getVeo31Endpoint, VEO31_PRICING, VideoQuality } from '@/lib/api/falai'
-import { checkCredits, deductCredits, getGenerationCost, GenerationType } from '@/lib/credits'
+import { generateVideo, getVeo31Endpoint, VideoQuality } from '@/lib/api/falai'
+import { getUserCredits, getGenerationCost, GenerationType, isAdminEmail } from '@/lib/credits'
 import { createGenerationLog, markGenerationCompleted, markGenerationFailed } from '@/lib/generation-logger'
 import { VideoEngine } from '@/types'
 
-// Map duration to generation type for credits
-function getGenerationTypeForDuration(duration: number): GenerationType {
-  if (duration <= 4) return 'video_veo31_4s'
-  if (duration <= 6) return 'video_veo31_6s'
-  return 'video_veo31_8s'
+// Map quality to generation type for credits
+function getGenerationTypeForQuality(quality: VideoQuality): GenerationType {
+  return quality === 'fast' ? 'video_veo31_fast' : 'video_veo31_standard'
 }
 
 export async function POST(request: NextRequest) {
@@ -41,8 +39,8 @@ export async function POST(request: NextRequest) {
       quality?: VideoQuality // 'standard' (default) or 'fast'
     }
 
-    // Default to standard quality if not specified
-    const videoQuality: VideoQuality = quality || 'standard'
+    // Default to fast quality (moins cher)
+    const videoQuality: VideoQuality = quality || 'fast'
 
     if (!prompt || !firstFrameUrl || !engine || !duration) {
       return NextResponse.json(
@@ -51,22 +49,27 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Determine generation type based on duration (4s, 6s, or 8s)
-    const generationType = getGenerationTypeForDuration(duration)
+    // Determine generation type based on quality (standard or fast)
+    const generationType = getGenerationTypeForQuality(videoQuality)
+    
+    // Get price per second from DB
+    const pricePerSecond = await getGenerationCost(generationType)
+    
+    // Calculate total cost based on duration
+    const totalCost = pricePerSecond * duration
 
-    // Check credits (unless skipped for testing)
-    if (!skipCredits) {
-      const creditsCheck = await checkCredits(user.id, generationType, user.email)
+    // Check credits (unless skipped for testing or admin)
+    if (!skipCredits && !isAdminEmail(user.email)) {
+      const userCredits = await getUserCredits(user.id)
       
-      if (!creditsCheck.hasEnough) {
+      if (!userCredits || userCredits.balance < totalCost) {
         return NextResponse.json(
           { 
             error: 'Crédits insuffisants',
             code: 'INSUFFICIENT_CREDITS',
-            required: creditsCheck.requiredAmount,
-            current: creditsCheck.currentBalance,
-            missing: creditsCheck.missingAmount,
-            isEarlyBirdEligible: creditsCheck.isEarlyBirdEligible,
+            required: totalCost,
+            current: userCredits?.balance || 0,
+            missing: totalCost - (userCredits?.balance || 0),
           },
           { status: 402 }
         )
@@ -86,7 +89,7 @@ export async function POST(request: NextRequest) {
         engine,
         quality: videoQuality,
       },
-      // Le coût estimé est lu depuis la DB automatiquement dans createGenerationLog
+      estimatedCostCents: totalCost,
       campaignId,
       clipId,
     })
@@ -94,33 +97,31 @@ export async function POST(request: NextRequest) {
     // Generate video
     const videoUrl = await generateVideo(prompt, firstFrameUrl, engine, duration, videoQuality)
 
-    // Get billed cost
-    const billedCost = await getGenerationCost(generationType)
-
     // Mark log as completed
     if (logId) {
-      await markGenerationCompleted(logId, videoUrl, startTime, billedCost, {
+      await markGenerationCompleted(logId, videoUrl, startTime, totalCost, {
         durationSeconds: duration,
       })
     }
 
     // Deduct credits after successful generation
-    if (!skipCredits) {
-      const deductResult = await deductCredits(
-        user.id,
-        generationType,
-        `Vidéo Veo 3 (${duration}s)`,
-        campaignId,
-        clipId,
-        user.email
-      )
+    if (!skipCredits && !isAdminEmail(user.email)) {
+      // Deduct manually with calculated cost
+      const { error: deductError } = await supabase.rpc('deduct_credits', {
+        p_user_id: user.id,
+        p_amount: totalCost,
+        p_description: `Vidéo Veo 3.1 ${videoQuality === 'fast' ? 'Fast' : 'Standard'} (${duration}s)`,
+        p_generation_type: generationType,
+        p_campaign_id: campaignId || null,
+        p_clip_id: clipId || null,
+      })
       
-      if (!deductResult.success) {
-        console.error('Failed to deduct credits:', deductResult.errorMessage)
+      if (deductError) {
+        console.error('Failed to deduct credits:', deductError)
       }
     }
 
-    return NextResponse.json({ videoUrl, logId, quality: videoQuality })
+    return NextResponse.json({ videoUrl, logId, quality: videoQuality, cost: totalCost })
   } catch (error) {
     console.error('Error generating video:', error)
     

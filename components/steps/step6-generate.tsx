@@ -630,9 +630,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     
     try {
       // Calculer le coût total : vidéo + voix + ambiance pour chaque clip
-      // On utilise video_veo31_6s par défaut (la durée standard)
+      // On utilise video_veo31_fast par défaut (mode économique)
       const generations = [
-        { type: 'video_veo31_6s' as const, count: clipsToGenerate.length },
+        { type: 'video_veo31_fast' as const, count: clipsToGenerate.length * 6 }, // × durée en secondes
         { type: 'voice_chatterbox' as const, count: clipsToGenerate.length },
         { type: 'ambient_elevenlabs' as const, count: clipsToGenerate.length },
       ]

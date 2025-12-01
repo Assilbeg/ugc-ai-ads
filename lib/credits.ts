@@ -17,10 +17,8 @@ export function isAdminEmail(email: string | undefined): boolean {
 
 export type GenerationType = 
   | 'first_frame' 
-  | 'video_veo31'      // Alias pour compatibilité (= 6s)
-  | 'video_veo31_4s'   // Vidéo 4 secondes
-  | 'video_veo31_6s'   // Vidéo 6 secondes  
-  | 'video_veo31_8s'   // Vidéo 8 secondes
+  | 'video_veo31_standard'  // Veo 3.1 Standard - prix par seconde
+  | 'video_veo31_fast'      // Veo 3.1 Fast - prix par seconde
   | 'voice_chatterbox' 
   | 'ambient_elevenlabs'
 
