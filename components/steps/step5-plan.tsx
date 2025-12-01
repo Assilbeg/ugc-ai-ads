@@ -581,6 +581,60 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
     }
   }, [clips, onClipsGenerated])
 
+  // ══════════════════════════════════════════════════════════════
+  // SAUVEGARDER LES CLIPS EN BDD DÈS QU'ILS SONT GÉNÉRÉS
+  // ══════════════════════════════════════════════════════════════
+  const saveClipsToDb = useCallback(async (clipsToSave: CampaignClip[]) => {
+    if (!state.campaign_id || clipsToSave.length === 0) return
+
+    try {
+      // Supprimer les anciens clips et insérer les nouveaux
+      const { error: deleteError } = await (supabase
+        .from('campaign_clips') as any)
+        .delete()
+        .eq('campaign_id', state.campaign_id)
+
+      if (deleteError) {
+        console.warn('[Step5] Error deleting old clips:', deleteError)
+      }
+
+      const clipsToInsert = clipsToSave.map(clip => ({
+        campaign_id: state.campaign_id,
+        order: clip.order,
+        beat: clip.beat,
+        first_frame: clip.first_frame,
+        script: clip.script,
+        video: clip.video,
+        audio: clip.audio || {},
+        status: clip.status || 'pending',
+      }))
+
+      const { error: insertError } = await (supabase
+        .from('campaign_clips') as any)
+        .insert(clipsToInsert)
+
+      if (insertError) {
+        console.error('[Step5] Error saving clips to DB:', insertError)
+        return
+      }
+
+      console.log('[Step5] ✓ Clips saved to DB:', clipsToSave.length)
+    } catch (err) {
+      console.error('[Step5] Error saving clips to DB:', err)
+    }
+  }, [state.campaign_id, supabase])
+
+  // Auto-save clips when they change (and we have a campaign_id)
+  useEffect(() => {
+    // Ne sauvegarder que si :
+    // 1. On a un campaign_id
+    // 2. On a des clips
+    // 3. Les clips n'ont pas été restaurés depuis la BDD (éviter boucle)
+    if (state.campaign_id && clips.length > 0 && hasGenerated && !hasRestoredClips) {
+      saveClipsToDb(clips)
+    }
+  }, [clips, state.campaign_id, hasGenerated, hasRestoredClips, saveClipsToDb])
+
   const handleGeneratePlan = async () => {
     if (!actor || !preset || !state.brief.what_selling) return
 
