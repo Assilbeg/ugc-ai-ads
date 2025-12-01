@@ -324,19 +324,15 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       // Applique trim + speed avec audio synchronisé (100% fiable, pas de Cloudinary)
       const clipsNeedingProcessing = clipsData.filter(c => c.needsProcessing)
       
-      // DEBUG: Voir les ajustements bruts avant utilisation
-      console.log('[Assemble] DEBUG - Raw adjustments state:', JSON.stringify(adjustments, null, 2))
-      console.log('[Assemble] DEBUG - clips.length:', clips.length, 'generatedClips.length:', generatedClips.length)
-      
-      console.log('[Assemble] Adjustments check:', clipsData.map(c => ({
-        clipOrder: c.clipOrder,
-        originalIndex: c.originalIndex,
-        adjustmentFound: !!adjustments[c.originalIndex],
+      console.log('[Assemble] Processing', clipsData.length, 'clips')
+      console.log('[Assemble] Adjustments from state:', JSON.stringify(adjustments, null, 2))
+      console.log('[Assemble] ClipsData with adjustments:', clipsData.map(c => ({
+        order: c.clipOrder,
         trimStart: c.trimStart,
         trimEnd: c.trimEnd,
         speed: c.speed,
         originalDuration: c.originalDuration,
-        needsProcessing: c.needsProcessing
+        calculatedDuration: c.duration
       })))
       console.log('[Assemble] Clips needing processing:', clipsNeedingProcessing.length)
       
@@ -346,18 +342,19 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         // Traiter en parallèle pour plus de rapidité
         await Promise.all(clipsNeedingProcessing.map(async (clipData) => {
           try {
-            console.log(`[Assemble] Processing clip ${clipData.clipOrder}...`)
+            const payload = {
+              videoUrl: clipData.rawUrl,
+              trimStart: clipData.trimStart,
+              trimEnd: clipData.trimEnd,
+              speed: clipData.speed,
+              duration: clipData.originalDuration,
+            }
+            console.log(`[Assemble] Processing clip ${clipData.clipOrder}:`, payload)
             
             const response = await fetch('/api/generate/process-clip', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                videoUrl: clipData.rawUrl,
-                trimStart: clipData.trimStart,
-                trimEnd: clipData.trimEnd,
-                speed: clipData.speed,
-                duration: clipData.originalDuration,
-              })
+              body: JSON.stringify(payload)
             })
             
             if (response.ok) {
@@ -383,14 +380,6 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       
       // Préparer les clips pour l'assemblage final
       // Note: trim/speed déjà appliqués par Transloadit, donc on envoie juste les URLs
-      console.log('[Assemble] URLs comparison (original vs processed):')
-      clipsData.forEach(c => {
-        const originalUrl = c.clip.video.final_url || c.clip.video.raw_url
-        console.log(`[Assemble]   Clip ${c.clipOrder}: ${c.rawUrl === originalUrl ? '❌ SAME (not processed!)' : '✅ DIFFERENT (processed)'}`)
-        console.log(`[Assemble]     Original: ${originalUrl?.slice(0, 80)}...`)
-        console.log(`[Assemble]     Current:  ${c.rawUrl?.slice(0, 80)}...`)
-      })
-      
       const clipsForAssembly = clipsData.map(({ rawUrl, duration, clipOrder }) => ({
         rawUrl,
         duration,
@@ -443,12 +432,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         throw new Error(result.error || 'Erreur assemblage')
       }
       
-      // DEBUG: Pause de 5 secondes pour voir les logs dans la console
-      console.log('[Assemble] ⏳ Waiting 5 seconds before redirect... Check the logs above!')
-      await new Promise(resolve => setTimeout(resolve, 5000))
-      
-      // 3. Assemblage terminé ! Rediriger vers la page campagne
-      console.log('[Assemble] Success! Redirecting...')
+      // Assemblage terminé ! Rediriger vers la page campagne
+      console.log('[Assemble] ✅ Success! Redirecting to campaign page...')
       window.location.href = `/campaign/${campaignId}`
       
     } catch (err) {
