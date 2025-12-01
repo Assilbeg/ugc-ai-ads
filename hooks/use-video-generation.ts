@@ -421,8 +421,9 @@ export function useVideoGeneration() {
         }
       }
 
-      // ── REFAIRE LE MIXAGE après régénération voix/ambiance ──
-      if (what === 'voice' || what === 'ambient' || what === 'all') {
+      // ── REFAIRE LE MIXAGE après régénération vidéo/voix/ambiance ──
+      // IMPORTANT: Aussi refaire le mix quand on régénère la vidéo pour garder la voix/ambiance
+      if (what === 'video' || what === 'voice' || what === 'ambient' || what === 'all') {
         const rawVideoUrl = updatedClip.video.raw_url
         const voiceUrl = updatedClip.audio?.transformed_voice_url
         const ambientUrl = updatedClip.audio?.ambient_url
