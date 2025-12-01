@@ -79,29 +79,32 @@ export async function POST(request: NextRequest) {
         robot: '/http/import',
         url: videoUrl
       },
-      // 2. Encoder avec trim + speed
-      // IMPORTANT: preset "empty" pour permettre les filtres custom
-      processed: {
+      // 2. D'abord le trim (coupe la vidéo)
+      trimmed: {
         robot: '/video/encode',
         use: 'imported',
-        result: true,
-        preset: 'empty',  // Crucial pour que les filtres FFmpeg fonctionnent !
+        result: !hasSpeed, // Résultat final seulement si pas de speed
+        preset: 'ipad-high', // Preset standard pour le trim
         ffmpeg_stack: 'v7.0.0',
-        rotate: false,
-        // TOUJOURS appliquer le clip pour garantir la durée exacte
-        // (même si trimStart=0, on veut s'assurer que la durée est exacte)
         clip: {
           offset_start: trimStart,
           duration: trimmedDuration
-        },
-        // Speed avec audio sync via filter_complex
-        ...(hasSpeed ? {
+        }
+      },
+      // 3. Ensuite le speed (si nécessaire) - sur la vidéo déjà trimmée
+      ...(hasSpeed ? {
+        processed: {
+          robot: '/video/encode',
+          use: 'trimmed',
+          result: true,
+          preset: 'empty', // Empty pour les filtres custom
+          ffmpeg_stack: 'v7.0.0',
           ffmpeg: {
             'filter_complex': `[0:v]setpts=${ptsFactor}*PTS[v];[0:a]atempo=${speed}[a]`,
             'map': ['[v]', '[a]']
           }
-        } : {})
-      }
+        }
+      } : {})
     }
     
     console.log('[ProcessClip] Assembly steps:', JSON.stringify(steps, null, 2))
@@ -119,15 +122,18 @@ export async function POST(request: NextRequest) {
       throw new Error(result.message || 'Assembly failed')
     }
 
-    // Récupérer l'URL de sortie
-    const outputUrl = result.results?.processed?.[0]?.ssl_url
+    // Récupérer l'URL de sortie (processed si speed, sinon trimmed)
+    const outputUrl = hasSpeed 
+      ? result.results?.processed?.[0]?.ssl_url
+      : result.results?.trimmed?.[0]?.ssl_url
     
     if (!outputUrl) {
       console.error('[ProcessClip] No output URL in result:', result.results)
+      console.error('[ProcessClip] hasSpeed:', hasSpeed, 'Looking for:', hasSpeed ? 'processed' : 'trimmed')
       throw new Error('No output URL')
     }
 
-    console.log('[ProcessClip] ✓ Processed:', outputUrl.slice(0, 60))
+    console.log('[ProcessClip] ✓ Processed:', outputUrl.slice(0, 60), '(hasSpeed:', hasSpeed, ')')
 
     return NextResponse.json({
       videoUrl: outputUrl,
