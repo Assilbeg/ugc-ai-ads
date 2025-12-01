@@ -1,115 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { buildPreviewUrl } from '@/lib/api/cloudinary'
-import { v2 as cloudinary } from 'cloudinary'
 
 // fal.ai configuration
 const FAL_KEY = process.env.FAL_KEY
 
-// Cloudinary configuration
-const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_CLOUD_NAME
-const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY
-const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET
-
-cloudinary.config({
-  cloud_name: CLOUDINARY_CLOUD_NAME,
-  api_key: CLOUDINARY_API_KEY,
-  api_secret: CLOUDINARY_API_SECRET,
-})
-
-interface Keyframe {
-  url: string
-  timestamp: number  // Position dans la timeline (en secondes)
-  duration: number   // Durée du clip (en secondes)
+// Interface pour fal.ai ffmpeg-api/run (concat)
+interface FFmpegRunInput {
+  input_files: { url: string }[]
+  arguments: string
 }
 
-interface Track {
-  id: string
-  type: 'video' | 'audio'
-  keyframes: Keyframe[]
-}
-
-interface ComposeInput {
-  tracks: Track[]
-}
-
-interface ComposeOutput {
-  video_url: string
-  thumbnail_url: string
+interface FFmpegRunOutput {
+  files: { url: string; content_type: string; file_name: string; file_size: number }[]
 }
 
 /**
- * Input pour chaque clip avec ses ajustements (nouveau format)
+ * Input pour chaque clip (simplifié - trim/speed déjà appliqués par Transloadit)
  */
-interface ClipInputNew {
-  rawUrl: string          // URL brute de la vidéo (ou final_url si mixée)
-  duration: number        // Durée finale en secondes (après ajustements)
+interface ClipInput {
+  rawUrl: string          // URL de la vidéo (déjà traitée si trim/speed)
+  duration: number        // Durée finale en secondes
   clipOrder?: number      // Ordre du clip dans la campagne
-  trimStart?: number      // Début du trim (secondes)
-  trimEnd?: number        // Fin du trim (secondes)
-  speed?: number          // Vitesse (0.8 à 1.2)
-  cloudinaryId?: string   // ID Cloudinary si déjà uploadé
-  originalDuration?: number // Durée originale du clip
-  hasMixedAudio?: boolean // Si true, la vidéo contient déjà l'audio mixé
-}
-
-/**
- * Ancien format (compatibilité)
- */
-interface ClipInputOld {
-  url: string
-  duration: number
-  clipOrder?: number
-  trimStart?: number
-  trimEnd?: number
-  speed?: number
-  cloudinaryId?: string
-}
-
-type ClipInput = ClipInputNew | ClipInputOld
-
-/**
- * Upload une vidéo vers Cloudinary si nécessaire
- */
-async function uploadToCloudinaryIfNeeded(
-  rawUrl: string, 
-  cloudinaryId?: string
-): Promise<string | null> {
-  if (cloudinaryId) {
-    console.log('[Assemble] Using existing Cloudinary ID:', cloudinaryId)
-    return cloudinaryId
-  }
-  
-  // Vérifier les credentials
-  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
-    console.error('[Assemble] CLOUDINARY CREDENTIALS MISSING!', {
-      hasCloudName: !!CLOUDINARY_CLOUD_NAME,
-      hasApiKey: !!CLOUDINARY_API_KEY,
-      hasApiSecret: !!CLOUDINARY_API_SECRET,
-    })
-    return null
-  }
-  
-  try {
-    console.log('[Assemble] Uploading to Cloudinary...', {
-      url: rawUrl.slice(0, 60),
-      cloudName: CLOUDINARY_CLOUD_NAME,
-    })
-    const result = await cloudinary.uploader.upload(rawUrl, {
-      resource_type: 'video',
-      folder: 'ugc-clips',
-    })
-    console.log('[Assemble] ✓ Uploaded to Cloudinary:', result.public_id)
-    return result.public_id
-  } catch (err: unknown) {
-    const error = err as Error & { http_code?: number; message?: string }
-    console.error('[Assemble] ✗ Cloudinary upload FAILED:', {
-      message: error.message,
-      httpCode: error.http_code,
-      url: rawUrl.slice(0, 60),
-    })
-    return null
-  }
 }
 
 /**
@@ -144,7 +55,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Support ancien format (videoUrls) ou nouveau format (clips)
-    let clipsToProcess: ClipInput[] = clips || (videoUrls?.map(url => ({ url, duration: 6 })) ?? [])
+    const clipsToProcess: ClipInput[] = clips || (videoUrls?.map(url => ({ rawUrl: url, duration: 6 })) ?? [])
 
     if (clipsToProcess.length === 0) {
       if (campaignId) await updateCampaignStatus(supabase, campaignId, 'failed')
@@ -163,96 +74,67 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('[Assemble] Starting assembly of', clipsToProcess.length, 'clips')
-    console.log('[Assemble] Raw clips data:', JSON.stringify(clipsToProcess, null, 2))
+    console.log('[Assemble] Clips data:', JSON.stringify(clipsToProcess, null, 2))
 
-    // Traiter chaque clip
-    // NOTE: Les clips avec audio mixé sont déjà pré-traités par Transloadit (/api/generate/process-clip)
-    // Pour les clips SANS audio, on utilise Cloudinary pour trim/speed (plus rapide)
-    const processedClips: { url: string; duration: number; clipOrder: number }[] = []
-    
-    for (let i = 0; i < clipsToProcess.length; i++) {
-      const clip = clipsToProcess[i]
-      const rawUrl = 'rawUrl' in clip ? clip.rawUrl : clip.url
-      const trimStart = clip.trimStart ?? 0
-      const trimEnd = clip.trimEnd ?? ('originalDuration' in clip ? clip.originalDuration : clip.duration) ?? clip.duration
-      const speed = clip.speed ?? 1.0
-      const originalDuration = 'originalDuration' in clip ? clip.originalDuration : clip.duration
-      const hasMixedAudio = 'hasMixedAudio' in clip ? clip.hasMixedAudio : false
-      
+    // Les clips arrivent déjà traités (trim/speed appliqués par Transloadit côté client)
+    // On les prépare simplement pour FFmpeg concat
+    const processedClips = clipsToProcess.map((clip, i) => {
       console.log(`[Assemble] Clip ${i + 1}:`, {
-        rawUrl: rawUrl?.slice(0, 60),
-        trimStart, trimEnd, speed,
-        originalDuration,
-        hasMixedAudio,
+        url: clip.rawUrl?.slice(0, 80),
         duration: clip.duration,
+        clipOrder: clip.clipOrder,
       })
       
-      let finalUrl = rawUrl
-      
-      // Pour les clips SANS audio mixé, on peut utiliser Cloudinary pour trim/speed
-      // Pour les clips AVEC audio mixé, ils sont déjà pré-traités (trim=0, speed=1)
-      const needsCloudinaryTransform = !hasMixedAudio && (trimStart !== 0 || trimEnd !== originalDuration || speed !== 1.0)
-      
-      if (needsCloudinaryTransform) {
-        console.log(`[Assemble] Clip ${i + 1} - Applying Cloudinary transforms...`)
-        const cloudinaryId = await uploadToCloudinaryIfNeeded(rawUrl, clip.cloudinaryId)
-        
-        if (cloudinaryId) {
-          const cloudinaryUrl = `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/video/upload/${cloudinaryId}.mp4`
-          finalUrl = buildPreviewUrl(cloudinaryUrl, { trimStart, trimEnd, speed })
-          console.log(`[Assemble] Clip ${i + 1} - Transformed URL:`, finalUrl.slice(0, 100))
-        }
-      }
-      
-      processedClips.push({
-        url: finalUrl,
+      return {
+        url: clip.rawUrl,
         duration: clip.duration,
-        clipOrder: clip.clipOrder ?? processedClips.length + 1
-      })
-    }
-
-    // Construire les keyframes avec timestamp cumulatif
-    // IMPORTANT: fal.ai attend timestamp et duration en MILLISECONDES, pas en secondes !
-    let currentTimestamp = 0
-    const keyframes: Keyframe[] = processedClips.map((clip) => {
-      const durationMs = clip.duration * 1000  // Convertir secondes → millisecondes
-      const keyframe: Keyframe = {
-        url: clip.url,
-        timestamp: currentTimestamp,
-        duration: durationMs
+        clipOrder: clip.clipOrder ?? i + 1
       }
-      currentTimestamp += durationMs
-      return keyframe
     })
 
-    const totalDurationMs = currentTimestamp
+    // ═══════════════════════════════════════════════════════════════════
+    // UTILISER FFMPEG CONCAT - Pas de durée fixe = pas de décalage lipsync !
+    // On utilise la durée RÉELLE des vidéos, pas la durée planifiée
+    // ═══════════════════════════════════════════════════════════════════
+    
     console.log('[Assemble] ═══════════════════════════════════════')
-    console.log('[Assemble] FINAL KEYFRAMES FOR FAL.AI (in milliseconds):')
-    keyframes.forEach((k, i) => {
-      console.log(`[Assemble]   Clip ${i + 1}: ${k.url.slice(0, 80)}...`)
-      console.log(`[Assemble]            timestamp: ${k.timestamp}ms, duration: ${k.duration}ms`)
+    console.log('[Assemble] Using FFmpeg concat (real durations):')
+    processedClips.forEach((c, i) => {
+      console.log(`[Assemble]   Clip ${i + 1}: ${c.url.slice(0, 80)}...`)
     })
-    console.log('[Assemble] Total duration:', totalDurationMs, 'ms (', totalDurationMs / 1000, 's)')
     console.log('[Assemble] ═══════════════════════════════════════')
 
-    const videoTrack: Track = {
-      id: 'video-track',
-      type: 'video',
-      keyframes
+    // Préparer les fichiers d'entrée pour fal.ai
+    const input_files = processedClips.map(c => ({ url: c.url }))
+    
+    // Construire la commande FFmpeg concat
+    // Pour N vidéos: [0:v:0][0:a:0][1:v:0][1:a:0]...[N:v:0][N:a:0]concat=n=N:v=1:a=1[outv][outa]
+    const n = processedClips.length
+    
+    // Construire les streams d'entrée
+    let filterInputs = ''
+    for (let i = 0; i < n; i++) {
+      filterInputs += `[${i}:v:0][${i}:a:0]`
+    }
+    
+    // La commande complète
+    const ffmpegArgs = `-filter_complex "${filterInputs}concat=n=${n}:v=1:a=1[outv][outa]" -map "[outv]" -map "[outa]" -c:v libx264 -preset fast -crf 23 -c:a aac -b:a 128k output.mp4`
+    
+    console.log('[Assemble] FFmpeg command:', ffmpegArgs)
+    
+    const ffmpegInput: FFmpegRunInput = {
+      input_files,
+      arguments: ffmpegArgs
     }
 
-    const input: ComposeInput = {
-      tracks: [videoTrack]
-    }
-
-    // Appeler fal.ai FFmpeg compose
-    const response = await fetch('https://fal.run/fal-ai/ffmpeg-api/compose', {
+    // Appeler fal.ai FFmpeg run (concat = durées réelles)
+    const response = await fetch('https://fal.run/fal-ai/ffmpeg-api/run', {
       method: 'POST',
       headers: {
         'Authorization': `Key ${FAL_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(input)
+      body: JSON.stringify(ffmpegInput)
     })
 
     if (!response.ok) {
@@ -261,25 +143,27 @@ export async function POST(request: NextRequest) {
       throw new Error(`fal.ai error: ${response.status}`)
     }
 
-    const result: ComposeOutput = await response.json()
-    console.log('[Assemble] Video assembled:', result.video_url?.slice(0, 50))
+    const result: FFmpegRunOutput = await response.json()
+    const outputFile = result.files?.[0]
+    
+    if (!outputFile?.url) {
+      throw new Error('No output file from FFmpeg')
+    }
+    
+    console.log('[Assemble] Video assembled:', outputFile.url?.slice(0, 50))
 
     // Préparer les ajustements pour la sauvegarde
-    const clipAdjustments = clipsToProcess.map((clip, index) => {
-      const rawUrl = 'rawUrl' in clip ? clip.rawUrl : clip.url
-      return {
-        clip_order: clip.clipOrder ?? index + 1,
-        trim_start: clip.trimStart ?? 0,
-        trim_end: clip.trimEnd ?? clip.duration,
-        speed: clip.speed ?? 1.0,
-        cloudinary_id: clip.cloudinaryId ?? null,
-        original_url: rawUrl,
-        final_duration: clip.duration
-      }
-    })
+    const clipAdjustments = clipsToProcess.map((clip, index) => ({
+      clip_order: clip.clipOrder ?? index + 1,
+      original_url: clip.rawUrl,
+      final_duration: clip.duration
+    }))
+
+    // Estimer la durée totale (somme des durées planifiées)
+    const estimatedDuration = processedClips.reduce((sum, c) => sum + c.duration, 0)
 
     // Sauvegarder dans campaign_assemblies (versioning)
-    if (campaignId && result.video_url) {
+    if (campaignId && outputFile.url) {
       const supabase = await createClient()
       
       // 1. Créer une nouvelle entrée dans campaign_assemblies
@@ -287,9 +171,9 @@ export async function POST(request: NextRequest) {
         .from('campaign_assemblies') as any)
         .insert({
           campaign_id: campaignId,
-          final_video_url: result.video_url,
-          thumbnail_url: result.thumbnail_url || null,
-          duration_seconds: totalDurationMs / 1000, // Stocker en secondes
+          final_video_url: outputFile.url,
+          thumbnail_url: null, // FFmpeg run ne retourne pas de thumbnail
+          duration_seconds: estimatedDuration,
           clip_adjustments: clipAdjustments
         })
         .select()
@@ -303,7 +187,7 @@ export async function POST(request: NextRequest) {
           await (supabase
             .from('campaigns') as any)
             .update({ 
-              final_video_url: result.video_url,
+              final_video_url: outputFile.url,
               status: 'completed'
             })
             .eq('id', campaignId)
@@ -316,7 +200,7 @@ export async function POST(request: NextRequest) {
       await (supabase
         .from('campaigns') as any)
         .update({ 
-          final_video_url: result.video_url,
+          final_video_url: outputFile.url,
           status: 'completed'
         })
         .eq('id', campaignId)
@@ -325,18 +209,16 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      videoUrl: result.video_url,
-      thumbnailUrl: result.thumbnail_url,
-      duration: totalDurationMs / 1000, // Convertir ms → secondes pour le client
+      videoUrl: outputFile.url,
+      thumbnailUrl: null,
+      duration: estimatedDuration,
       clipCount: clipsToProcess.length,
       // Debug: URLs utilisées pour l'assemblage
       debug: {
-        cloudinaryConfigured: !!(CLOUDINARY_CLOUD_NAME && CLOUDINARY_API_KEY && CLOUDINARY_API_SECRET),
+        method: 'ffmpeg-concat',
         processedClips: processedClips.map((c) => ({
           clipOrder: c.clipOrder,
           urlUsed: c.url.slice(0, 120),
-          isCloudinary: c.url.includes('cloudinary.com'),
-          hasTransforms: c.url.includes('so_') || c.url.includes('eo_') || c.url.includes('e_accelerate'),
         }))
       }
     })

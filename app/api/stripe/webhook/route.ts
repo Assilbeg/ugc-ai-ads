@@ -83,6 +83,32 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
 
   console.log(`[Stripe] Checkout completed for user ${userId}, plan ${planId}`)
 
+  // Update user's Stripe customer ID
+  await supabaseAdmin
+    .from('user_credits')
+    .update({ stripe_customer_id: customerId })
+    .eq('user_id', userId)
+
+  // Handle custom admin payment
+  if (planId === 'custom_admin') {
+    const creditsAmount = parseInt(session.metadata?.credits_amount || '0')
+    if (creditsAmount > 0) {
+      const result = await addCredits(
+        userId,
+        creditsAmount,
+        `Recharge Admin ${(creditsAmount / 100).toFixed(2)}€`,
+        'purchase',
+        session.payment_intent as string
+      )
+      if (result.success) {
+        console.log(`[Stripe] Added ${creditsAmount} custom credits to admin ${userId}`)
+      } else {
+        console.error('Failed to add custom credits:', result.errorMessage)
+      }
+    }
+    return
+  }
+
   // Get plan details
   const { data: plan } = await supabaseAdmin
     .from('subscription_plans')
@@ -94,12 +120,6 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     console.error(`Plan ${planId} not found`)
     return
   }
-
-  // Update user's Stripe customer ID
-  await supabaseAdmin
-    .from('user_credits')
-    .update({ stripe_customer_id: customerId })
-    .eq('user_id', userId)
 
   if (plan.is_one_time) {
     // One-time payment (Early Bird)

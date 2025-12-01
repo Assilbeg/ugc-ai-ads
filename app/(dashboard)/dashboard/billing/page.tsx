@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { BillingActions } from './billing-actions'
 import { formatCredits, getRemainingGenerations, getAllGenerationCosts, CreditTransaction } from '@/lib/credits'
+import { isAdmin } from '@/lib/admin'
 
 export default async function BillingPage() {
   const supabase = await createClient()
@@ -27,6 +28,8 @@ export default async function BillingPage() {
   if (authError || !user) {
     redirect('/login')
   }
+
+  const userIsAdmin = isAdmin(user.email)
 
   // Get user credits
   const { data: userCredits, error: creditsError } = await (supabase
@@ -129,6 +132,7 @@ export default async function BillingPage() {
               <BillingActions 
                 hasStripeCustomer={!!userCredits?.stripe_customer_id}
                 showEarlyBird={true}
+                isAdmin={userIsAdmin}
               />
             </div>
           </CardContent>
@@ -251,6 +255,7 @@ export default async function BillingPage() {
         <BillingActions 
           hasStripeCustomer={!!userCredits?.stripe_customer_id}
           showEarlyBird={false}
+          isAdmin={userIsAdmin}
         />
       </div>
 

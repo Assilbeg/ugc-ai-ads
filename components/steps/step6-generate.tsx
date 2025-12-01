@@ -7,8 +7,7 @@ import { useActors } from '@/hooks/use-actors'
 import { useCampaignCreation } from '@/hooks/use-campaign-creation'
 import { getPresetById } from '@/lib/presets'
 import { createClient } from '@/lib/supabase/client'
-import { buildPreviewUrl, calculateAdjustedDuration } from '@/lib/api/cloudinary'
-// Trim + Speed processing done server-side via Transloadit (/api/generate/process-clip)
+import { calculateAdjustedDuration } from '@/lib/api/video-utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -270,78 +269,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         trimStart: 0,
         trimEnd: clip.video.duration,
         speed: 1.0,
-        isApplied: false,
-        // Garder cloudinaryId si déjà uploadé
-        cloudinaryId: prev[index]?.cloudinaryId,
       }
     }))
   }, [clips, generatedClips])
-
-  // Appliquer les ajustements (uploader vers Cloudinary si nécessaire)
-  const applyAdjustments = useCallback(async (index: number) => {
-    const clip = generatedClips[index] || clips[index]
-    let adj = adjustments[index]
-    
-    if (!clip?.video?.raw_url || !adj) return
-    
-    // Si pas encore uploadé sur Cloudinary, uploader d'abord
-    if (!adj.cloudinaryId) {
-      setAdjustments(prev => ({
-        ...prev,
-        [index]: { ...prev[index], isUploading: true }
-      }))
-      
-      try {
-        const response = await fetch('/api/cloudinary/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ videoUrl: clip.video.raw_url })
-        })
-        
-        if (!response.ok) throw new Error('Upload failed')
-        
-        const data = await response.json()
-        adj = { ...adj, cloudinaryId: data.publicId }
-        setAdjustments(prev => ({
-          ...prev,
-          [index]: { ...prev[index], cloudinaryId: data.publicId, isUploading: false }
-        }))
-      } catch (err) {
-        console.error('Upload error:', err)
-        setAdjustments(prev => ({
-          ...prev,
-          [index]: { ...prev[index], isUploading: false }
-        }))
-        return
-      }
-    }
-    
-    const cloudinaryUrl = `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/video/upload/${adj.cloudinaryId}.mp4`
-    const adjustedUrl = buildPreviewUrl(cloudinaryUrl, {
-      trimStart: adj.trimStart,
-      trimEnd: adj.trimEnd,
-      speed: adj.speed
-    })
-    
-    setAdjustments(prev => ({
-      ...prev,
-      [index]: { ...prev[index], adjustedUrl, isApplied: true, isUploading: false }
-    }))
-    
-    // Mettre à jour le clip avec l'URL ajustée
-    const updatedClips = [...generatedClips]
-    if (updatedClips[index]) {
-      updatedClips[index] = {
-        ...updatedClips[index],
-        video: {
-          ...updatedClips[index].video,
-          final_url: adjustedUrl
-        }
-      }
-      setGeneratedClips(updatedClips)
-      onClipsUpdate(updatedClips)
-    }
-  }, [adjustments, generatedClips, clips, onClipsUpdate])
 
   // Assembler la vidéo finale (applique les ajustements automatiquement)
   // Pré-traite les clips avec trim/speed via Transloadit (/api/generate/process-clip)
@@ -363,9 +293,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           const speed = adj?.speed ?? 1.0
           const trimmedDuration = trimEnd - trimStart
           const duration = trimmedDuration / speed
-          const hasMixedAudio = !!clip.video.final_url
-          // Besoin de traitement si : audio mixé + (trim OU speed modifié)
-          const needsProcessing = hasMixedAudio && (trimStart > 0 || trimEnd !== originalDuration || speed !== 1.0)
+          // Besoin de traitement si : trim OU speed modifié (Transloadit pour TOUS)
+          const needsProcessing = trimStart > 0 || trimEnd !== originalDuration || speed !== 1.0
           
           return {
             clip,
@@ -376,15 +305,13 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
             trimStart,
             trimEnd,
             speed,
-            cloudinaryId: adj?.cloudinaryId,
             originalDuration,
-            hasMixedAudio,
             needsProcessing,
           }
         })
       
-      // Pré-traiter les clips avec audio via Transloadit
-      // Applique trim + speed avec audio synchronisé (100% fiable)
+      // Pré-traiter TOUS les clips avec trim/speed via Transloadit
+      // Applique trim + speed avec audio synchronisé (100% fiable, pas de Cloudinary)
       const clipsNeedingProcessing = clipsData.filter(c => c.needsProcessing)
       
       if (clipsNeedingProcessing.length > 0) {
@@ -429,16 +356,11 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       }
       
       // Préparer les clips pour l'assemblage final
-      const clipsForAssembly = clipsData.map(({ rawUrl, duration, clipOrder, trimStart, trimEnd, speed, cloudinaryId, originalDuration, hasMixedAudio }) => ({
+      // Note: trim/speed déjà appliqués par Transloadit, donc on envoie juste les URLs
+      const clipsForAssembly = clipsData.map(({ rawUrl, duration, clipOrder }) => ({
         rawUrl,
         duration,
         clipOrder,
-        trimStart,
-        trimEnd,
-        speed,
-        cloudinaryId,
-        originalDuration,
-        hasMixedAudio,
       }))
       
       console.log('[Assemble] Total clips:', clipsForAssembly.length)
@@ -737,8 +659,6 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           trimStart: 0,
           trimEnd: result.video.duration,
           speed: 1.0,
-          isApplied: false,
-          cloudinaryId: undefined, // Reset le cloudinaryId car nouvelle vidéo
         }
       }))
     }

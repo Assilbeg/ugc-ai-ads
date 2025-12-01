@@ -2,10 +2,38 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Users, Palette, FileText, BarChart3, Plus, Settings, Layers, CreditCard, Activity } from 'lucide-react'
+import { Users, Palette, FileText, BarChart3, Plus, Settings, Layers, CreditCard, Activity, Wallet } from 'lucide-react'
+
+// Fetch Fal.ai balance
+async function getFalBalance(): Promise<{ balance: number; currency: string } | null> {
+  const FAL_KEY = process.env.FAL_KEY
+  if (!FAL_KEY) return null
+  
+  try {
+    const response = await fetch('https://rest.fal.ai/billing/balance', {
+      headers: {
+        'Authorization': `Key ${FAL_KEY}`,
+      },
+      next: { revalidate: 60 }, // Cache for 60 seconds
+    })
+    
+    if (!response.ok) return null
+    
+    const data = await response.json()
+    return {
+      balance: data.balance || 0,
+      currency: data.currency || 'USD',
+    }
+  } catch {
+    return null
+  }
+}
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
+  
+  // Get Fal.ai balance
+  const falBalance = await getFalBalance()
   
   // Get counts
   const { count: actorsCount } = await (supabase
@@ -72,6 +100,31 @@ export default async function AdminDashboard() {
         <h1 className="text-3xl font-semibold tracking-tight">Dashboard Admin</h1>
         <p className="text-muted-foreground mt-2">Gérer les acteurs, presets et prompts</p>
       </div>
+
+      {/* Fal.ai Balance Card */}
+      {falBalance && (
+        <Card className="bg-gradient-to-r from-violet-500/10 to-purple-500/10 border-violet-500/20">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-violet-500/20 flex items-center justify-center">
+                  <Wallet className="w-6 h-6 text-violet-500" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg font-medium">Solde Fal.ai</CardTitle>
+                  <CardDescription>Crédits disponibles pour les générations IA</CardDescription>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-3xl font-bold text-violet-500">
+                  ${falBalance.balance.toFixed(2)}
+                </p>
+                <p className="text-sm text-muted-foreground">{falBalance.currency}</p>
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
