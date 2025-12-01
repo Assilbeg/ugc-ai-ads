@@ -659,24 +659,36 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
 
   const saveEdit = () => {
     if (editingClip !== null) {
-      updateClipScript(editingClip, editText)
+      const clipIndex = editingClip
+      const newText = editText
+      const currentClip = clips[clipIndex]
+      const scriptChanged = currentClip?.script.text !== newText
       
-      // Invalider la vidéo existante si le script a changé
-      // Pour forcer une régénération à l'étape 6
-      const currentClip = clips[editingClip]
-      if (currentClip?.video?.raw_url && currentClip.script.text !== editText) {
-        const updatedClips = [...clips]
-        updatedClips[editingClip] = {
-          ...updatedClips[editingClip],
-          video: {
-            ...updatedClips[editingClip].video,
-            raw_url: undefined, // Invalider pour forcer régénération
-            final_url: undefined,
-          },
-          status: 'pending',
+      // Utiliser functional updater pour éviter race conditions
+      // Met à jour le script ET invalide la vidéo si nécessaire en une seule opération
+      setClips(prevClips => {
+        const updatedClips = [...prevClips]
+        if (updatedClips[clipIndex]) {
+          updatedClips[clipIndex] = {
+            ...updatedClips[clipIndex],
+            script: {
+              ...updatedClips[clipIndex].script,
+              text: newText,
+              word_count: newText.split(/\s+/).filter(Boolean).length
+            },
+            // Invalider la vidéo existante si le script a changé
+            ...(scriptChanged && updatedClips[clipIndex].video?.raw_url ? {
+              video: {
+                ...updatedClips[clipIndex].video,
+                raw_url: undefined,
+                final_url: undefined,
+              },
+              status: 'pending' as const,
+            } : {}),
+          }
         }
-        setClips(updatedClips)
-      }
+        return updatedClips
+      })
       
       setEditingClip(null)
       setEditText('')
