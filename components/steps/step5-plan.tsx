@@ -563,13 +563,16 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
     loadPreset()
   }, [state.preset_id])
 
-  // Generate plan on mount
+  // Generate plan on mount - SEULEMENT si pas de clips existants dans le state parent
   useEffect(() => {
-    if (!hasGenerated && clips.length === 0 && actor && preset && state.brief.what_selling && !loading && !actorLoading && !presetLoading) {
+    // Ne PAS générer si des clips existent déjà (en cours de restauration ou déjà restaurés)
+    const hasExistingClips = state.generated_clips && state.generated_clips.length > 0
+    
+    if (!hasGenerated && clips.length === 0 && !hasExistingClips && actor && preset && state.brief.what_selling && !loading && !actorLoading && !presetLoading) {
       setHasGenerated(true)
       handleGeneratePlan()
     }
-  }, [actor, preset, state.brief.what_selling, hasGenerated, clips.length, loading, actorLoading, presetLoading])
+  }, [actor, preset, state.brief.what_selling, hasGenerated, clips.length, loading, actorLoading, presetLoading, state.generated_clips])
 
   // Sync clips with parent
   useEffect(() => {
