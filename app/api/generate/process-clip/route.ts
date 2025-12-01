@@ -46,15 +46,10 @@ export async function POST(request: NextRequest) {
     const hasTrim = trimStart > 0 || effectiveTrimEnd !== duration
     const hasSpeed = speed !== 1.0
 
-    // Si pas de transformation, retourner l'URL originale
-    if (!hasTrim && !hasSpeed) {
-      console.log('[ProcessClip] No transformations needed')
-      return NextResponse.json({ 
-        videoUrl,
-        processed: false,
-        duration
-      })
-    }
+    // TOUJOURS traiter pour garantir la durée exacte
+    // (fal.ai compose ne trim pas, il utilise la vidéo complète)
+    // Même sans trim/speed, on re-encode pour avoir une vidéo de la durée spécifiée
+    console.log('[ProcessClip] Will process - hasTrim:', hasTrim, 'hasSpeed:', hasSpeed)
 
     console.log('[ProcessClip] Processing with Transloadit:', {
       videoUrl: videoUrl.slice(0, 60),
@@ -93,13 +88,12 @@ export async function POST(request: NextRequest) {
         preset: 'empty',  // Crucial pour que les filtres FFmpeg fonctionnent !
         ffmpeg_stack: 'v7.0.0',
         rotate: false,
-        // Trim
-        ...(hasTrim ? {
-          clip: {
-            offset_start: trimStart,
-            duration: trimmedDuration
-          }
-        } : {}),
+        // TOUJOURS appliquer le clip pour garantir la durée exacte
+        // (même si trimStart=0, on veut s'assurer que la durée est exacte)
+        clip: {
+          offset_start: trimStart,
+          duration: trimmedDuration
+        },
         // Speed avec audio sync via filter_complex
         ...(hasSpeed ? {
           ffmpeg: {
