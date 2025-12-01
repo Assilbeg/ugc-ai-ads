@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { AssemblingAnimation } from './assembling-animation'
+import { EditableTitle } from './editable-title'
 
 interface CampaignPageProps {
   params: Promise<{ id: string }>
@@ -176,9 +177,12 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
             </div>
 
             {/* Titre */}
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground leading-tight">
-              {title}
-            </h1>
+            <EditableTitle
+              campaignId={id}
+              initialTitle={brief?.what_selling || 'Campagne UGC'}
+              brief={brief || {}}
+              className="text-2xl sm:text-3xl font-bold text-foreground leading-tight"
+            />
 
             {/* Badges */}
             <div className="flex flex-wrap gap-2">
@@ -247,9 +251,12 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
             <span className={`w-2 h-2 rounded-full ${status.dot}`} />
             {statusLabels[campaign.status]}
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">
-            {title}
-          </h1>
+          <EditableTitle
+            campaignId={id}
+            initialTitle={brief?.what_selling || 'Campagne UGC'}
+            brief={brief || {}}
+            className="text-2xl sm:text-3xl font-bold text-foreground mb-3"
+          />
           <div className="flex flex-wrap items-center gap-3">
             {preset && (
               <Badge variant="secondary" className="rounded-lg">{preset.name}</Badge>
