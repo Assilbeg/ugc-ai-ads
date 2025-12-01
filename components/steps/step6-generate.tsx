@@ -276,7 +276,16 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   // Assembler la vidéo finale (applique les ajustements automatiquement)
   // Pré-traite les clips avec trim/speed via Transloadit (/api/generate/process-clip)
   const assembleVideo = useCallback(async () => {
-    if (!campaignId) return
+    console.log('[Assemble] Starting assembly...', {
+      campaignId,
+      generatedClipsCount: generatedClips.length,
+      clipsWithVideo: generatedClips.filter(c => c?.video?.raw_url).length
+    })
+    
+    if (!campaignId) {
+      console.error('[Assemble] No campaignId!')
+      return
+    }
     
     setAssembling(true)
     
@@ -417,7 +426,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       window.location.href = `/campaign/${campaignId}`
       
     } catch (err) {
-      console.error('Assemble error:', err)
+      console.error('[Assemble] Error caught:', err)
+      alert(`Erreur d'assemblage: ${err instanceof Error ? err.message : 'Erreur inconnue'}`)
       setAssembling(false)
       // En cas d'erreur, mettre le status à failed
       await (supabase.from('campaigns') as any)
