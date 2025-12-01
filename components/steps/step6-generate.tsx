@@ -644,6 +644,12 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     )
 
     if (result) {
+      console.log('[Regenerate] New clip result:', {
+        clipIndex,
+        what,
+        raw_url: result.video?.raw_url?.slice(0, 80),
+        final_url: result.video?.final_url?.slice(0, 80),
+      })
       const updatedClips = [...generatedClips]
       updatedClips[clipIndex] = result
       setGeneratedClips(updatedClips)
@@ -875,7 +881,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
               const isGenerating = currentStatus !== 'pending' && currentStatus !== 'completed' && currentStatus !== 'failed'
               
               // Utiliser final_url (vidéo mixée avec audio) en priorité, sinon raw_url
-              const videoUrl = generatedClip?.video?.final_url || generatedClip?.video?.raw_url
+              // Ajouter un cache-buster pour forcer le refresh après régénération
+              const baseVideoUrl = generatedClip?.video?.final_url || generatedClip?.video?.raw_url
+              const videoUrl = baseVideoUrl ? `${baseVideoUrl}${baseVideoUrl.includes('?') ? '&' : '?'}t=${generatedClip?.video?.raw_url?.slice(-8) || ''}` : undefined
               const firstFrameUrl = clip.first_frame?.image_url || state.generated_first_frames?.[index]?.url
               
               return (
