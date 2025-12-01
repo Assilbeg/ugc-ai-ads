@@ -417,12 +417,13 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
       }))
       
       // Mettre à jour aussi le clip lui-même pour que ça persiste
+      // IMPORTANT: utiliser le clip passé en paramètre (qui peut avoir un prompt modifié)
       const updatedClips = [...clips]
       if (updatedClips[clipIndex]) {
         updatedClips[clipIndex] = {
           ...updatedClips[clipIndex],
           first_frame: {
-            ...updatedClips[clipIndex].first_frame,
+            ...clip.first_frame, // Utiliser le clip passé en paramètre pour garder le nouveau prompt
             image_url: data.url
           }
         }
