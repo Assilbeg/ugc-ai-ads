@@ -78,16 +78,23 @@ export default function ExistingCampaignPage() {
           return
         }
 
-        // Charger les clips associés
-        const { data: clips, error: clipsError } = await (supabase
-          .from('campaign_clips') as any)
-          .select('*')
-          .eq('campaign_id', campaignId)
-          .order('order', { ascending: true })
+      // Charger les clips associés
+      const { data: clips, error: clipsError } = await (supabase
+        .from('campaign_clips') as any)
+        .select('*')
+        .eq('campaign_id', campaignId)
+        .order('order', { ascending: true })
 
-        if (clipsError) {
-          console.error('Erreur chargement clips:', clipsError)
-        }
+      if (clipsError) {
+        console.error('[/new/[id]] Erreur chargement clips:', clipsError)
+      }
+      
+      console.log('[/new/[id]] Clips chargés depuis DB:', {
+        count: clips?.length || 0,
+        hasError: !!clipsError,
+        hasFirstFrames: clips?.filter((c: any) => c.first_frame?.image_url).length || 0,
+        hasVideos: clips?.filter((c: any) => c.video?.raw_url).length || 0,
+      })
 
         // Déterminer l'étape en fonction des données présentes
         let step: 1 | 2 | 3 | 4 | 5 | 6 = 2 // Par défaut step 2 après création

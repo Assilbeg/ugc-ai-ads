@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
 import { NewCampaignState, CampaignClip, CampaignBrief, Actor } from '@/types'
@@ -335,40 +335,57 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
 
   // Restaurer les clips et first frames depuis le state parent
   useEffect(() => {
-    if (!hasRestoredClips && state.generated_clips && state.generated_clips.length > 0 && clips.length === 0) {
-      setClips(state.generated_clips)
-      setHasGenerated(true)
-      setHasRestoredClips(true)
-      
-      // Initialiser firstFrames depuis le cache parent OU depuis les clips
-      const preGeneratedFrames: FirstFrameStatus = {}
-      
-      // D'abord, récupérer depuis le cache parent (prioritaire car plus fiable)
-      if (state.generated_first_frames) {
-        Object.entries(state.generated_first_frames).forEach(([indexStr, frame]) => {
-          const index = parseInt(indexStr)
-          if (frame.url) {
-            preGeneratedFrames[index] = { loading: false, url: frame.url }
+    // Si on a un campaign_id mais pas de clips, marquer comme "restauration tentée"
+    // Cela évite de bloquer indéfiniment le useEffect de génération
+    const isExistingCampaign = !!state.campaign_id
+    
+    if (!hasRestoredClips) {
+      if (state.generated_clips && state.generated_clips.length > 0 && clips.length === 0) {
+        // On a des clips à restaurer
+        console.log('[Step5] ✓ Restauration de', state.generated_clips.length, 'clips depuis le state parent')
+        
+        setClips(state.generated_clips)
+        setHasGenerated(true)
+        setHasRestoredClips(true)
+        
+        // Initialiser firstFrames depuis le cache parent OU depuis les clips
+        const preGeneratedFrames: FirstFrameStatus = {}
+        
+        // D'abord, récupérer depuis le cache parent (prioritaire car plus fiable)
+        if (state.generated_first_frames) {
+          Object.entries(state.generated_first_frames).forEach(([indexStr, frame]) => {
+            const index = parseInt(indexStr)
+            if (frame.url) {
+              preGeneratedFrames[index] = { loading: false, url: frame.url }
+            }
+          })
+        }
+        
+        // Ensuite, compléter avec les URLs dans les clips (pour step4)
+        state.generated_clips.forEach((clip, index) => {
+          if (clip.first_frame?.image_url && !preGeneratedFrames[index]) {
+            preGeneratedFrames[index] = { loading: false, url: clip.first_frame.image_url }
           }
         })
-      }
-      
-      // Ensuite, compléter avec les URLs dans les clips (pour step4)
-      state.generated_clips.forEach((clip, index) => {
-        if (clip.first_frame?.image_url && !preGeneratedFrames[index]) {
-          preGeneratedFrames[index] = { loading: false, url: clip.first_frame.image_url }
+        
+        console.log('[Step5] ✓ First frames restaurées:', Object.keys(preGeneratedFrames).length)
+        
+        if (Object.keys(preGeneratedFrames).length > 0) {
+          setFirstFrames(preGeneratedFrames)
         }
-      })
-      
-      if (Object.keys(preGeneratedFrames).length > 0) {
-        setFirstFrames(preGeneratedFrames)
+        
+        // Marquer les first frames comme restaurées APRÈS avoir mis à jour l'état
+        // Cela évite que l'auto-génération se déclenche avant que firstFrames soit à jour
+        setHasRestoredFirstFrames(true)
+      } else if (isExistingCampaign && (!state.generated_clips || state.generated_clips.length === 0)) {
+        // Campagne existante mais pas de clips à restaurer
+        // Marquer comme "restauration tentée" pour débloquer le useEffect de génération
+        console.log('[Step5] ⚠️ Campagne existante sans clips - permettre la génération')
+        setHasRestoredClips(true)
+        setHasRestoredFirstFrames(true)
       }
-      
-      // Marquer les first frames comme restaurées APRÈS avoir mis à jour l'état
-      // Cela évite que l'auto-génération se déclenche avant que firstFrames soit à jour
-      setHasRestoredFirstFrames(true)
     }
-  }, [state.generated_clips, state.generated_first_frames, clips.length, hasRestoredClips, setClips])
+  }, [state.generated_clips, state.generated_first_frames, clips.length, hasRestoredClips, setClips, state.campaign_id])
 
   // Generate first frame for a single clip
   // invalidateVideo = true quand c'est une régénération manuelle (pas la génération initiale)
@@ -635,11 +652,43 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
     // Ne PAS générer si des clips existent déjà (en cours de restauration ou déjà restaurés)
     const hasExistingClips = state.generated_clips && state.generated_clips.length > 0
     
+    // Si on a un campaign_id, c'est une campagne existante
+    // On doit attendre que la restauration soit tentée avant de générer
+    const isExistingCampaign = !!state.campaign_id
+    
+    // Conditions pour générer automatiquement :
+    // 1. Pas de génération en cours ou déjà faite
+    // 2. Pas de clips locaux
+    // 3. Pas de clips dans le state parent
+    // 4. Actor et preset chargés
+    // 5. Brief rempli
+    // 6. Si campagne existante, attendre que hasRestoredClips soit true (même si vide)
+    //    Cela signifie que la restauration a été tentée
+    const shouldWaitForRestore = isExistingCampaign && !hasRestoredClips
+    
+    console.log('[Step5] Check auto-generate:', {
+      hasGenerated,
+      clipsLength: clips.length,
+      hasExistingClips,
+      isExistingCampaign,
+      hasRestoredClips,
+      shouldWaitForRestore,
+      actorLoaded: !!actor,
+      presetLoaded: !!preset,
+      hasBrief: !!state.brief.what_selling,
+    })
+    
+    if (shouldWaitForRestore) {
+      console.log('[Step5] Waiting for restore to complete before deciding to generate')
+      return
+    }
+    
     if (!hasGenerated && clips.length === 0 && !hasExistingClips && actor && preset && state.brief.what_selling && !loading && !actorLoading && !presetLoading) {
+      console.log('[Step5] ⚡ Starting auto-generation')
       setHasGenerated(true)
       handleGeneratePlan()
     }
-  }, [actor, preset, state.brief.what_selling, hasGenerated, clips.length, loading, actorLoading, presetLoading, state.generated_clips])
+  }, [actor, preset, state.brief.what_selling, hasGenerated, clips.length, loading, actorLoading, presetLoading, state.generated_clips, state.campaign_id, hasRestoredClips])
 
   // Sync clips with parent
   useEffect(() => {
@@ -691,13 +740,36 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
     }
   }, [state.campaign_id, supabase])
 
+  // Ref pour tracker la dernière sauvegarde
+  const lastSavedClipsRef = useRef<string | null>(null)
+  
   // Auto-save clips when they change (and we have a campaign_id)
   useEffect(() => {
     // Ne sauvegarder que si :
     // 1. On a un campaign_id
     // 2. On a des clips
-    // 3. Les clips n'ont pas été restaurés depuis la BDD (éviter boucle)
-    if (state.campaign_id && clips.length > 0 && hasGenerated && !hasRestoredClips) {
+    // 3. Les clips n'ont pas été restaurés depuis la BDD (éviter boucle de sauvegarde initiale)
+    //    OU les clips ont changé depuis la dernière sauvegarde (modifications utilisateur)
+    if (!state.campaign_id || clips.length === 0) return
+    
+    // Créer une signature des clips pour détecter les changements réels
+    const clipsSignature = JSON.stringify(clips.map(c => ({
+      order: c.order,
+      beat: c.beat,
+      script: c.script?.text,
+      prompt: c.first_frame?.prompt,
+      imageUrl: c.first_frame?.image_url,
+    })))
+    
+    // Si les clips ont été restaurés et n'ont pas changé, ne pas re-sauvegarder
+    if (hasRestoredClips && lastSavedClipsRef.current === clipsSignature) {
+      return
+    }
+    
+    // Sauvegarder si c'est une nouvelle génération OU si les clips ont été modifiés
+    if (hasGenerated) {
+      console.log('[Step5] 💾 Sauvegarde des clips en DB:', clips.length)
+      lastSavedClipsRef.current = clipsSignature
       saveClipsToDb(clips)
     }
   }, [clips, state.campaign_id, hasGenerated, hasRestoredClips, saveClipsToDb])
