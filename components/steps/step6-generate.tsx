@@ -302,8 +302,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           const speed = adj?.speed ?? 1.0
           const trimmedDuration = trimEnd - trimStart
           const duration = trimmedDuration / speed
-          // Besoin de traitement si : trim OU speed modifié (Transloadit pour TOUS)
-          const needsProcessing = trimStart > 0 || trimEnd !== originalDuration || speed !== 1.0
+          // TOUJOURS traiter avec Transloadit pour garantir la durée exacte
+          // (fal.ai compose ne trim pas, il concatène les vidéos complètes)
+          const needsProcessing = true
           
           return {
             clip,
