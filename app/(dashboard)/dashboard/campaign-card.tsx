@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Video, Clock, Calendar, Pencil, Trash2 } from 'lucide-react'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
@@ -24,12 +24,57 @@ interface CampaignCardProps {
 export function CampaignCard({ campaign, presetName, statusConfig, onDelete }: CampaignCardProps) {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedTitle, setEditedTitle] = useState(campaign.brief?.what_selling || '')
+  const [saving, setSaving] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const status = statusConfig[campaign.status] || statusConfig.draft
   const title = campaign.brief?.what_selling || 'Sans titre'
   const duration = campaign.brief?.target_duration || 30
   const clipsCount = campaign.campaign_clips?.[0]?.count || 0
   const actor = campaign.actors
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus()
+      inputRef.current.select()
+    }
+  }, [isEditing])
+
+  const handleSaveTitle = async () => {
+    if (!editedTitle.trim() || editedTitle === title) {
+      setIsEditing(false)
+      setEditedTitle(title)
+      return
+    }
+
+    setSaving(true)
+    try {
+      const supabase = createClient()
+      const newBrief = { ...campaign.brief, what_selling: editedTitle.trim() }
+      await (supabase.from('campaigns') as any)
+        .update({ brief: newBrief })
+        .eq('id', campaign.id)
+      
+      window.location.reload()
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde:', error)
+      setEditedTitle(title)
+    } finally {
+      setSaving(false)
+      setIsEditing(false)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSaveTitle()
+    } else if (e.key === 'Escape') {
+      setIsEditing(false)
+      setEditedTitle(title)
+    }
+  }
 
   const handleDelete = async () => {
     setDeleting(true)
@@ -116,10 +161,45 @@ export function CampaignCard({ campaign, presetName, statusConfig, onDelete }: C
               </div>
             )}
             
-            {/* Title (what_selling) */}
-            <h3 className="font-medium text-sm text-foreground line-clamp-2 group-hover:text-primary transition-colors leading-tight">
-              {title}
-            </h3>
+            {/* Title (what_selling) - Editable */}
+            {isEditing ? (
+              <div 
+                className="flex items-center gap-1"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }}
+              >
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={editedTitle}
+                  onChange={(e) => setEditedTitle(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onBlur={handleSaveTitle}
+                  className="flex-1 text-sm font-medium bg-muted/50 border border-border rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  disabled={saving}
+                />
+              </div>
+            ) : (
+              <div className="flex items-start gap-1 group/title">
+                <h3 className="font-medium text-sm text-foreground line-clamp-2 group-hover:text-primary transition-colors leading-tight flex-1">
+                  {title}
+                </h3>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setEditedTitle(title)
+                    setIsEditing(true)
+                  }}
+                  className="p-1 rounded text-muted-foreground hover:text-foreground opacity-0 group-hover/title:opacity-100 transition-opacity shrink-0"
+                  title="Modifier le titre"
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+              </div>
+            )}
             
             <div className="flex items-center justify-between mt-2">
               <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
