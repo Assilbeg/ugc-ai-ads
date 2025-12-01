@@ -114,13 +114,13 @@ export async function getGenerationCost(
     .single()
   
   if (error || !data) {
-    // Fallback to default costs if not found
+    // Fallback to default costs if not found (match billing.sql values)
     const defaultCosts: Record<GenerationType, number> = {
-      first_frame: 20,
-      video_veo31: 240,      // Standard: $0.40/sec × 6s = $2.40 = 240 cents
-      video_veo31_fast: 90,  // Fast: $0.15/sec × 6s = $0.90 = 90 cents
-      voice_chatterbox: 15,
-      ambient_elevenlabs: 8,
+      first_frame: 10,       // 0.10€
+      video_veo31: 300,      // 3.00€ (Standard: coût réel $2.40 + marge)
+      video_veo31_fast: 120, // 1.20€ (Fast: coût réel $0.90 + marge)
+      voice_chatterbox: 20,  // 0.20€
+      ambient_elevenlabs: 15, // 0.15€
     }
     return defaultCosts[generationType]
   }
@@ -140,12 +140,13 @@ export async function getAllGenerationCosts(): Promise<Record<GenerationType, nu
     .select('id, cost_cents')
     .eq('is_active', true)
   
+  // Fallback costs (match billing.sql values)
   const defaultCosts: Record<GenerationType, number> = {
-    first_frame: 20,
-    video_veo31: 240,      // Standard: $0.40/sec × 6s = $2.40 = 240 cents
-    video_veo31_fast: 90,  // Fast: $0.15/sec × 6s = $0.90 = 90 cents
-    voice_chatterbox: 15,
-    ambient_elevenlabs: 8,
+    first_frame: 10,       // 0.10€
+    video_veo31: 300,      // 3.00€ (Standard)
+    video_veo31_fast: 120, // 1.20€ (Fast)
+    voice_chatterbox: 20,  // 0.20€
+    ambient_elevenlabs: 15, // 0.15€
   }
   
   if (error || !data) {

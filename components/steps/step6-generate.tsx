@@ -900,9 +900,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                       <Check className="w-4 h-4 text-green-500 ml-auto" />
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">Économique • ~0.90$/vidéo</p>
+                  <p className="text-xs text-muted-foreground">Économique • ~1.55€/clip</p>
                   <div className="mt-2 text-xs text-green-600 font-medium">
-                    -62% vs Standard
+                    -54% vs Standard
                   </div>
                 </button>
                 
@@ -921,7 +921,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                       <Check className="w-4 h-4 text-violet-500 ml-auto" />
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">Qualité max • ~2.40$/vidéo</p>
+                  <p className="text-xs text-muted-foreground">Qualité max • ~3.35€/clip</p>
                   <div className="mt-2 text-xs text-violet-600 font-medium">
                     Meilleure qualité
                   </div>
@@ -971,7 +971,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                 >
                   <Gauge className="w-4 h-4" />
                   Fast
-                  <span className="text-xs opacity-75">0.90$</span>
+                  <span className="text-xs opacity-75">1.55€</span>
                 </button>
                 <button
                   onClick={() => setVideoQuality('standard')}
@@ -983,7 +983,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                 >
                   <Sparkles className="w-4 h-4" />
                   Standard
-                  <span className="text-xs opacity-75">2.40$</span>
+                  <span className="text-xs opacity-75">3.35€</span>
                 </button>
               </div>
             </div>
