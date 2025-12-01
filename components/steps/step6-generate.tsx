@@ -374,12 +374,20 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                 clipData.speed = 1.0
                 clipData.duration = result.newDuration
                 clipData.needsProcessing = false
+                console.log(`[Assemble] Clip ${clipData.clipOrder} after update:`, {
+                  duration: clipData.duration,
+                  rawUrl: clipData.rawUrl?.slice(0, 50)
+                })
               } else {
-                console.warn(`[Assemble] ⚠️ Clip ${clipData.clipOrder} not processed - keeping original`)
+                console.warn(`[Assemble] ⚠️ Clip ${clipData.clipOrder} not processed:`, {
+                  processed: result.processed,
+                  hasUrl: !!result.videoUrl,
+                  error: result.error
+                })
               }
             } else {
               const errorText = await response.text()
-              console.warn(`[Assemble] ⚠️ Processing failed for clip ${clipData.clipOrder}:`, response.status, errorText)
+              console.error(`[Assemble] ❌ Processing FAILED for clip ${clipData.clipOrder}:`, response.status, errorText)
             }
           } catch (err) {
             console.warn(`[Assemble] ⚠️ Error processing clip ${clipData.clipOrder}:`, err)
@@ -389,6 +397,10 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       
       // Préparer les clips pour l'assemblage final
       // Note: trim/speed déjà appliqués par Transloadit, donc on envoie juste les URLs
+      console.log('[Assemble] clipsData BEFORE creating clipsForAssembly:',
+        clipsData.map(c => ({ order: c.clipOrder, duration: c.duration, hasUrl: !!c.rawUrl }))
+      )
+      
       const clipsForAssembly = clipsData.map(({ rawUrl, duration, clipOrder }) => ({
         rawUrl,
         duration,
