@@ -90,20 +90,21 @@ export async function POST(request: NextRequest) {
       importStepNames.push(stepName)
     })
 
-    // 2. Concaténer toutes les vidéos avec ré-encodage complet
-    // - preset: 'ipad-high' force le ré-encodage H.264
-    // - Cela résout les problèmes de keyframes et timestamps
+    // 2. Concaténer toutes les vidéos
+    // Doc: https://transloadit.com/docs/robots/video-concat/
+    // "It will pre-transcode the input videos if necessary before concatenation"
+    // → Résout automatiquement les problèmes de keyframes et timestamps !
     steps['concatenated'] = {
       robot: '/video/concat',
       use: {
-        steps: importStepNames.map(name => ({ name, as: 'video' }))
+        steps: importStepNames.map((name, index) => ({ 
+          name, 
+          as: `video_${index + 1}`  // Format requis par la doc
+        }))
       },
       result: true,
       preset: 'ipad-high',  // Force ré-encodage H.264 de qualité
-      ffmpeg_stack: 'v7.0.0',
-      // Normaliser le framerate et l'audio
-      framerate: '30',
-      // Reset timestamps automatiquement fait par /video/concat
+      ffmpeg_stack: 'v6.0.0',  // Recommandé par la doc
     }
 
     // 3. Générer une thumbnail
