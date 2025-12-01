@@ -4,14 +4,16 @@ import { createClient } from '@/lib/supabase/server'
 // fal.ai configuration
 const FAL_KEY = process.env.FAL_KEY
 
-// Interface pour fal.ai ffmpeg-api/run (concat)
-interface FFmpegRunInput {
-  input_files: { url: string }[]
-  arguments: string
+// Interface pour fal.ai ffmpeg-api/compose
+interface Track {
+  id: string
+  type: 'video' | 'audio'
+  keyframes: { url: string; timestamp: number; duration: number }[]
 }
 
-interface FFmpegRunOutput {
-  files: { url: string; content_type: string; file_name: string; file_size: number }[]
+interface ComposeOutput {
+  video_url: string
+  thumbnail_url?: string
 }
 
 /**
@@ -93,64 +95,68 @@ export async function POST(request: NextRequest) {
     })
 
     // ═══════════════════════════════════════════════════════════════════
-    // UTILISER FFMPEG CONCAT - Pas de durée fixe = pas de décalage lipsync !
-    // On utilise la durée RÉELLE des vidéos, pas la durée planifiée
+    // UTILISER FFMPEG COMPOSE - Concatène les vidéos via keyframes séquentiels
     // ═══════════════════════════════════════════════════════════════════
     
     console.log('[Assemble] ═══════════════════════════════════════')
-    console.log('[Assemble] Using FFmpeg concat (real durations):')
+    console.log('[Assemble] Using FFmpeg compose (sequential keyframes):')
     processedClips.forEach((c, i) => {
-      console.log(`[Assemble]   Clip ${i + 1}: ${c.url.slice(0, 80)}...`)
+      console.log(`[Assemble]   Clip ${i + 1}: ${c.url.slice(0, 80)}... (${c.duration}s)`)
     })
     console.log('[Assemble] ═══════════════════════════════════════')
 
-    // Préparer les fichiers d'entrée pour fal.ai
-    const input_files = processedClips.map(c => ({ url: c.url }))
+    // Construire les keyframes séquentiels pour la track vidéo
+    let currentTimestamp = 0
+    const videoKeyframes: { url: string; timestamp: number; duration: number }[] = []
     
-    // Construire la commande FFmpeg concat
-    // Pour N vidéos: [0:v:0][0:a:0][1:v:0][1:a:0]...[N:v:0][N:a:0]concat=n=N:v=1:a=1[outv][outa]
-    const n = processedClips.length
-    
-    // Construire les streams d'entrée
-    let filterInputs = ''
-    for (let i = 0; i < n; i++) {
-      filterInputs += `[${i}:v:0][${i}:a:0]`
+    for (const clip of processedClips) {
+      const durationMs = clip.duration * 1000
+      videoKeyframes.push({
+        url: clip.url,
+        timestamp: currentTimestamp,
+        duration: durationMs
+      })
+      currentTimestamp += durationMs
     }
     
-    // La commande complète
-    const ffmpegArgs = `-filter_complex "${filterInputs}concat=n=${n}:v=1:a=1[outv][outa]" -map "[outv]" -map "[outa]" -c:v libx264 -preset fast -crf 23 -c:a aac -b:a 128k output.mp4`
+    const totalDurationMs = currentTimestamp
     
-    console.log('[Assemble] FFmpeg command:', ffmpegArgs)
+    console.log('[Assemble] Video keyframes:', videoKeyframes.length, 'total duration:', totalDurationMs / 1000, 's')
     
-    const ffmpegInput: FFmpegRunInput = {
-      input_files,
-      arguments: ffmpegArgs
-    }
+    // Créer la track vidéo avec tous les keyframes
+    const tracks: Track[] = [
+      {
+        id: 'video-track',
+        type: 'video',
+        keyframes: videoKeyframes
+      }
+    ]
 
-    // Appeler fal.ai FFmpeg run (concat = durées réelles)
-    const response = await fetch('https://fal.run/fal-ai/ffmpeg-api/run', {
+    // Appeler fal.ai FFmpeg compose
+    console.log('[Assemble] Calling fal.ai FFmpeg compose...')
+    
+    const response = await fetch('https://fal.run/fal-ai/ffmpeg-api/compose', {
       method: 'POST',
       headers: {
         'Authorization': `Key ${FAL_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(ffmpegInput)
+      body: JSON.stringify({ tracks })
     })
 
     if (!response.ok) {
       const errorText = await response.text()
       console.error('[Assemble] fal.ai error:', errorText)
-      throw new Error(`fal.ai error: ${response.status}`)
+      throw new Error(`fal.ai error: ${response.status} - ${errorText}`)
     }
 
-    const result: FFmpegRunOutput = await response.json()
-    const outputFile = result.files?.[0]
+    const result: ComposeOutput = await response.json()
     
-    if (!outputFile?.url) {
-      throw new Error('No output file from FFmpeg')
+    if (!result.video_url) {
+      throw new Error('No video_url from FFmpeg compose')
     }
     
-    console.log('[Assemble] Video assembled:', outputFile.url?.slice(0, 50))
+    console.log('[Assemble] Video assembled:', result.video_url?.slice(0, 50))
 
     // Préparer les ajustements pour la sauvegarde
     const clipAdjustments = clipsToProcess.map((clip, index) => ({
@@ -163,7 +169,7 @@ export async function POST(request: NextRequest) {
     const estimatedDuration = processedClips.reduce((sum, c) => sum + c.duration, 0)
 
     // Sauvegarder dans campaign_assemblies (versioning)
-    if (campaignId && outputFile.url) {
+    if (campaignId && result.video_url) {
       const supabase = await createClient()
       
       // 1. Créer une nouvelle entrée dans campaign_assemblies
@@ -171,8 +177,8 @@ export async function POST(request: NextRequest) {
         .from('campaign_assemblies') as any)
         .insert({
           campaign_id: campaignId,
-          final_video_url: outputFile.url,
-          thumbnail_url: null, // FFmpeg run ne retourne pas de thumbnail
+          final_video_url: result.video_url,
+          thumbnail_url: result.thumbnail_url || null,
           duration_seconds: estimatedDuration,
           clip_adjustments: clipAdjustments
         })
@@ -187,7 +193,7 @@ export async function POST(request: NextRequest) {
           await (supabase
             .from('campaigns') as any)
             .update({ 
-              final_video_url: outputFile.url,
+              final_video_url: result.video_url,
               status: 'completed'
             })
             .eq('id', campaignId)
@@ -200,7 +206,7 @@ export async function POST(request: NextRequest) {
       await (supabase
         .from('campaigns') as any)
         .update({ 
-          final_video_url: outputFile.url,
+          final_video_url: result.video_url,
           status: 'completed'
         })
         .eq('id', campaignId)
@@ -209,9 +215,9 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      videoUrl: outputFile.url,
-      thumbnailUrl: null,
-      duration: estimatedDuration,
+      videoUrl: result.video_url,
+      thumbnailUrl: result.thumbnail_url || null,
+      duration: totalDurationMs / 1000,
       clipCount: clipsToProcess.length,
       // Debug: URLs utilisées pour l'assemblage
       debug: {
