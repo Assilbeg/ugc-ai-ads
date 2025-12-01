@@ -36,11 +36,14 @@ export default function RegisterPage() {
       return
     }
 
+    // Utiliser l'URL de prod pour les emails (évite localhost en dev)
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
+    
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/dashboard`,
+        emailRedirectTo: `${siteUrl}/dashboard`,
       },
     })
 
