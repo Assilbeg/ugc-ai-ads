@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
     // Deduct credits after successful generation
     if (!skipCredits && !isAdminEmail(user.email)) {
       // Deduct manually with calculated cost
-      const { error: deductError } = await supabase.rpc('deduct_credits', {
+      const { error: deductError } = await (supabase.rpc as any)('deduct_credits', {
         p_user_id: user.id,
         p_amount: totalCost,
         p_description: `Vidéo Veo 3.1 ${videoQuality === 'fast' ? 'Fast' : 'Standard'} (${duration}s)`,
