@@ -169,6 +169,8 @@ CREATE TRIGGER on_auth_user_created
 
 -- ─────────────────────────────────────────────────────────────────
 -- FUNCTION: Deduct credits (appelée par l'API)
+-- NOTE: Autorise les balances négatives pour éviter les pertes
+-- sur race conditions (génération déjà payée côté API externe)
 -- ─────────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION deduct_credits(
   p_user_id UUID,
@@ -198,12 +200,12 @@ BEGIN
     RETURN;
   END IF;
   
-  IF v_current_balance < p_amount THEN
-    RETURN QUERY SELECT false, v_current_balance, 'Insufficient credits'::TEXT;
-    RETURN;
-  END IF;
+  -- NOTE: On autorise les balances négatives intentionnellement
+  -- Le check côté app bloque les nouvelles générations si balance < coût
+  -- Mais si une génération est déjà lancée (et payée côté Fal.ai),
+  -- on doit pouvoir la facturer même si ça passe en négatif
   
-  -- Deduct credits
+  -- Deduct credits (peut passer en négatif)
   v_new_balance := v_current_balance - p_amount;
   
   UPDATE user_credits

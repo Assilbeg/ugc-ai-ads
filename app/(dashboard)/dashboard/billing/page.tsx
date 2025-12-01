@@ -13,7 +13,8 @@ import {
   Image,
   Video,
   Mic,
-  Music
+  Music,
+  AlertTriangle
 } from 'lucide-react'
 import { BillingActions } from './billing-actions'
 import { formatCredits, getRemainingGenerations, getAllGenerationCosts, CreditTransaction } from '@/lib/credits'
@@ -65,6 +66,9 @@ export default async function BillingPage() {
     ? now < earlyBirdDeadline && !userCredits?.early_bird_used
     : false
 
+  // Check for negative balance
+  const isNegativeBalance = (userCredits?.balance || 0) < 0
+
   // Format subscription tier display
   const tierLabels: Record<string, string> = {
     free: 'Gratuit',
@@ -115,8 +119,34 @@ export default async function BillingPage() {
         </p>
       </div>
 
+      {/* Negative Balance Alert */}
+      {isNegativeBalance && (
+        <Card className="bg-gradient-to-r from-red-500/10 to-rose-500/10 border-red-500/40 shadow-lg shadow-red-500/5">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center animate-pulse">
+                <AlertTriangle className="w-6 h-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-lg text-red-600 dark:text-red-400">
+                  Solde négatif : {formatCredits(userCredits?.balance || 0)}
+                </h3>
+                <p className="text-muted-foreground">
+                  Votre compte a un solde négatif. Rechargez vos crédits pour continuer à générer du contenu.
+                </p>
+              </div>
+              <BillingActions 
+                hasStripeCustomer={!!userCredits?.stripe_customer_id}
+                showEarlyBird={false}
+                isAdmin={userIsAdmin}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Early Bird Banner */}
-      {isEarlyBirdEligible && (
+      {isEarlyBirdEligible && !isNegativeBalance && (
         <Card className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/30">
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
@@ -142,21 +172,31 @@ export default async function BillingPage() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Balance Card */}
-        <Card>
+        <Card className={isNegativeBalance ? 'border-red-500/40 bg-red-500/5' : ''}>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base font-medium">Solde actuel</CardTitle>
-              <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
-                <CreditCard className="w-5 h-5 text-green-500" />
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                isNegativeBalance 
+                  ? 'bg-red-500/10' 
+                  : 'bg-green-500/10'
+              }`}>
+                {isNegativeBalance ? (
+                  <AlertTriangle className="w-5 h-5 text-red-500" />
+                ) : (
+                  <CreditCard className="w-5 h-5 text-green-500" />
+                )}
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-bold">
+            <p className={`text-4xl font-bold ${isNegativeBalance ? 'text-red-500' : ''}`}>
               {formatCredits(userCredits?.balance || 0)}
             </p>
             <p className="text-sm text-muted-foreground mt-1">
-              de crédits disponibles
+              {isNegativeBalance 
+                ? 'Rechargement requis' 
+                : 'de crédits disponibles'}
             </p>
           </CardContent>
         </Card>
