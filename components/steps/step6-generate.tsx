@@ -323,6 +323,16 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       // Applique trim + speed avec audio synchronisé (100% fiable, pas de Cloudinary)
       const clipsNeedingProcessing = clipsData.filter(c => c.needsProcessing)
       
+      console.log('[Assemble] Adjustments check:', clipsData.map(c => ({
+        clipOrder: c.clipOrder,
+        trimStart: c.trimStart,
+        trimEnd: c.trimEnd,
+        speed: c.speed,
+        originalDuration: c.originalDuration,
+        needsProcessing: c.needsProcessing
+      })))
+      console.log('[Assemble] Clips needing processing:', clipsNeedingProcessing.length)
+      
       if (clipsNeedingProcessing.length > 0) {
         console.log('[Assemble] 🎬 Processing', clipsNeedingProcessing.length, 'clips with server-side FFmpeg...')
         
