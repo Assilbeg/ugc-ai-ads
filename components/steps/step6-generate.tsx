@@ -359,6 +359,12 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
             
             if (response.ok) {
               const result = await response.json()
+              console.log(`[Assemble] Clip ${clipData.clipOrder} response:`, {
+                processed: result.processed,
+                hasUrl: !!result.videoUrl,
+                newDuration: result.newDuration,
+                originalDuration: result.originalDuration
+              })
               if (result.processed && result.videoUrl) {
                 console.log(`[Assemble] ✓ Clip ${clipData.clipOrder} processed:`, result.videoUrl.slice(0, 60))
                 // Mettre à jour avec l'URL traitée - trim/speed déjà appliqués
@@ -368,9 +374,12 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                 clipData.speed = 1.0
                 clipData.duration = result.newDuration
                 clipData.needsProcessing = false
+              } else {
+                console.warn(`[Assemble] ⚠️ Clip ${clipData.clipOrder} not processed - keeping original`)
               }
             } else {
-              console.warn(`[Assemble] ⚠️ Processing failed for clip ${clipData.clipOrder}`)
+              const errorText = await response.text()
+              console.warn(`[Assemble] ⚠️ Processing failed for clip ${clipData.clipOrder}:`, response.status, errorText)
             }
           } catch (err) {
             console.warn(`[Assemble] ⚠️ Error processing clip ${clipData.clipOrder}:`, err)
