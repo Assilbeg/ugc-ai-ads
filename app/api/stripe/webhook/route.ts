@@ -77,17 +77,23 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   const customerId = session.customer as string
 
   if (!userId || !planId) {
-    console.error('Missing metadata in checkout session')
+    console.error('[Stripe Webhook] ❌ Missing metadata in checkout session:', { userId, planId })
     return
   }
 
-  console.log(`[Stripe] Checkout completed for user ${userId}, plan ${planId}`)
+  console.log(`[Stripe Webhook] ✓ Checkout completed for user ${userId}, plan ${planId}, customer ${customerId}`)
 
   // Update user's Stripe customer ID
-  await supabaseAdmin
+  const { error: updateError } = await supabaseAdmin
     .from('user_credits')
     .update({ stripe_customer_id: customerId })
     .eq('user_id', userId)
+  
+  if (updateError) {
+    console.error('[Stripe Webhook] ❌ Failed to update stripe_customer_id:', updateError)
+  } else {
+    console.log('[Stripe Webhook] ✓ Updated stripe_customer_id')
+  }
 
   // Handle custom admin payment
   if (planId === 'custom_admin') {
@@ -101,25 +107,33 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
         session.payment_intent as string
       )
       if (result.success) {
-        console.log(`[Stripe] Added ${creditsAmount} custom credits to admin ${userId}`)
+        console.log(`[Stripe Webhook] ✓ Added ${creditsAmount} custom credits to admin ${userId}`)
       } else {
-        console.error('Failed to add custom credits:', result.errorMessage)
+        console.error('[Stripe Webhook] ❌ Failed to add custom credits:', result.errorMessage)
       }
     }
     return
   }
 
   // Get plan details
-  const { data: plan } = await supabaseAdmin
+  console.log(`[Stripe Webhook] Looking for plan: ${planId}`)
+  const { data: plan, error: planError } = await supabaseAdmin
     .from('subscription_plans')
     .select('*')
     .eq('id', planId)
     .single()
 
+  if (planError) {
+    console.error(`[Stripe Webhook] ❌ Error fetching plan ${planId}:`, planError)
+  }
+
   if (!plan) {
-    console.error(`Plan ${planId} not found`)
+    console.error(`[Stripe Webhook] ❌ Plan ${planId} not found in subscription_plans table!`)
+    console.error(`[Stripe Webhook] ❌ This is why credits were not added. Run the SQL seed to create the plan.`)
     return
   }
+  
+  console.log(`[Stripe Webhook] ✓ Found plan:`, { id: plan.id, name: plan.name, credits: plan.monthly_credits, is_one_time: plan.is_one_time })
 
   if (plan.is_one_time) {
     // One-time payment (Early Bird)
@@ -152,6 +166,13 @@ async function handleOneTimePayment(
   plan: { id: string; name: string; monthly_credits: number; is_early_bird: boolean },
   session: Stripe.Checkout.Session
 ) {
+  console.log(`[Stripe Webhook] Processing one-time payment for user ${userId}:`, {
+    planId: plan.id,
+    credits: plan.monthly_credits,
+    isEarlyBird: plan.is_early_bird,
+    paymentIntent: session.payment_intent
+  })
+
   // Add credits
   const result = await addCredits(
     userId,
@@ -162,15 +183,15 @@ async function handleOneTimePayment(
   )
 
   if (!result.success) {
-    console.error('Failed to add credits:', result.errorMessage)
+    console.error('[Stripe Webhook] ❌ Failed to add credits:', result.errorMessage)
     return
   }
 
-  console.log(`[Stripe] Added ${plan.monthly_credits} credits to user ${userId}`)
+  console.log(`[Stripe Webhook] ✓ Added ${plan.monthly_credits} credits to user ${userId}, new balance: ${result.newBalance}`)
 
   // If Early Bird, mark as used
   if (plan.is_early_bird) {
-    await supabaseAdmin
+    const { error: ebError } = await supabaseAdmin
       .from('user_credits')
       .update({ 
         early_bird_used: true,
@@ -178,7 +199,11 @@ async function handleOneTimePayment(
       })
       .eq('user_id', userId)
     
-    console.log(`[Stripe] Early Bird marked as used for user ${userId}`)
+    if (ebError) {
+      console.error('[Stripe Webhook] ❌ Failed to mark early bird as used:', ebError)
+    } else {
+      console.log(`[Stripe Webhook] ✓ Early Bird marked as used for user ${userId}`)
+    }
   }
 }
 
