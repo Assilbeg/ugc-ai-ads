@@ -50,18 +50,6 @@ export function CampaignCard({ campaign, presetName, statusConfig, onDelete }: C
   return (
     <>
       <div className="group relative bg-card rounded-xl border overflow-hidden hover:shadow-xl hover:shadow-black/5 hover:border-foreground/20 transition-all duration-300">
-        {/* Delete button */}
-        <button
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            setShowDeleteModal(true)
-          }}
-          className="absolute top-2 right-10 z-20 w-6 h-6 rounded-full bg-red-500/80 hover:bg-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-          title="Supprimer"
-        >
-          <Trash2 className="w-3 h-3 text-white" />
-        </button>
 
         <Link href={`/campaign/${campaign.id}`}>
           {/* Video area - Format 9:16 */}
@@ -133,22 +121,37 @@ export function CampaignCard({ campaign, presetName, statusConfig, onDelete }: C
               {title}
             </h3>
             
-            <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-2">
-              <div className="flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
-                <span>
-                  {new Date(campaign.created_at).toLocaleDateString('fr-FR', {
-                    day: 'numeric',
-                    month: 'short',
-                  })}
-                </span>
+            <div className="flex items-center justify-between mt-2">
+              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  <span>
+                    {new Date(campaign.created_at).toLocaleDateString('fr-FR', {
+                      day: 'numeric',
+                      month: 'short',
+                    })}
+                  </span>
+                </div>
+                {clipsCount > 0 && (
+                  <>
+                    <span className="text-border">•</span>
+                    <span>{clipsCount} clip{clipsCount > 1 ? 's' : ''}</span>
+                  </>
+                )}
               </div>
-              {clipsCount > 0 && (
-                <>
-                  <span className="text-border">•</span>
-                  <span>{clipsCount} clip{clipsCount > 1 ? 's' : ''}</span>
-                </>
-              )}
+              
+              {/* Delete button */}
+              <button
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setShowDeleteModal(true)
+                }}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"
+                title="Supprimer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
         </Link>
