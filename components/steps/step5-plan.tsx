@@ -5,6 +5,9 @@ import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
 import { NewCampaignState, CampaignClip, CampaignBrief, Actor } from '@/types'
 import { usePlanGeneration } from '@/hooks/use-plan-generation'
+import { useCredits } from '@/hooks/use-credits'
+import { FirstPurchaseModal } from '@/components/modals/first-purchase-modal'
+import { UpgradeModal } from '@/components/modals/upgrade-modal'
 import { getPresetById } from '@/lib/presets'
 import { IntentionPreset } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -306,6 +309,7 @@ function LoadingAnimation() {
 
 export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext, onBack }: Step5PlanProps) {
   const { clips, loading, error, generatePlan, updateClipScript, setClips } = usePlanGeneration()
+  const { credits, checkCredits } = useCredits()
   const [editingClip, setEditingClip] = useState<number | null>(null)
   const [editText, setEditText] = useState('')
   const [editingVisualPrompt, setEditingVisualPrompt] = useState<number | null>(null)
@@ -318,6 +322,12 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
   const [presetLoading, setPresetLoading] = useState(true)
   const [firstFrames, setFirstFrames] = useState<FirstFrameStatus>({})
   const [generatingFrames, setGeneratingFrames] = useState(false)
+  
+  // Crédits insuffisants
+  const [hasInsufficientCredits, setHasInsufficientCredits] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [creditsNeeded, setCreditsNeeded] = useState<{ required: number; current: number } | null>(null)
+  const [isFirstPurchase, setIsFirstPurchase] = useState(false)
   
   const supabase = createClient()
 
@@ -412,6 +422,21 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
       const data = await response.json()
 
       if (!response.ok) {
+        // Capturer l'erreur de crédits insuffisants
+        if (data.code === 'INSUFFICIENT_CREDITS') {
+          setHasInsufficientCredits(true)
+          setCreditsNeeded({
+            required: data.required,
+            current: data.current,
+          })
+          setIsFirstPurchase(data.isEarlyBirdEligible || data.current === 0)
+          setShowUpgradeModal(true)
+          setFirstFrames(prev => ({
+            ...prev,
+            [clipIndex]: { loading: false, error: 'Crédits insuffisants' }
+          }))
+          return null
+        }
         throw new Error(data.error || 'Failed to generate first frame')
       }
       
@@ -448,13 +473,19 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
 
   // Generate all first frames after plan is ready (séquentiel avec chaînage)
   const generateAllFirstFrames = useCallback(async () => {
-    if (!actor?.soul_image_url || clips.length === 0 || generatingFrames) return
+    if (!actor?.soul_image_url || clips.length === 0 || generatingFrames || hasInsufficientCredits) return
     
     setGeneratingFrames(true)
     
     let previousUrl: string | undefined = undefined
     
     for (let i = 0; i < clips.length; i++) {
+      // Arrêter si on a détecté un problème de crédits
+      if (hasInsufficientCredits) {
+        console.log('[Step5] Stopping frame generation - insufficient credits')
+        break
+      }
+      
       // Vérifier si ce clip a déjà une image générée
       const existingFrame = firstFrames[i]
       if (existingFrame?.url) {
@@ -465,6 +496,12 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
       
       // Passer l'URL du clip précédent pour continuité visuelle
       const generatedUrl = await generateFirstFrame(i, clips[i], previousUrl)
+      
+      // Si la génération a échoué par manque de crédits, arrêter
+      if (!generatedUrl && hasInsufficientCredits) {
+        console.log('[Step5] First frame failed due to credits, stopping')
+        break
+      }
       
       // Utiliser cette URL comme référence pour le prochain clip
       if (generatedUrl) {
@@ -477,17 +514,20 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
     }
     
     setGeneratingFrames(false)
-  }, [actor, clips, generatingFrames, generateFirstFrame, firstFrames])
+  }, [actor, clips, generatingFrames, generateFirstFrame, firstFrames, hasInsufficientCredits])
 
   // Auto-generate first frames when clips are ready (seulement si toutes les images ne sont pas déjà là)
   useEffect(() => {
+    // Ne pas auto-générer si on a détecté un manque de crédits
+    if (hasInsufficientCredits) return
+    
     const existingFrameCount = Object.values(firstFrames).filter(f => f.url).length
     const needsGeneration = clips.length > 0 && existingFrameCount < clips.length
     
     if (needsGeneration && actor && !generatingFrames) {
       generateAllFirstFrames()
     }
-  }, [clips, actor, firstFrames, generatingFrames, generateAllFirstFrames])
+  }, [clips, actor, firstFrames, generatingFrames, generateAllFirstFrames, hasInsufficientCredits])
 
   // Sauvegarder les first frames dans le state parent pour persistance
   useEffect(() => {
@@ -830,6 +870,31 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
         </Card>
       )}
 
+      {/* Insufficient credits banner */}
+      {hasInsufficientCredits && !loading && (
+        <Card className="border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-orange-500/10 p-6 gap-0">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-amber-700 dark:text-amber-400 mb-1">Crédits insuffisants</p>
+              <p className="text-muted-foreground text-sm mb-4">
+                Tu n'as pas assez de crédits pour générer les visuels de prévisualisation. 
+                Recharge tes crédits pour continuer.
+              </p>
+              <Button 
+                className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
+                onClick={() => setShowUpgradeModal(true)}
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                Recharger mes crédits
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Clips preview */}
       {!loading && clips.length > 0 && (
         <div className="space-y-6">
@@ -1081,15 +1146,20 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
         </Button>
         <Button
           onClick={handleContinue}
-          disabled={clips.length === 0 || loading || generatingFrames || generatedFrames < clips.length}
+          disabled={clips.length === 0 || loading || (generatingFrames && !hasInsufficientCredits)}
           className="h-11 px-6 rounded-xl font-medium group"
         >
-          {generatingFrames ? (
+          {generatingFrames && !hasInsufficientCredits ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               Génération des images...
             </>
-          ) : generatedFrames < clips.length ? (
+          ) : hasInsufficientCredits ? (
+            <>
+              Continuer sans images
+              <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+            </>
+          ) : generatedFrames < clips.length && !hasInsufficientCredits ? (
             <>
               Images {generatedFrames}/{clips.length}
               <Loader2 className="w-4 h-4 ml-2 animate-spin" />
@@ -1102,6 +1172,36 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
           )}
         </Button>
       </div>
+
+      {/* Modal d'achat de crédits */}
+      {isFirstPurchase ? (
+        <FirstPurchaseModal
+          isOpen={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
+          requiredCredits={creditsNeeded?.required}
+          currentBalance={creditsNeeded?.current}
+          clipCount={clips.length}
+          onSuccess={() => {
+            setShowUpgradeModal(false)
+            setHasInsufficientCredits(false)
+            // Refresh pour avoir les nouveaux crédits
+            window.location.reload()
+          }}
+        />
+      ) : (
+        <UpgradeModal
+          isOpen={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
+          requiredCredits={creditsNeeded?.required}
+          currentBalance={creditsNeeded?.current}
+          onSuccess={() => {
+            setShowUpgradeModal(false)
+            setHasInsufficientCredits(false)
+            // Refresh pour avoir les nouveaux crédits
+            window.location.reload()
+          }}
+        />
+      )}
     </div>
   )
 }

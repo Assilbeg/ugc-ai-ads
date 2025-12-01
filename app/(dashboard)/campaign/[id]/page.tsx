@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { AssemblingAnimation } from './assembling-animation'
 import { EditableTitle } from './editable-title'
+import { FailedCampaignState } from './failed-campaign-state'
 
 interface CampaignPageProps {
   params: Promise<{ id: string }>
@@ -244,8 +245,8 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
             </div>
           </div>
         </div>
-      ) : (
-        /* Header simple si pas de vidéo finale */
+      ) : campaign.status !== 'failed' ? (
+        /* Header simple si pas de vidéo finale et pas en échec */
         <div className="mb-8">
           <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium mb-4 ${status.bg} ${status.text}`}>
             <span className={`w-2 h-2 rounded-full ${status.dot}`} />
@@ -271,10 +272,10 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
             )}
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Historique des versions (si plusieurs assemblages) */}
-      {assemblies && assemblies.length > 1 && (
+      {/* Historique des versions (si plusieurs assemblages et pas en échec) */}
+      {assemblies && assemblies.length > 1 && campaign.status !== 'failed' && (
         <div className="mb-8 p-4 rounded-xl bg-muted/30 border border-border">
           <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -327,8 +328,21 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
         </div>
       )}
 
-      {/* Empty state si pas de vidéo */}
-      {!finalVideoUrl && (
+      {/* Failed state - campagne en échec */}
+      {campaign.status === 'failed' && (
+        <FailedCampaignState
+          campaignId={id}
+          clips={clips || []}
+          presetName={preset?.name}
+          totalDuration={totalDuration}
+          title={brief?.what_selling || 'Campagne UGC'}
+          targetDuration={brief?.target_duration || 30}
+          hasProduct={product?.has_product || false}
+        />
+      )}
+
+      {/* Empty state si pas de vidéo et pas en échec */}
+      {!finalVideoUrl && campaign.status !== 'failed' && (
         <div className="rounded-2xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 py-16 text-center">
           <div className="w-16 h-16 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
             <svg className="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -340,7 +354,7 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
           </p>
           <Link href={`/new/${id}`}>
             <Button className="rounded-xl">
-              🚀 Générer la vidéo
+              ▶️ Continuer la campagne
             </Button>
           </Link>
         </div>

@@ -3,11 +3,17 @@
 import { useState, useCallback, useRef } from 'react'
 import { CampaignClip, ClipStatus, Actor } from '@/types'
 
-interface GenerationProgress {
+export interface GenerationProgress {
   clipId: string
   status: ClipStatus
   progress: number
   message: string
+  errorCode?: string // 'INSUFFICIENT_CREDITS' etc.
+  errorDetails?: {
+    required?: number
+    current?: number
+    missing?: number
+  }
 }
 
 // Type pour spécifier quel asset régénérer
@@ -119,6 +125,32 @@ export function useVideoGeneration() {
 
       if (!videoResponse.ok) {
         const err = await videoResponse.json()
+        // Handle insufficient credits error specifically
+        if (err.code === 'INSUFFICIENT_CREDITS') {
+          setProgress(prev => ({
+            ...prev,
+            [clipId]: { 
+              clipId, 
+              status: 'failed', 
+              progress: 0, 
+              message: 'Crédits insuffisants',
+              errorCode: 'INSUFFICIENT_CREDITS',
+              errorDetails: {
+                required: err.required,
+                current: err.current,
+                missing: err.missing,
+              }
+            },
+          }))
+          const creditsError = new Error('INSUFFICIENT_CREDITS')
+          ;(creditsError as any).code = 'INSUFFICIENT_CREDITS'
+          ;(creditsError as any).details = {
+            required: err.required,
+            current: err.current,
+            missing: err.missing,
+          }
+          throw creditsError
+        }
         throw new Error(err.error || 'Erreur génération vidéo')
       }
       const videoData = await videoResponse.json()
@@ -364,7 +396,36 @@ export function useVideoGeneration() {
           signal: abortControllerRef.current?.signal,
         })
 
-        if (!videoResponse.ok) throw new Error('Erreur régénération vidéo')
+        if (!videoResponse.ok) {
+          const err = await videoResponse.json()
+          // Handle insufficient credits error specifically
+          if (err.code === 'INSUFFICIENT_CREDITS') {
+            setProgress(prev => ({
+              ...prev,
+              [clipId]: { 
+                clipId, 
+                status: 'failed', 
+                progress: 0, 
+                message: 'Crédits insuffisants',
+                errorCode: 'INSUFFICIENT_CREDITS',
+                errorDetails: {
+                  required: err.required,
+                  current: err.current,
+                  missing: err.missing,
+                }
+              },
+            }))
+            const creditsError = new Error('INSUFFICIENT_CREDITS')
+            ;(creditsError as any).code = 'INSUFFICIENT_CREDITS'
+            ;(creditsError as any).details = {
+              required: err.required,
+              current: err.current,
+              missing: err.missing,
+            }
+            throw creditsError
+          }
+          throw new Error('Erreur régénération vidéo')
+        }
         const videoData = await videoResponse.json()
         updatedClip.video = { 
           ...updatedClip.video, 

@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { NewCampaignState, CampaignClip, ClipStatus, ClipAdjustments } from '@/types'
-import { useVideoGeneration, RegenerateWhat, VideoQuality } from '@/hooks/use-video-generation'
+import { useVideoGeneration, RegenerateWhat, VideoQuality, GenerationProgress } from '@/hooks/use-video-generation'
+import { useCredits } from '@/hooks/use-credits'
 import { useActors } from '@/hooks/use-actors'
 import { useCampaignCreation } from '@/hooks/use-campaign-creation'
 import { getPresetById } from '@/lib/presets'
@@ -14,7 +15,9 @@ import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
-import { Loader2, Play, X, Video, Mic, Music, Maximize2, Clock, Scissors, Gauge, Eye, Check, RefreshCw, Film, Sparkles } from 'lucide-react'
+import { Loader2, Play, X, Video, Mic, Music, Maximize2, Clock, Scissors, Gauge, Eye, Check, RefreshCw, Film, Sparkles, Zap, AlertCircle } from 'lucide-react'
+import { UpgradeModal } from '@/components/modals/upgrade-modal'
+import { FirstPurchaseModal } from '@/components/modals/first-purchase-modal'
 
 // Messages rotatifs pour l'assemblage
 const ASSEMBLY_MESSAGES = [
@@ -163,6 +166,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   const { getActorById } = useActors()
   const { generating, isClipRegenerating, progress, generateAllClips, regenerateSingleClip, cancel, getOverallProgress } = useVideoGeneration()
   const { saving } = useCampaignCreation()
+  const { credits, checkMultipleCredits, refetch: refetchCredits } = useCredits()
   const supabase = createClient()
   
   const actor = state.actor_id ? getActorById(state.actor_id) : undefined
@@ -230,6 +234,12 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   
   // Qualité vidéo sélectionnée
   const [videoQuality, setVideoQuality] = useState<VideoQuality>('standard')
+  
+  // Modal d'achat de crédits
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [creditsNeeded, setCreditsNeeded] = useState<{ required: number; current: number } | null>(null)
+  const [isFirstPurchase, setIsFirstPurchase] = useState(false)
+  const [checkingCredits, setCheckingCredits] = useState(false)
 
   // Initialiser les ajustements quand les clips changent
   useEffect(() => {
@@ -588,6 +598,69 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   const handleStartGeneration = async () => {
     if (!actor || !preset || clips.length === 0) return
 
+    // Enrichir les clips avec les first frames générées à l'étape Plan
+    const clipsWithFirstFrames = clips.map((clip, index) => {
+      const generatedFrame = state.generated_first_frames?.[index]
+      if (generatedFrame?.url) {
+        return {
+          ...clip,
+          first_frame: {
+            ...clip.first_frame,
+            image_url: generatedFrame.url
+          }
+        }
+      }
+      return clip
+    })
+
+    // Filtrer les clips qui n'ont pas encore de vidéo générée
+    const clipsWithoutVideo = clipsWithFirstFrames.filter(c => !c.video?.raw_url)
+    const clipsToGenerate = clipsWithoutVideo
+
+    if (clipsToGenerate.length === 0) {
+      console.log('Tous les clips ont déjà des vidéos')
+      return
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // VÉRIFICATION DES CRÉDITS AVANT GÉNÉRATION
+    // ═══════════════════════════════════════════════════════════════════
+    setCheckingCredits(true)
+    
+    try {
+      // Calculer le coût total : vidéo + voix + ambiance pour chaque clip
+      const generationType = videoQuality === 'fast' ? 'video_veo31_fast' : 'video_veo31'
+      const generations = [
+        { type: generationType as any, count: clipsToGenerate.length },
+        { type: 'voice' as any, count: clipsToGenerate.length },
+        { type: 'ambient' as any, count: clipsToGenerate.length },
+      ]
+      
+      const creditsCheck = await checkMultipleCredits(generations)
+      
+      if (creditsCheck && !creditsCheck.hasEnough) {
+        // Pas assez de crédits ! Ouvrir le modal d'achat
+        console.log('[Credits] Not enough credits:', creditsCheck)
+        setCreditsNeeded({
+          required: creditsCheck.requiredAmount,
+          current: creditsCheck.currentBalance,
+        })
+        // C'est un premier achat si l'utilisateur n'a jamais fait d'achat (balance = 0 ou early bird eligible)
+        setIsFirstPurchase(creditsCheck.isEarlyBirdEligible || creditsCheck.currentBalance === 0)
+        setShowUpgradeModal(true)
+        setCheckingCredits(false)
+        return
+      }
+    } catch (err) {
+      console.error('[Credits] Error checking credits:', err)
+      // En cas d'erreur, on continue quand même (l'API échouera plus tard si pas de crédits)
+    }
+    
+    setCheckingCredits(false)
+
+    // ═══════════════════════════════════════════════════════════════════
+    // LANCEMENT DE LA GÉNÉRATION
+    // ═══════════════════════════════════════════════════════════════════
     setStarted(true)
     
     // Utiliser le campaign_id existant (depuis /new/[id]) ou en créer un nouveau
@@ -608,33 +681,6 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       setCampaignId(dbCampaignId)
     }
 
-    // Enrichir les clips avec les first frames générées à l'étape Plan
-    // On utilise TOUJOURS la first frame de generated_first_frames si elle existe
-    // car c'est la plus récente (peut avoir été régénérée)
-    const clipsWithFirstFrames = clips.map((clip, index) => {
-      const generatedFrame = state.generated_first_frames?.[index]
-      if (generatedFrame?.url) {
-        return {
-          ...clip,
-          first_frame: {
-            ...clip.first_frame,
-            image_url: generatedFrame.url
-          }
-        }
-      }
-      return clip
-    })
-
-    // Filtrer les clips qui n'ont pas encore de vidéo générée
-    const clipsWithoutVideo = clipsWithFirstFrames.filter(c => !c.video?.raw_url)
-    
-    const clipsToGenerate = clipsWithoutVideo
-
-    if (clipsToGenerate.length === 0) {
-      console.log('Tous les clips ont déjà des vidéos')
-      return
-    }
-
     const results = await generateAllClips(
       clipsToGenerate,
       actor,
@@ -649,7 +695,20 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
 
     // Fusionner avec les clips existants - on utilise l'order comme clé unique
     // IMPORTANT: On ne compare pas les id car ils peuvent être undefined
-    const updatedClips = clipsWithFirstFrames.map((clip, index) => {
+    const clipsWithFirstFramesForMerge = clips.map((clip, index) => {
+      const generatedFrame = state.generated_first_frames?.[index]
+      if (generatedFrame?.url) {
+        return {
+          ...clip,
+          first_frame: {
+            ...clip.first_frame,
+            image_url: generatedFrame.url
+          }
+        }
+      }
+      return clip
+    })
+    const updatedClips = clipsWithFirstFramesForMerge.map((clip, index) => {
       // Chercher par order (qui est unique et défini par Claude)
       const generated = results.find(r => r.order !== undefined && clip.order !== undefined && r.order === clip.order)
       return generated || clip
@@ -759,6 +818,28 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     return clipProgress?.status || generatedClips[index]?.status || 'pending'
   }
 
+  // Vérifier si un clip a échoué par manque de crédits
+  const getClipErrorInfo = (index: number): GenerationProgress | null => {
+    const clipProgress = progress[clips[index]?.id || `clip-${clips[index]?.order}`]
+    if (clipProgress?.errorCode === 'INSUFFICIENT_CREDITS') {
+      return clipProgress
+    }
+    return null
+  }
+
+  // Vérifier si un clip a échoué par manque de crédits
+  const hasInsufficientCreditsError = Object.values(progress).some(
+    p => p.errorCode === 'INSUFFICIENT_CREDITS'
+  )
+
+  // Ouvrir le modal d'upgrade avec les infos de crédits
+  const openUpgradeModal = (required?: number, current?: number) => {
+    if (required !== undefined && current !== undefined) {
+      setCreditsNeeded({ required, current })
+    }
+    setShowUpgradeModal(true)
+  }
+
   const getCurrentStep = (status: ClipStatus): number => {
     if (status === 'generating_video') return 0
     if (status === 'generating_voice') return 1
@@ -856,8 +937,16 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                 onClick={handleStartGeneration}
                 className="h-14 px-10 rounded-xl font-medium text-lg"
                 size="lg"
+                disabled={checkingCredits}
               >
-                🚀 Lancer la génération ({videoQuality === 'fast' ? 'Fast' : 'Standard'})
+                {checkingCredits ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Vérification...
+                  </>
+                ) : (
+                  <>🚀 Lancer la génération ({videoQuality === 'fast' ? 'Fast' : 'Standard'})</>
+                )}
               </Button>
             </div>
           </CardContent>
@@ -1089,18 +1178,67 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                         </div>
                       )}
 
-                      {/* Failed state */}
+                      {/* Failed state - distinguish credits errors from other errors */}
                       {isFailed && (
                         <div className="mb-4">
-                          <Button 
-                            variant="destructive" 
-                            size="sm"
-                            className="h-9 text-sm rounded-lg"
-                            onClick={() => askRegenerate(index, 'all')}
-                            disabled={isClipRegenerating(clip.id || `clip-${clip.order}`)}
-                          >
-                            🔄 Réessayer tout
-                          </Button>
+                          {(() => {
+                            const errorInfo = getClipErrorInfo(index)
+                            const isCreditsError = errorInfo?.errorCode === 'INSUFFICIENT_CREDITS'
+                            
+                            if (isCreditsError) {
+                              // Erreur de crédits insuffisants
+                              return (
+                                <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Zap className="w-5 h-5 text-amber-500" />
+                                    <span className="font-semibold text-amber-600">Crédits insuffisants</span>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground mb-3">
+                                    Il vous manque des crédits pour générer cette vidéo.
+                                    {errorInfo.errorDetails?.missing && (
+                                      <span className="block mt-1 font-medium text-amber-600">
+                                        Manquant : {(errorInfo.errorDetails.missing / 100).toFixed(2)}€
+                                      </span>
+                                    )}
+                                  </p>
+                                  <Button 
+                                    size="sm"
+                                    className="h-9 text-sm rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
+                                    onClick={() => openUpgradeModal(
+                                      errorInfo.errorDetails?.required,
+                                      errorInfo.errorDetails?.current
+                                    )}
+                                  >
+                                    <Zap className="w-4 h-4 mr-1" />
+                                    Recharger mes crédits
+                                  </Button>
+                                </div>
+                              )
+                            } else {
+                              // Autre erreur
+                              return (
+                                <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <AlertCircle className="w-5 h-5 text-red-500" />
+                                    <span className="font-semibold text-red-600">Échec de la génération</span>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground mb-3">
+                                    {clipProgress?.message || 'Une erreur est survenue lors de la génération.'}
+                                  </p>
+                                  <Button 
+                                    variant="destructive" 
+                                    size="sm"
+                                    className="h-9 text-sm rounded-lg"
+                                    onClick={() => askRegenerate(index, 'all')}
+                                    disabled={isClipRegenerating(clip.id || `clip-${clip.order}`)}
+                                  >
+                                    <RefreshCw className="w-4 h-4 mr-1" />
+                                    Réessayer
+                                  </Button>
+                                </div>
+                              )
+                            }
+                          })()}
                         </div>
                       )}
 
@@ -1356,6 +1494,44 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
             }}
           />
         </div>
+      )}
+
+      {/* Modal d'achat de crédits - Première campagne */}
+      {isFirstPurchase ? (
+        <FirstPurchaseModal
+          isOpen={showUpgradeModal}
+          onClose={() => {
+            setShowUpgradeModal(false)
+            setCreditsNeeded(null)
+            setIsFirstPurchase(false)
+          }}
+          requiredCredits={creditsNeeded?.required}
+          currentBalance={creditsNeeded?.current}
+          clipCount={clips.length}
+          onSuccess={() => {
+            setShowUpgradeModal(false)
+            setCreditsNeeded(null)
+            setIsFirstPurchase(false)
+            // Refresh la page pour avoir les nouveaux crédits
+            window.location.reload()
+          }}
+        />
+      ) : (
+        <UpgradeModal
+          isOpen={showUpgradeModal}
+          onClose={() => {
+            setShowUpgradeModal(false)
+            setCreditsNeeded(null)
+          }}
+          requiredCredits={creditsNeeded?.required}
+          currentBalance={creditsNeeded?.current}
+          onSuccess={() => {
+            setShowUpgradeModal(false)
+            setCreditsNeeded(null)
+            // Refresh la page pour avoir les nouveaux crédits
+            window.location.reload()
+          }}
+        />
       )}
     </div>
   )
