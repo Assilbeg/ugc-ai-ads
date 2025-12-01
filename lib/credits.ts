@@ -3,6 +3,13 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { createClient } from '@/lib/supabase/server'
+import { ADMIN_EMAILS } from '@/lib/admin'
+
+// Check if user email is admin (has unlimited credits)
+export function isAdminEmail(email: string | undefined): boolean {
+  if (!email) return false
+  return ADMIN_EMAILS.includes(email.toLowerCase())
+}
 
 // ─────────────────────────────────────────────────────────────────
 // TYPES
@@ -161,8 +168,21 @@ export async function getAllGenerationCosts(): Promise<Record<GenerationType, nu
 
 export async function checkCredits(
   userId: string,
-  generationType: GenerationType
+  generationType: GenerationType,
+  userEmail?: string
 ): Promise<CreditsCheckResult> {
+  // Admin has unlimited credits
+  if (userEmail && isAdminEmail(userEmail)) {
+    return {
+      hasEnough: true,
+      currentBalance: Infinity,
+      requiredAmount: 0,
+      missingAmount: 0,
+      isEarlyBirdEligible: false,
+      earlyBirdUsed: false,
+    }
+  }
+
   const [userCredits, cost] = await Promise.all([
     getUserCredits(userId),
     getGenerationCost(generationType),
@@ -207,8 +227,21 @@ export async function checkCredits(
 
 export async function checkCreditsForMultiple(
   userId: string,
-  generations: { type: GenerationType; count: number }[]
+  generations: { type: GenerationType; count: number }[],
+  userEmail?: string
 ): Promise<CreditsCheckResult> {
+  // Admin has unlimited credits
+  if (userEmail && isAdminEmail(userEmail)) {
+    return {
+      hasEnough: true,
+      currentBalance: Infinity,
+      requiredAmount: 0,
+      missingAmount: 0,
+      isEarlyBirdEligible: false,
+      earlyBirdUsed: false,
+    }
+  }
+
   const [userCredits, costs] = await Promise.all([
     getUserCredits(userId),
     getAllGenerationCosts(),
@@ -289,8 +322,19 @@ export async function deductCredits(
   generationType: GenerationType,
   description: string,
   campaignId?: string,
-  clipId?: string
+  clipId?: string,
+  userEmail?: string
 ): Promise<DeductResult> {
+  // Admin has unlimited credits - skip deduction
+  if (userEmail && isAdminEmail(userEmail)) {
+    console.log(`[Credits] Skipping deduction for admin: ${userEmail}`)
+    return {
+      success: true,
+      newBalance: Infinity,
+      errorMessage: null,
+    }
+  }
+
   const supabase = await createClient()
   const cost = await getGenerationCost(generationType)
   

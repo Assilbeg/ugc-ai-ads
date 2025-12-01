@@ -2,27 +2,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { LogoutButton } from '@/components/logout-button'
-import { isAdmin, ADMIN_EMAILS } from '@/lib/admin'
+import { isAdmin } from '@/lib/admin'
 import { formatCredits } from '@/lib/credits'
-
-// Fetch Fal.ai balance for admin sync
-async function getFalBalanceCents(): Promise<number | null> {
-  const FAL_KEY = process.env.FAL_KEY
-  if (!FAL_KEY) return null
-  
-  try {
-    const response = await fetch('https://rest.fal.ai/billing/balance', {
-      headers: { 'Authorization': `Key ${FAL_KEY}` },
-      next: { revalidate: 30 },
-    })
-    if (!response.ok) return null
-    const data = await response.json()
-    // Convert USD to cents (Fal.ai returns balance in dollars)
-    return Math.round((data.balance || 0) * 100)
-  } catch {
-    return null
-  }
-}
 
 export default async function DashboardLayout({
   children,
@@ -38,28 +19,14 @@ export default async function DashboardLayout({
 
   const userIsAdmin = isAdmin(user.email)
   
-  // Get user credits
+  // Get user credits (not needed for admin - they have unlimited)
   let userBalance = 0
-  const { data: userCredits } = await (supabase
-    .from('user_credits') as any)
-    .select('balance')
-    .eq('user_id', user.id)
-    .single()
-  
-  // For admin, sync with Fal.ai balance
-  if (userIsAdmin && ADMIN_EMAILS.includes(user.email?.toLowerCase() || '')) {
-    const falBalance = await getFalBalanceCents()
-    if (falBalance !== null) {
-      userBalance = falBalance
-      // Update the admin's balance in database to match Fal.ai
-      await (supabase
-        .from('user_credits') as any)
-        .update({ balance: falBalance, updated_at: new Date().toISOString() })
-        .eq('user_id', user.id)
-    } else {
-      userBalance = userCredits?.balance || 0
-    }
-  } else {
+  if (!userIsAdmin) {
+    const { data: userCredits } = await (supabase
+      .from('user_credits') as any)
+      .select('balance')
+      .eq('user_id', user.id)
+      .single()
     userBalance = userCredits?.balance || 0
   }
 
@@ -106,12 +73,18 @@ export default async function DashboardLayout({
             {/* Credits display */}
             <Link 
               href="/dashboard/billing"
-              className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+              className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors ${
+                userIsAdmin 
+                  ? 'bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20' 
+                  : 'bg-muted/50 hover:bg-muted'
+              }`}
             >
-              <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`w-4 h-4 ${userIsAdmin ? 'text-violet-500' : 'text-emerald-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span className="text-sm font-medium">{formatCredits(userBalance)}</span>
+              <span className={`text-sm font-medium ${userIsAdmin ? 'text-violet-500' : ''}`}>
+                {userIsAdmin ? '∞' : formatCredits(userBalance)}
+              </span>
             </Link>
             
             <Link 
