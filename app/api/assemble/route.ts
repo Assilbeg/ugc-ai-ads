@@ -1,20 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { Transloadit } from 'transloadit'
 
-// fal.ai configuration
-const FAL_KEY = process.env.FAL_KEY
-
-// Interface pour fal.ai ffmpeg-api/compose
-interface Track {
-  id: string
-  type: 'video' | 'audio'
-  keyframes: { url: string; timestamp: number; duration: number }[]
-}
-
-interface ComposeOutput {
-  video_url: string
-  thumbnail_url?: string
-}
+// Transloadit credentials
+const TRANSLOADIT_KEY = process.env.TRANSLOADIT_KEY
+const TRANSLOADIT_SECRET = process.env.TRANSLOADIT_SECRET
 
 /**
  * Input pour chaque clip (simplifié - trim/speed déjà appliqués par Transloadit)
@@ -40,8 +30,10 @@ async function updateCampaignStatus(supabase: any, campaignId: string, status: s
 }
 
 /**
- * Assemble multiple video clips into a single video using fal.ai FFmpeg API
- * Sauvegarde dans campaign_assemblies pour garder l'historique (versioning)
+ * Assemble multiple video clips into a single video using Transloadit
+ * - Force ré-encodage pour éviter les problèmes de keyframes
+ * - Reset des timestamps pour une concaténation propre
+ * - Normalise framerate et audio sample rate
  */
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -49,137 +41,129 @@ export async function POST(request: NextRequest) {
   
   try {
     const body = await request.json()
-    campaignId = body.campaignId
-    const { clips, videoUrls } = body as {
-      clips?: ClipInput[]
-      videoUrls?: string[] // Ancien format (fallback)
-      campaignId: string
-    }
+    const { clips, campaignId: cId } = body
+    campaignId = cId
+    
+    const clipsToProcess: ClipInput[] = clips
 
-    // Support ancien format (videoUrls) ou nouveau format (clips)
-    const clipsToProcess: ClipInput[] = clips || (videoUrls?.map(url => ({ rawUrl: url, duration: 6 })) ?? [])
-
-    if (clipsToProcess.length === 0) {
-      if (campaignId) await updateCampaignStatus(supabase, campaignId, 'failed')
+    if (!clipsToProcess || clipsToProcess.length === 0) {
       return NextResponse.json(
-        { error: 'clips ou videoUrls est requis' },
+        { error: 'Aucun clip fourni' },
         { status: 400 }
       )
     }
 
-    if (!FAL_KEY) {
+    if (!TRANSLOADIT_KEY || !TRANSLOADIT_SECRET) {
       if (campaignId) await updateCampaignStatus(supabase, campaignId, 'failed')
       return NextResponse.json(
-        { error: 'FAL_KEY non configuré' },
+        { error: 'TRANSLOADIT_KEY/SECRET non configurés' },
         { status: 500 }
       )
     }
 
-    console.log('[Assemble] Starting assembly of', clipsToProcess.length, 'clips')
+    console.log('[Assemble] Starting assembly of', clipsToProcess.length, 'clips with Transloadit')
     console.log('[Assemble] Clips data:', JSON.stringify(clipsToProcess, null, 2))
 
-    // Les clips arrivent déjà traités (trim/speed appliqués par Transloadit côté client)
-    // On les prépare simplement pour FFmpeg concat
-    const processedClips = clipsToProcess.map((clip, i) => {
-      console.log(`[Assemble] Clip ${i + 1}:`, {
-        url: clip.rawUrl?.slice(0, 80),
-        duration: clip.duration,
-        clipOrder: clip.clipOrder,
-      })
-      
-      return {
-        url: clip.rawUrl,
-        duration: clip.duration,
-        clipOrder: clip.clipOrder ?? i + 1
-      }
+    // Trier par clipOrder
+    const sortedClips = [...clipsToProcess].sort((a, b) => 
+      (a.clipOrder || 0) - (b.clipOrder || 0)
+    )
+
+    // Initialiser le client Transloadit
+    const transloadit = new Transloadit({
+      authKey: TRANSLOADIT_KEY,
+      authSecret: TRANSLOADIT_SECRET,
     })
 
-    // ═══════════════════════════════════════════════════════════════════
-    // UTILISER FFMPEG COMPOSE - Concatène les vidéos via keyframes séquentiels
-    // ═══════════════════════════════════════════════════════════════════
-    
-    console.log('[Assemble] ═══════════════════════════════════════')
-    console.log('[Assemble] Using FFmpeg compose (sequential keyframes):')
-    processedClips.forEach((c, i) => {
-      console.log(`[Assemble]   Clip ${i + 1}: ${c.url.slice(0, 80)}... (${c.duration}s)`)
-    })
-    console.log('[Assemble] ═══════════════════════════════════════')
+    // Construire les steps Transloadit pour la concaténation
+    // Ref: https://transloadit.com/docs/transcoding/video-encoding/concatenate-videos/
+    const steps: Record<string, unknown> = {}
+    const importStepNames: string[] = []
 
-    // Construire les keyframes séquentiels pour la track vidéo
-    let currentTimestamp = 0
-    const videoKeyframes: { url: string; timestamp: number; duration: number }[] = []
-    
-    for (const clip of processedClips) {
-      const durationMs = clip.duration * 1000
-      videoKeyframes.push({
-        url: clip.url,
-        timestamp: currentTimestamp,
-        duration: durationMs
-      })
-      currentTimestamp += durationMs
-    }
-    
-    const totalDurationMs = currentTimestamp
-    
-    console.log('[Assemble] Video keyframes:', videoKeyframes.length, 'total duration:', totalDurationMs / 1000, 's')
-    
-    // Créer la track vidéo avec tous les keyframes
-    const tracks: Track[] = [
-      {
-        id: 'video-track',
-        type: 'video',
-        keyframes: videoKeyframes
+    // 1. Importer chaque vidéo
+    sortedClips.forEach((clip, index) => {
+      const stepName = `import_${index + 1}`
+      steps[stepName] = {
+        robot: '/http/import',
+        url: clip.rawUrl
       }
-    ]
+      importStepNames.push(stepName)
+    })
 
-    // Appeler fal.ai FFmpeg compose
-    console.log('[Assemble] Calling fal.ai FFmpeg compose...')
-    
-    const response = await fetch('https://fal.run/fal-ai/ffmpeg-api/compose', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Key ${FAL_KEY}`,
-        'Content-Type': 'application/json',
+    // 2. Concaténer toutes les vidéos avec ré-encodage complet
+    // - preset: 'ipad-high' force le ré-encodage H.264
+    // - Cela résout les problèmes de keyframes et timestamps
+    steps['concatenated'] = {
+      robot: '/video/concat',
+      use: {
+        steps: importStepNames.map(name => ({ name, as: 'video' }))
       },
-      body: JSON.stringify({ tracks })
+      result: true,
+      preset: 'ipad-high',  // Force ré-encodage H.264 de qualité
+      ffmpeg_stack: 'v7.0.0',
+      // Normaliser le framerate et l'audio
+      framerate: '30',
+      // Reset timestamps automatiquement fait par /video/concat
+    }
+
+    // 3. Générer une thumbnail
+    steps['thumbnail'] = {
+      robot: '/video/thumbs',
+      use: 'concatenated',
+      result: true,
+      count: 1,
+      offsets: [0],
+      format: 'jpg',
+      width: 720,
+      height: 1280,
+    }
+
+    console.log('[Assemble] Transloadit steps:', Object.keys(steps))
+    console.log('[Assemble] Import steps:', importStepNames)
+
+    // Créer et attendre l'assemblage
+    const result = await transloadit.createAssembly({
+      params: { steps } as any,
+      waitForCompletion: true,
     })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('[Assemble] fal.ai error:', errorText)
-      throw new Error(`fal.ai error: ${response.status} - ${errorText}`)
+    console.log('[Assemble] Assembly result:', result.ok, result.assembly_id)
+
+    if (result.ok !== 'ASSEMBLY_COMPLETED') {
+      console.error('[Assemble] Assembly failed:', result.error, result.message)
+      throw new Error(result.message || 'Assembly failed')
     }
 
-    const result: ComposeOutput = await response.json()
-    
-    if (!result.video_url) {
-      throw new Error('No video_url from FFmpeg compose')
+    // Récupérer les URLs de sortie
+    const videoUrl = result.results?.concatenated?.[0]?.ssl_url
+    const thumbnailUrl = result.results?.thumbnail?.[0]?.ssl_url
+
+    if (!videoUrl) {
+      console.error('[Assemble] No video URL in result:', result.results)
+      throw new Error('No output video URL')
     }
-    
-    console.log('[Assemble] Video assembled:', result.video_url?.slice(0, 50))
 
-    // Préparer les ajustements pour la sauvegarde
-    const clipAdjustments = clipsToProcess.map((clip, index) => ({
-      clip_order: clip.clipOrder ?? index + 1,
-      original_url: clip.rawUrl,
-      final_duration: clip.duration
-    }))
+    console.log('[Assemble] ✓ Video:', videoUrl.slice(0, 60))
+    console.log('[Assemble] ✓ Thumbnail:', thumbnailUrl?.slice(0, 60) || 'none')
 
-    // Estimer la durée totale (somme des durées planifiées)
-    const estimatedDuration = processedClips.reduce((sum, c) => sum + c.duration, 0)
+    // Calculer la durée totale
+    const totalDuration = sortedClips.reduce((sum, c) => sum + (c.duration || 0), 0)
 
-    // Sauvegarder dans campaign_assemblies (versioning)
-    if (campaignId && result.video_url) {
-      const supabase = await createClient()
-      
-      // 1. Créer une nouvelle entrée dans campaign_assemblies
+    // Sauvegarder en base de données si on a un campaignId
+    if (campaignId) {
+      // 1. Créer une entrée dans campaign_assemblies (historique)
+      const clipAdjustments = sortedClips.map((c, i) => ({
+        clipOrder: c.clipOrder || i + 1,
+        duration: c.duration,
+      }))
+
       const { data: assembly, error: assemblyError } = await (supabase
         .from('campaign_assemblies') as any)
         .insert({
           campaign_id: campaignId,
-          final_video_url: result.video_url,
-          thumbnail_url: result.thumbnail_url || null,
-          duration_seconds: estimatedDuration,
+          final_video_url: videoUrl,
+          thumbnail_url: thumbnailUrl || null,
+          duration_seconds: totalDuration,
           clip_adjustments: clipAdjustments
         })
         .select()
@@ -188,12 +172,12 @@ export async function POST(request: NextRequest) {
       if (assemblyError) {
         console.error('[Assemble] Error saving assembly:', assemblyError)
         // Fallback: mettre à jour la campagne directement si la table n'existe pas encore
-        if (assemblyError.code === '42P01') { // Table doesn't exist
+        if (assemblyError.code === '42P01') {
           console.log('[Assemble] campaign_assemblies table not found, updating campaign directly')
           await (supabase
             .from('campaigns') as any)
             .update({ 
-              final_video_url: result.video_url,
+              final_video_url: videoUrl,
               status: 'completed'
             })
             .eq('id', campaignId)
@@ -202,11 +186,11 @@ export async function POST(request: NextRequest) {
         console.log('[Assemble] Assembly saved with version:', assembly?.version || 'unknown')
       }
 
-      // 2. Mettre à jour la campagne avec le dernier assemblage (pour compatibilité)
+      // 2. Mettre à jour la campagne avec le dernier assemblage
       await (supabase
         .from('campaigns') as any)
         .update({ 
-          final_video_url: result.video_url,
+          final_video_url: videoUrl,
           status: 'completed'
         })
         .eq('id', campaignId)
@@ -215,29 +199,23 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      videoUrl: result.video_url,
-      thumbnailUrl: result.thumbnail_url || null,
-      duration: totalDurationMs / 1000,
-      clipCount: clipsToProcess.length,
-      // Debug: URLs utilisées pour l'assemblage
-      debug: {
-        method: 'ffmpeg-concat',
-        processedClips: processedClips.map((c) => ({
-          clipOrder: c.clipOrder,
-          urlUsed: c.url.slice(0, 120),
-        }))
-      }
+      videoUrl,
+      thumbnailUrl: thumbnailUrl || null,
+      duration: totalDuration,
+      clipCount: sortedClips.length,
+      method: 'transloadit-concat',
+      assemblyId: result.assembly_id
     })
+
   } catch (error) {
     console.error('[Assemble] Error:', error)
     
-    // Mettre le status en 'failed' en cas d'erreur
     if (campaignId) {
       await updateCampaignStatus(supabase, campaignId, 'failed')
     }
     
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Erreur assemblage' },
+      { error: error instanceof Error ? error.message : 'Erreur assemblage vidéo' },
       { status: 500 }
     )
   }
