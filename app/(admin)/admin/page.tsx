@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Users, Palette, FileText, BarChart3, Plus, Settings, Layers } from 'lucide-react'
+import { Users, Palette, FileText, BarChart3, Plus, Settings, Layers, CreditCard, Activity } from 'lucide-react'
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
@@ -49,6 +49,20 @@ export default async function AdminDashboard() {
       description: 'Total utilisateurs',
       icon: BarChart3,
     },
+    {
+      title: 'Billing',
+      count: null,
+      href: '/admin/billing',
+      description: 'Gérer les prix et plans',
+      icon: CreditCard,
+    },
+    {
+      title: 'Logs',
+      count: null,
+      href: '/admin/logs',
+      description: 'Logs de génération Fal.ai',
+      icon: Activity,
+    },
   ]
 
   return (
@@ -78,7 +92,11 @@ export default async function AdminDashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-4xl font-semibold">{stat.count}</p>
+                  {stat.count !== null ? (
+                    <p className="text-4xl font-semibold">{stat.count}</p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Configurer</p>
+                  )}
                 </CardContent>
               </Card>
             </Link>

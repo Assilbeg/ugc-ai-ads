@@ -185,7 +185,11 @@ export async function generateFirstFrame(
 // ─────────────────────────────────────────────────────────────────
 // VEO 3.1 - Video Generation (Image to Video)
 // Docs: https://fal.ai/models/fal-ai/veo3.1/image-to-video
+// Fast: https://fal.ai/models/fal-ai/veo3.1/fast/image-to-video
 // ─────────────────────────────────────────────────────────────────
+
+export type VideoQuality = 'standard' | 'fast'
+
 interface Veo31Input {
   prompt: string
   image_url: string      // First frame (required for image-to-video)
@@ -197,13 +201,27 @@ interface Veo31Output {
   video: { url: string }
 }
 
+// Pricing per second (with audio):
+// - Standard: $0.40/sec
+// - Fast: $0.15/sec
+export const VEO31_PRICING = {
+  standard: { perSecond: 40, label: 'Standard (Qualité max)' },  // 40 cents/sec
+  fast: { perSecond: 15, label: 'Fast (Économique)' },           // 15 cents/sec
+} as const
+
+export function getVeo31Endpoint(quality: VideoQuality): string {
+  return quality === 'fast' 
+    ? 'fal-ai/veo3.1/fast/image-to-video'
+    : 'fal-ai/veo3.1/image-to-video'
+}
+
 export async function generateVideoVeo31(
   prompt: string,
   firstFrameUrl: string,
-  duration: 4 | 6 | 8 = 6
+  duration: 4 | 6 | 8 = 6,
+  quality: VideoQuality = 'standard'
 ): Promise<string> {
-  // Utiliser l'endpoint image-to-video de Veo 3.1
-  const path = 'fal-ai/veo3.1/image-to-video'
+  const path = getVeo31Endpoint(quality)
   
   const input: Veo31Input = {
     prompt,
@@ -212,8 +230,10 @@ export async function generateVideoVeo31(
     aspect_ratio: '9:16',
   }
 
-  console.log('[Veo3.1] Generating video:', { 
+  console.log(`[Veo3.1 ${quality.toUpperCase()}] Generating video:`, { 
     duration, 
+    quality,
+    endpoint: path,
     firstFrameUrl: firstFrameUrl?.slice(0, 80),
     prompt: prompt.slice(0, 100) + '...' 
   })
@@ -230,7 +250,7 @@ export async function generateVideoVeo31(
     10000
   )
   
-  console.log('[Veo3.1] Video generated:', result.video?.url?.slice(0, 80))
+  console.log(`[Veo3.1 ${quality.toUpperCase()}] Video generated:`, result.video?.url?.slice(0, 80))
   
   return result.video.url
 }
@@ -319,8 +339,9 @@ export async function generateVideo(
   prompt: string,
   firstFrameUrl: string,
   _engine: 'veo3.1', // On garde le paramètre pour compatibilité mais on force Veo3.1
-  duration: number
+  duration: number,
+  quality: VideoQuality = 'standard'
 ): Promise<string> {
-  // Toujours utiliser Veo3.1 - meilleur rapport qualité/prix
-  return generateVideoVeo31(prompt, firstFrameUrl, duration as 4 | 6 | 8)
+  // Utiliser Veo3.1 avec la qualité choisie
+  return generateVideoVeo31(prompt, firstFrameUrl, duration as 4 | 6 | 8, quality)
 }

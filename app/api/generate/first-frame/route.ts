@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateFirstFrame } from '@/lib/api/falai'
+import { checkCredits, deductCredits, getGenerationCost } from '@/lib/credits'
+import { createGenerationLog, markGenerationCompleted, markGenerationFailed } from '@/lib/generation-logger'
 import crypto from 'crypto'
 
 // Template si on utilise la soul_image (sans intention_media pré-générée)
@@ -12,7 +14,7 @@ const INTENTION_IMAGE_TEMPLATE = `Generate a variation of this same person in th
 // Template si on utilise l'image du clip précédent (continuité entre clips)
 const PREVIOUS_FRAME_TEMPLATE = `Generate the next frame of this same TikTok UGC video with the same person. {PROMPT}. Keep the EXACT SAME FACE, clothing and style. Maintain visual continuity with the reference. NO TIKTOK UI, NO TEXT, NO WATERMARKS, NO OVERLAYS.`
 
-// Coût estimé par génération (en euros)
+// Coût estimé par génération (en euros) - kept for legacy asset tracking
 const GENERATION_COST = 0.15
 
 // Générer un hash SHA256 du prompt pour recherche rapide
@@ -22,8 +24,20 @@ function hashPrompt(prompt: string): string {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient()
+    
+    // Get authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Non authentifié' },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
-    const { soulImageUrl, prompt, presetId, intentionImageUrl, previousFrameUrl, actorId, skipCache } = body as {
+    const { soulImageUrl, prompt, presetId, intentionImageUrl, previousFrameUrl, actorId, skipCache, campaignId, clipId, skipCredits } = body as {
       soulImageUrl: string
       prompt: string
       presetId?: string
@@ -31,6 +45,9 @@ export async function POST(request: NextRequest) {
       previousFrameUrl?: string  // Image du clip précédent (pour continuité)
       actorId?: string           // ID de l'acteur pour le cache
       skipCache?: boolean        // Forcer la régénération
+      campaignId?: string
+      clipId?: string
+      skipCredits?: boolean
     }
 
     console.log('First frame request:', { 
@@ -49,8 +66,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-
-    const supabase = await createClient()
 
     // Choisir l'image de référence et le template approprié
     // Priorité : previousFrameUrl > intentionImageUrl > soulImageUrl
@@ -113,13 +128,89 @@ export async function POST(request: NextRequest) {
     }
 
     // ══════════════════════════════════════════════════════════════
+    // VÉRIFIER LES CRÉDITS AVANT GÉNÉRATION
+    // ══════════════════════════════════════════════════════════════
+    if (!skipCredits) {
+      const creditsCheck = await checkCredits(user.id, 'first_frame')
+      
+      if (!creditsCheck.hasEnough) {
+        return NextResponse.json(
+          { 
+            error: 'Crédits insuffisants',
+            code: 'INSUFFICIENT_CREDITS',
+            required: creditsCheck.requiredAmount,
+            current: creditsCheck.currentBalance,
+            missing: creditsCheck.missingAmount,
+            isEarlyBirdEligible: creditsCheck.isEarlyBirdEligible,
+          },
+          { status: 402 }
+        )
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // CREATE GENERATION LOG
+    // ══════════════════════════════════════════════════════════════
+    const logId = await createGenerationLog({
+      userId: user.id,
+      generationType: 'first_frame',
+      modelPath: 'fal-ai/nano-banana-pro/edit',
+      inputParams: {
+        prompt: prompt.slice(0, 500),
+        referenceImageUrl: referenceImageUrl.slice(0, 200),
+        presetId,
+        usedIntentionImage: !!intentionImageUrl && !previousFrameUrl,
+        usedPreviousFrame: !!previousFrameUrl,
+      },
+      campaignId,
+      clipId,
+    })
+
+    // ══════════════════════════════════════════════════════════════
     // GÉNÉRER UNE NOUVELLE IMAGE
     // ══════════════════════════════════════════════════════════════
     const startTime = Date.now()
-    const url = await generateFirstFrame(referenceImageUrl, fullPrompt)
+    let url: string
+    
+    try {
+      url = await generateFirstFrame(referenceImageUrl, fullPrompt)
+    } catch (error) {
+      // Mark log as failed
+      if (logId) {
+        await markGenerationFailed(
+          logId,
+          error instanceof Error ? error.message : 'Unknown error',
+          startTime
+        )
+      }
+      throw error
+    }
+    
     const generationTime = Date.now() - startTime
-
     console.log('First frame generated:', url?.slice(0, 50), `(${generationTime}ms)`)
+
+    // Get billed cost
+    const billedCost = await getGenerationCost('first_frame')
+
+    // Mark log as completed
+    if (logId) {
+      await markGenerationCompleted(logId, url, startTime, billedCost)
+    }
+
+    // Deduct credits after successful generation
+    if (!skipCredits) {
+      const deductResult = await deductCredits(
+        user.id,
+        'first_frame',
+        'First Frame NanoBanana Pro',
+        campaignId,
+        clipId
+      )
+      
+      if (!deductResult.success) {
+        console.error('Failed to deduct credits:', deductResult.errorMessage)
+      }
+    }
 
     // ══════════════════════════════════════════════════════════════
     // SAUVEGARDER L'ASSET (sauf si previousFrame car trop spécifique)
@@ -136,7 +227,7 @@ export async function POST(request: NextRequest) {
           url: url,
           generation_cost: GENERATION_COST,
           generation_time_ms: generationTime,
-          model_used: 'fal-ai/flux-pro', // ou le modèle utilisé
+          model_used: 'fal-ai/nano-banana-pro',
         })
 
       if (insertError) {
@@ -151,7 +242,8 @@ export async function POST(request: NextRequest) {
       url, 
       cached: false,
       usedIntentionImage: !!intentionImageUrl && !previousFrameUrl,
-      usedPreviousFrame: !!previousFrameUrl 
+      usedPreviousFrame: !!previousFrameUrl,
+      logId,
     })
   } catch (error) {
     console.error('Error generating first frame:', error)

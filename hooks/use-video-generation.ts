@@ -13,6 +13,9 @@ interface GenerationProgress {
 // Type pour spécifier quel asset régénérer
 export type RegenerateWhat = 'frame' | 'video' | 'voice' | 'ambient' | 'all'
 
+// Qualité vidéo Veo 3.1
+export type VideoQuality = 'standard' | 'fast'
+
 export function useVideoGeneration() {
   const [generating, setGenerating] = useState(false)
   const [progress, setProgress] = useState<Record<string, GenerationProgress>>({})
@@ -27,7 +30,8 @@ export function useVideoGeneration() {
     actor: Actor,
     campaignId: string,
     ambientPrompt: string,
-    presetId?: string
+    presetId?: string,
+    videoQuality: VideoQuality = 'standard'
   ): Promise<CampaignClip | null> => {
     const clipId = clip.id || `clip-${clip.order}`
 
@@ -99,6 +103,7 @@ export function useVideoGeneration() {
           firstFrameUrl: frameUrl,
           engine: 'veo3.1',
           duration: clip.video.duration,
+          quality: videoQuality,
         }),
         signal: abortControllerRef.current?.signal,
       })
@@ -290,7 +295,8 @@ export function useVideoGeneration() {
     actor: Actor,
     what: RegenerateWhat,
     ambientPrompt: string,
-    presetId?: string
+    presetId?: string,
+    videoQuality: VideoQuality = 'standard'
   ): Promise<CampaignClip | null> => {
     const clipId = clip.id || `clip-${clip.order}`
 
@@ -344,6 +350,7 @@ export function useVideoGeneration() {
             firstFrameUrl: frameUrl,
             engine: 'veo3.1',
             duration: clip.video.duration,
+            quality: videoQuality,
           }),
           signal: abortControllerRef.current?.signal,
         })
@@ -392,7 +399,7 @@ export function useVideoGeneration() {
 
       // ── RÉGÉNÉRER AMBIANCE ── (pas cher)
       if (what === 'ambient' || what === 'all') {
-        updateProgress('generating_ambient', 90, 'Régénération de l\'ambiance...')
+        updateProgress('generating_ambient', 85, 'Régénération de l\'ambiance...')
 
         const ambientResponse = await fetch('/api/generate/ambient', {
           method: 'POST',
@@ -411,6 +418,50 @@ export function useVideoGeneration() {
           ambient_url: ambientData.audioUrl,
           voice_volume: updatedClip.audio?.voice_volume ?? 100,
           ambient_volume: updatedClip.audio?.ambient_volume ?? 20,
+        }
+      }
+
+      // ── REFAIRE LE MIXAGE après régénération voix/ambiance ──
+      if (what === 'voice' || what === 'ambient' || what === 'all') {
+        const rawVideoUrl = updatedClip.video.raw_url
+        const voiceUrl = updatedClip.audio?.transformed_voice_url
+        const ambientUrl = updatedClip.audio?.ambient_url
+        
+        if (rawVideoUrl && (voiceUrl || ambientUrl)) {
+          updateProgress('generating_ambient', 92, 'Mixage audio...')
+          
+          try {
+            const mixResponse = await fetch('/api/generate/mix-video', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                videoUrl: rawVideoUrl,
+                voiceUrl: voiceUrl,
+                ambientUrl: ambientUrl,
+                voiceVolume: updatedClip.audio?.voice_volume ?? 100,
+                ambientVolume: updatedClip.audio?.ambient_volume ?? 20,
+                duration: clip.video.duration,
+              }),
+              signal: abortControllerRef.current?.signal,
+            })
+
+            if (mixResponse.ok) {
+              const mixData = await mixResponse.json()
+              if (mixData.mixed && mixData.videoUrl) {
+                console.log('[Regenerate] Video mixed successfully:', mixData.videoUrl.slice(0, 50))
+                updatedClip.video = { 
+                  ...updatedClip.video, 
+                  final_url: mixData.videoUrl 
+                }
+                updatedClip.audio = { 
+                  ...updatedClip.audio, 
+                  final_audio_url: mixData.videoUrl
+                }
+              }
+            }
+          } catch (mixErr) {
+            console.warn('[Regenerate] Mix failed:', mixErr)
+          }
         }
       }
 
@@ -435,7 +486,8 @@ export function useVideoGeneration() {
     actor: Actor,
     campaignId: string,
     ambientPrompt: string,
-    presetId?: string
+    presetId?: string,
+    videoQuality: VideoQuality = 'standard'
   ): Promise<CampaignClip[]> => {
     setGenerating(true)
     setError(null)
@@ -443,7 +495,7 @@ export function useVideoGeneration() {
 
     // Génération parallèle de tous les clips
     const promises = clips.map(clip => 
-      generateClipAssets(clip, actor, campaignId, ambientPrompt, presetId)
+      generateClipAssets(clip, actor, campaignId, ambientPrompt, presetId, videoQuality)
         .then(result => result || { 
           ...clip, 
           status: 'failed' as const,
@@ -466,7 +518,8 @@ export function useVideoGeneration() {
     campaignId: string,
     ambientPrompt: string,
     what: RegenerateWhat,
-    presetId?: string
+    presetId?: string,
+    videoQuality: VideoQuality = 'standard'
   ): Promise<CampaignClip | null> => {
     setGenerating(true)
     setError(null)
@@ -475,9 +528,9 @@ export function useVideoGeneration() {
     let result: CampaignClip | null = null
 
     if (what === 'all') {
-      result = await generateClipAssets(clip, actor, campaignId, ambientPrompt, presetId)
+      result = await generateClipAssets(clip, actor, campaignId, ambientPrompt, presetId, videoQuality)
     } else {
-      result = await regenerateAsset(clip, actor, what, ambientPrompt, presetId)
+      result = await regenerateAsset(clip, actor, what, ambientPrompt, presetId, videoQuality)
     }
 
     setGenerating(false)

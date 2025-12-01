@@ -165,12 +165,13 @@ export async function POST(request: NextRequest) {
     console.log('[Assemble] Starting assembly of', clipsToProcess.length, 'clips')
     console.log('[Assemble] Raw clips data:', JSON.stringify(clipsToProcess, null, 2))
 
-    // Traiter chaque clip : upload Cloudinary si nécessaire + appliquer transformations
+    // Traiter chaque clip
+    // NOTE: Les clips avec audio mixé sont déjà pré-traités par Transloadit (/api/generate/process-clip)
+    // Pour les clips SANS audio, on utilise Cloudinary pour trim/speed (plus rapide)
     const processedClips: { url: string; duration: number; clipOrder: number }[] = []
     
     for (let i = 0; i < clipsToProcess.length; i++) {
       const clip = clipsToProcess[i]
-      // Déterminer l'URL brute (nouveau ou ancien format)
       const rawUrl = 'rawUrl' in clip ? clip.rawUrl : clip.url
       const trimStart = clip.trimStart ?? 0
       const trimEnd = clip.trimEnd ?? ('originalDuration' in clip ? clip.originalDuration : clip.duration) ?? clip.duration
@@ -178,74 +179,34 @@ export async function POST(request: NextRequest) {
       const originalDuration = 'originalDuration' in clip ? clip.originalDuration : clip.duration
       const hasMixedAudio = 'hasMixedAudio' in clip ? clip.hasMixedAudio : false
       
-      console.log(`[Assemble] Clip ${i + 1} analysis:`, {
+      console.log(`[Assemble] Clip ${i + 1}:`, {
         rawUrl: rawUrl?.slice(0, 60),
-        trimStart,
-        trimEnd,
+        trimStart, trimEnd, speed,
         originalDuration,
-        speed,
-        finalDuration: clip.duration,
-        hasTrimStartChange: trimStart !== 0,
-        hasTrimEndChange: trimEnd !== originalDuration,
-        hasSpeedChange: speed !== 1.0,
         hasMixedAudio,
+        duration: clip.duration,
       })
-      
-      // Vérifier si des ajustements sont nécessaires
-      const hasTrimAdjustments = trimStart !== 0 || trimEnd !== originalDuration
-      const hasSpeedAdjustment = speed !== 1.0
-      const hasAdjustments = hasTrimAdjustments || hasSpeedAdjustment
-      
-      // IMPORTANT: Si la vidéo a de l'audio mixé, on ne peut PAS utiliser e_accelerate
-      // car Cloudinary ne synchronise pas l'audio avec le changement de vitesse
-      // On applique seulement le trim dans ce cas
-      const canApplySpeed = !hasMixedAudio || speed === 1.0
-      if (hasMixedAudio && hasSpeedAdjustment) {
-        console.warn(`[Assemble] ⚠️ Clip ${i + 1} has mixed audio - speed change (${speed}x) will be IGNORED to preserve audio sync!`)
-        console.warn(`[Assemble] ⚠️ Speed changes with mixed audio require FFmpeg processing (not yet implemented)`)
-      }
-      
-      console.log(`[Assemble] Clip ${i + 1} hasAdjustments:`, hasAdjustments, '| canApplySpeed:', canApplySpeed)
       
       let finalUrl = rawUrl
       
-      // Appliquer les transformations seulement si nécessaire
-      if (hasTrimAdjustments || (hasSpeedAdjustment && canApplySpeed)) {
-        console.log(`[Assemble] Clip ${i + 1} - Uploading to Cloudinary...`)
-        // Upload vers Cloudinary si pas encore fait
+      // Pour les clips SANS audio mixé, on peut utiliser Cloudinary pour trim/speed
+      // Pour les clips AVEC audio mixé, ils sont déjà pré-traités (trim=0, speed=1)
+      const needsCloudinaryTransform = !hasMixedAudio && (trimStart !== 0 || trimEnd !== originalDuration || speed !== 1.0)
+      
+      if (needsCloudinaryTransform) {
+        console.log(`[Assemble] Clip ${i + 1} - Applying Cloudinary transforms...`)
         const cloudinaryId = await uploadToCloudinaryIfNeeded(rawUrl, clip.cloudinaryId)
         
-        console.log(`[Assemble] Clip ${i + 1} - Cloudinary ID:`, cloudinaryId)
-        
         if (cloudinaryId) {
-          // Construire l'URL avec transformations
           const cloudinaryUrl = `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/video/upload/${cloudinaryId}.mp4`
-          console.log(`[Assemble] Clip ${i + 1} - Base Cloudinary URL:`, cloudinaryUrl)
-          
-          // Appliquer trim toujours, speed seulement si autorisé
-          finalUrl = buildPreviewUrl(cloudinaryUrl, {
-            trimStart,
-            trimEnd,
-            speed: canApplySpeed ? speed : 1.0  // Ignorer speed si audio mixé
-          })
-          console.log(`[Assemble] Clip ${i + 1} - FINAL URL WITH TRANSFORMS:`, finalUrl)
-        } else {
-          console.error(`[Assemble] Clip ${i + 1} - Cloudinary upload FAILED, using raw video WITHOUT transforms!`)
+          finalUrl = buildPreviewUrl(cloudinaryUrl, { trimStart, trimEnd, speed })
+          console.log(`[Assemble] Clip ${i + 1} - Transformed URL:`, finalUrl.slice(0, 100))
         }
-      } else {
-        console.log(`[Assemble] Clip ${i + 1} no adjustments to apply, using raw URL`)
       }
-      
-      console.log(`[Assemble] Clip ${i + 1} - URL being sent to FAL:`, finalUrl.slice(0, 120))
-      
-      // Si on a ignoré le speed, recalculer la durée correcte (durée trimmée sans accélération)
-      const effectiveDuration = hasMixedAudio && hasSpeedAdjustment 
-        ? (trimEnd - trimStart)  // Durée sans speed car speed ignoré
-        : clip.duration          // Durée calculée avec speed
       
       processedClips.push({
         url: finalUrl,
-        duration: effectiveDuration,
+        duration: clip.duration,
         clipOrder: clip.clipOrder ?? processedClips.length + 1
       })
     }

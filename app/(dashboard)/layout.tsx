@@ -40,6 +40,12 @@ export default async function DashboardLayout({
               >
                 Campagnes
               </Link>
+              <Link 
+                href="/dashboard/billing" 
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Facturation
+              </Link>
               {userIsAdmin && (
                 <Link 
                   href="/admin" 

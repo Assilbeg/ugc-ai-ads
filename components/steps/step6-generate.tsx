@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { NewCampaignState, CampaignClip, ClipStatus, ClipAdjustments } from '@/types'
-import { useVideoGeneration, RegenerateWhat } from '@/hooks/use-video-generation'
+import { useVideoGeneration, RegenerateWhat, VideoQuality } from '@/hooks/use-video-generation'
 import { useActors } from '@/hooks/use-actors'
 import { useCampaignCreation } from '@/hooks/use-campaign-creation'
 import { getPresetById } from '@/lib/presets'
 import { createClient } from '@/lib/supabase/client'
 import { buildPreviewUrl, calculateAdjustedDuration } from '@/lib/api/cloudinary'
-import { processVideoWithSync, isFFmpegSupported } from '@/lib/ffmpeg-utils'
+// Trim + Speed processing done server-side via Transloadit (/api/generate/process-clip)
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -228,6 +228,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     label: string
     warning?: string
   } | null>(null)
+  
+  // Qualité vidéo sélectionnée
+  const [videoQuality, setVideoQuality] = useState<VideoQuality>('standard')
 
   // Initialiser les ajustements quand les clips changent
   useEffect(() => {
@@ -341,7 +344,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   }, [adjustments, generatedClips, clips, onClipsUpdate])
 
   // Assembler la vidéo finale (applique les ajustements automatiquement)
-  // ATTEND LA RÉPONSE DU SERVEUR avant de rediriger (garantit que l'assemblage est lancé)
+  // Pré-traite les clips avec trim/speed via Transloadit (/api/generate/process-clip)
   const assembleVideo = useCallback(async () => {
     if (!campaignId) return
     
@@ -349,7 +352,6 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     
     try {
       // Préparer les données avec les ajustements trim/speed
-      // IMPORTANT: on garde l'index original pour récupérer les bons adjustments
       const clipsData = generatedClips
         .map((clip, originalIndex) => ({ clip, originalIndex }))
         .filter(({ clip }) => clip?.video?.raw_url)
@@ -362,7 +364,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           const trimmedDuration = trimEnd - trimStart
           const duration = trimmedDuration / speed
           const hasMixedAudio = !!clip.video.final_url
-          const needsFFmpegProcessing = hasMixedAudio && speed !== 1.0
+          // Besoin de traitement si : audio mixé + (trim OU speed modifié)
+          const needsProcessing = hasMixedAudio && (trimStart > 0 || trimEnd !== originalDuration || speed !== 1.0)
           
           return {
             clip,
@@ -376,60 +379,56 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
             cloudinaryId: adj?.cloudinaryId,
             originalDuration,
             hasMixedAudio,
-            needsFFmpegProcessing,
+            needsProcessing,
           }
         })
       
-      // Pré-traiter les clips qui ont speed + audio mixé via FFmpeg WASM
-      const ffmpegSupported = isFFmpegSupported()
-      const clipsNeedingFFmpeg = clipsData.filter(c => c.needsFFmpegProcessing)
+      // Pré-traiter les clips avec audio via Transloadit
+      // Applique trim + speed avec audio synchronisé (100% fiable)
+      const clipsNeedingProcessing = clipsData.filter(c => c.needsProcessing)
       
-      if (clipsNeedingFFmpeg.length > 0 && ffmpegSupported) {
-        console.log('[Assemble] 🎬 Processing', clipsNeedingFFmpeg.length, 'clips with FFmpeg WASM for speed + audio sync...')
+      if (clipsNeedingProcessing.length > 0) {
+        console.log('[Assemble] 🎬 Processing', clipsNeedingProcessing.length, 'clips with server-side FFmpeg...')
         
-        for (const clipData of clipsNeedingFFmpeg) {
+        // Traiter en parallèle pour plus de rapidité
+        await Promise.all(clipsNeedingProcessing.map(async (clipData) => {
           try {
-            console.log(`[Assemble] FFmpeg processing clip ${clipData.clipOrder}...`)
+            console.log(`[Assemble] Processing clip ${clipData.clipOrder}...`)
             
-            // Traiter avec FFmpeg WASM
-            const processedBlob = await processVideoWithSync({
-              videoUrl: clipData.rawUrl!,
-              trimStart: clipData.trimStart,
-              trimEnd: clipData.trimEnd,
-              speed: clipData.speed,
-            })
-            
-            // Upload vers Cloudinary
-            const formData = new FormData()
-            formData.append('file', processedBlob, `clip-${clipData.clipOrder}-processed.mp4`)
-            
-            const uploadResponse = await fetch('/api/cloudinary/upload', {
+            const response = await fetch('/api/generate/process-clip', {
               method: 'POST',
-              body: formData,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                videoUrl: clipData.rawUrl,
+                trimStart: clipData.trimStart,
+                trimEnd: clipData.trimEnd,
+                speed: clipData.speed,
+                duration: clipData.originalDuration,
+              })
             })
             
-            if (uploadResponse.ok) {
-              const uploadData = await uploadResponse.json()
-              console.log(`[Assemble] ✓ Clip ${clipData.clipOrder} processed and uploaded:`, uploadData.url?.slice(0, 50))
-              
-              // Mettre à jour l'URL - trim/speed déjà appliqués
-              clipData.rawUrl = uploadData.url
-              clipData.trimStart = 0
-              clipData.trimEnd = clipData.duration // Durée après speed
-              clipData.speed = 1.0 // Speed déjà appliqué
-              clipData.needsFFmpegProcessing = false
+            if (response.ok) {
+              const result = await response.json()
+              if (result.processed && result.videoUrl) {
+                console.log(`[Assemble] ✓ Clip ${clipData.clipOrder} processed:`, result.videoUrl.slice(0, 60))
+                // Mettre à jour avec l'URL traitée - trim/speed déjà appliqués
+                clipData.rawUrl = result.videoUrl
+                clipData.trimStart = 0
+                clipData.trimEnd = result.newDuration
+                clipData.speed = 1.0
+                clipData.duration = result.newDuration
+                clipData.needsProcessing = false
+              }
             } else {
-              console.warn(`[Assemble] ⚠️ Upload failed for clip ${clipData.clipOrder}, will use original`)
+              console.warn(`[Assemble] ⚠️ Processing failed for clip ${clipData.clipOrder}`)
             }
-          } catch (ffmpegError) {
-            console.warn(`[Assemble] ⚠️ FFmpeg processing failed for clip ${clipData.clipOrder}:`, ffmpegError)
+          } catch (err) {
+            console.warn(`[Assemble] ⚠️ Error processing clip ${clipData.clipOrder}:`, err)
           }
-        }
-      } else if (clipsNeedingFFmpeg.length > 0) {
-        console.warn('[Assemble] ⚠️ FFmpeg WASM not supported - speed changes will be ignored for clips with audio')
+        }))
       }
       
-      // Préparer les clips pour l'assemblage
+      // Préparer les clips pour l'assemblage final
       const clipsForAssembly = clipsData.map(({ rawUrl, duration, clipOrder, trimStart, trimEnd, speed, cloudinaryId, originalDuration, hasMixedAudio }) => ({
         rawUrl,
         duration,
@@ -673,7 +672,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       actor,
       dbCampaignId || `temp-${Date.now()}`,
       preset.ambient_audio.prompt,
-      preset.id
+      preset.id,
+      videoQuality
     )
 
     // Marquer qu'on a de nouveaux clips générés (pour déclencher la sauvegarde)
@@ -717,7 +717,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       campaignId || 'temp',
       preset.ambient_audio.prompt,
       what,
-      preset.id
+      preset.id,
+      videoQuality
     )
 
     if (result) {
@@ -827,6 +828,54 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
               Chaque clip passe par : Vidéo → Voix → Ambiance
             </p>
             
+            {/* Sélecteur de qualité vidéo */}
+            <div className="max-w-md mx-auto mb-8">
+              <p className="text-sm font-medium text-muted-foreground mb-3">Qualité vidéo Veo 3.1</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setVideoQuality('fast')}
+                  className={`relative p-4 rounded-xl border-2 transition-all text-left ${
+                    videoQuality === 'fast' 
+                      ? 'border-green-500 bg-green-500/10' 
+                      : 'border-border hover:border-muted-foreground/50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <Gauge className="w-4 h-4 text-green-500" />
+                    <span className="font-semibold">Fast</span>
+                    {videoQuality === 'fast' && (
+                      <Check className="w-4 h-4 text-green-500 ml-auto" />
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Économique • ~0.90$/vidéo</p>
+                  <div className="mt-2 text-xs text-green-600 font-medium">
+                    -62% vs Standard
+                  </div>
+                </button>
+                
+                <button
+                  onClick={() => setVideoQuality('standard')}
+                  className={`relative p-4 rounded-xl border-2 transition-all text-left ${
+                    videoQuality === 'standard' 
+                      ? 'border-violet-500 bg-violet-500/10' 
+                      : 'border-border hover:border-muted-foreground/50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <Sparkles className="w-4 h-4 text-violet-500" />
+                    <span className="font-semibold">Standard</span>
+                    {videoQuality === 'standard' && (
+                      <Check className="w-4 h-4 text-violet-500 ml-auto" />
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Qualité max • ~2.40$/vidéo</p>
+                  <div className="mt-2 text-xs text-violet-600 font-medium">
+                    Meilleure qualité
+                  </div>
+                </button>
+              </div>
+            </div>
+            
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8">
               <Button variant="ghost" onClick={onBack} className="h-12 px-6 rounded-xl text-base">
                 ← Modifier le plan
@@ -836,7 +885,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                 className="h-14 px-10 rounded-xl font-medium text-lg"
                 size="lg"
               >
-                🚀 Lancer la génération
+                🚀 Lancer la génération ({videoQuality === 'fast' ? 'Fast' : 'Standard'})
               </Button>
             </div>
           </CardContent>
