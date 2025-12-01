@@ -630,20 +630,22 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
     setEditVisualText(clips[index].first_frame.prompt)
   }
 
-  const saveVisualEdit = () => {
+  const saveVisualEdit = async () => {
     if (editingVisualPrompt !== null) {
       const currentClip = clips[editingVisualPrompt]
       const promptChanged = currentClip.first_frame.prompt !== editVisualText
       
+      const newFirstFrame = {
+        ...currentClip.first_frame,
+        prompt: editVisualText,
+        // Invalider l'image existante si le prompt a changé
+        image_url: promptChanged ? undefined : currentClip.first_frame.image_url,
+      }
+      
       const updatedClips = [...clips]
       updatedClips[editingVisualPrompt] = {
         ...updatedClips[editingVisualPrompt],
-        first_frame: {
-          ...updatedClips[editingVisualPrompt].first_frame,
-          prompt: editVisualText,
-          // Invalider l'image existante si le prompt a changé
-          image_url: promptChanged ? undefined : updatedClips[editingVisualPrompt].first_frame.image_url,
-        },
+        first_frame: newFirstFrame,
         // Invalider la vidéo existante si le prompt visuel a changé
         // Pour forcer une régénération à l'étape 6
         ...(promptChanged && currentClip.video?.raw_url ? {
@@ -658,6 +660,32 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
       setClips(updatedClips)
       setEditingVisualPrompt(null)
       setEditVisualText('')
+      
+      // Sauvegarder en BDD si on a un campaign_id
+      if (state.campaign_id && currentClip.order !== undefined) {
+        try {
+          const { error } = await (supabase
+            .from('campaign_clips') as any)
+            .update({ 
+              first_frame: newFirstFrame,
+              // Invalider la vidéo si le prompt a changé
+              ...(promptChanged ? { 
+                video: { ...currentClip.video, raw_url: null, final_url: null },
+                status: 'pending'
+              } : {})
+            })
+            .eq('campaign_id', state.campaign_id)
+            .eq('order', currentClip.order)
+          
+          if (error) {
+            console.error('[Step5] Error saving prompt to DB:', error)
+          } else {
+            console.log('[Step5] ✓ Prompt saved to DB for clip', currentClip.order)
+          }
+        } catch (err) {
+          console.error('[Step5] Error saving prompt to DB:', err)
+        }
+      }
     }
   }
 
@@ -946,8 +974,8 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
                                 <Button variant="ghost" size="sm" className="h-7 text-xs rounded-lg" onClick={cancelVisualEdit}>
                                   Annuler
                                 </Button>
-                                <Button size="sm" className="h-7 text-xs rounded-lg" onClick={() => {
-                                  saveVisualEdit()
+                                <Button size="sm" className="h-7 text-xs rounded-lg" onClick={async () => {
+                                  await saveVisualEdit()
                                   generateFirstFrame(index, { ...clip, first_frame: { ...clip.first_frame, prompt: editVisualText } }, index > 0 ? firstFrames[index - 1]?.url : undefined, true)
                                 }}>
                                   Sauvegarder & Regénérer
