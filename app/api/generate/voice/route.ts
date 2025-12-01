@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     // Check credits
     if (!skipCredits) {
-      const creditsCheck = await checkCredits(user.id, 'voice_chatterbox')
+      const creditsCheck = await checkCredits(user.id, 'voice_chatterbox', user.email)
       
       if (!creditsCheck.hasEnough) {
         return NextResponse.json(
@@ -91,7 +91,8 @@ export async function POST(request: NextRequest) {
         'voice_chatterbox',
         'Conversion voix Chatterbox HD',
         campaignId,
-        clipId
+        clipId,
+        user.email
       )
       
       if (!deductResult.success) {

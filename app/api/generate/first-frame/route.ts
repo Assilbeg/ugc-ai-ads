@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
     // VÉRIFIER LES CRÉDITS AVANT GÉNÉRATION
     // ══════════════════════════════════════════════════════════════
     if (!skipCredits) {
-      const creditsCheck = await checkCredits(user.id, 'first_frame')
+      const creditsCheck = await checkCredits(user.id, 'first_frame', user.email)
       
       if (!creditsCheck.hasEnough) {
         return NextResponse.json(
@@ -204,7 +204,8 @@ export async function POST(request: NextRequest) {
         'first_frame',
         'First Frame NanoBanana Pro',
         campaignId,
-        clipId
+        clipId,
+        user.email
       )
       
       if (!deductResult.success) {

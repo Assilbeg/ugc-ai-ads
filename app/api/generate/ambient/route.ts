@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     // Check credits
     if (!skipCredits) {
-      const creditsCheck = await checkCredits(user.id, 'ambient_elevenlabs')
+      const creditsCheck = await checkCredits(user.id, 'ambient_elevenlabs', user.email)
       
       if (!creditsCheck.hasEnough) {
         return NextResponse.json(
@@ -88,7 +88,8 @@ export async function POST(request: NextRequest) {
         'ambient_elevenlabs',
         'Audio ambiant ElevenLabs',
         campaignId,
-        clipId
+        clipId,
+        user.email
       )
       
       if (!deductResult.success) {

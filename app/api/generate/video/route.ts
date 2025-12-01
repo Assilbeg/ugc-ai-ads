@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     // Check credits (unless skipped for testing)
     if (!skipCredits) {
-      const creditsCheck = await checkCredits(user.id, generationType)
+      const creditsCheck = await checkCredits(user.id, generationType, user.email)
       
       if (!creditsCheck.hasEnough) {
         return NextResponse.json(
@@ -110,7 +110,8 @@ export async function POST(request: NextRequest) {
         generationType,
         `Vidéo Veo 3.1 ${qualityLabel} (${duration}s)`,
         campaignId,
-        clipId
+        clipId,
+        user.email
       )
       
       if (!deductResult.success) {

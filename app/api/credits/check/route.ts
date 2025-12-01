@@ -20,13 +20,13 @@ export async function POST(request: NextRequest) {
     
     // Single generation check
     if (body.generationType) {
-      const result = await checkCredits(user.id, body.generationType as GenerationType)
+      const result = await checkCredits(user.id, body.generationType as GenerationType, user.email)
       return NextResponse.json(result)
     }
     
     // Multiple generations check
     if (body.generations && Array.isArray(body.generations)) {
-      const result = await checkCreditsForMultiple(user.id, body.generations)
+      const result = await checkCreditsForMultiple(user.id, body.generations, user.email)
       return NextResponse.json(result)
     }
 
