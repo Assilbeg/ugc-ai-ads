@@ -163,21 +163,9 @@ export default function ExistingCampaignPage() {
       if (updates.actor_id !== undefined) campaignUpdates.actor_id = updates.actor_id
       if (updates.product !== undefined) campaignUpdates.product = updates.product
       
-      // Pour preset_id, on le stocke dans brief._preset_id (car FK peut échouer)
+      // Stocker preset_id dans brief (les presets sont dans le code, pas en DB)
       if (updates.preset_id !== undefined) {
-        // Vérifier si le preset existe en DB
-        const { data: presetData } = await (supabase
-          .from('intention_presets') as any)
-          .select('id')
-          .eq('id', updates.preset_id)
-          .maybeSingle()
-        
-        if (presetData) {
-          campaignUpdates.preset_id = updates.preset_id
-        } else {
-          // Stocker dans brief comme backup
-          campaignUpdates.brief = { ...state.brief, _preset_id: updates.preset_id }
-        }
+        campaignUpdates.brief = { ...state.brief, _preset_id: updates.preset_id }
       }
       
       if (updates.brief !== undefined) {
