@@ -436,8 +436,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         throw new Error(result.error || 'Erreur assemblage')
       }
       
-      // Petite pause pour laisser le temps de voir les logs
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // DEBUG: Pause de 5 secondes pour voir les logs dans la console
+      console.log('[Assemble] ⏳ Waiting 5 seconds before redirect... Check the logs above!')
+      await new Promise(resolve => setTimeout(resolve, 5000))
       
       // 3. Assemblage terminé ! Rediriger vers la page campagne
       console.log('[Assemble] Success! Redirecting...')
