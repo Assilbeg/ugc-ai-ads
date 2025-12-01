@@ -73,3 +73,4 @@ CREATE POLICY "Authenticated users can create assets" ON generated_assets
 
 -- Pas de suppression directe (nettoyage par job scheduled)
 
+

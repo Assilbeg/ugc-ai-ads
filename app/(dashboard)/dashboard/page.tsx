@@ -1,16 +1,15 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Plus, Video, Clock, Calendar, Play, Sparkles, TrendingUp, ArrowUpRight } from 'lucide-react'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
   
-  // Fetch user's campaigns with clips count
+  // Fetch user's campaigns with clips count and actor info
   const { data: campaigns } = await (supabase
     .from('campaigns') as any)
-    .select('*, campaign_clips(count)')
+    .select('*, campaign_clips(count), actors(id, name, soul_image_url)')
     .order('created_at', { ascending: false })
 
   const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
@@ -81,21 +80,21 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      {/* Campaigns grid */}
+      {/* Campaigns grid - Format 9:16 */}
       {campaigns && campaigns.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
           {campaigns.map((campaign: any) => {
             const status = statusConfig[campaign.status] || statusConfig.draft
-            const title = (campaign.brief as { what_selling?: string })?.what_selling || 'Sans titre'
+            const intention = (campaign.brief as { what_selling?: string })?.what_selling || 'Sans titre'
             const duration = (campaign.brief as { target_duration?: number })?.target_duration || 30
-            const hasProduct = (campaign.product as { has_product?: boolean })?.has_product
             const clipsCount = campaign.campaign_clips?.[0]?.count || 0
+            const actor = campaign.actors as { id: string; name: string; soul_image_url: string } | null
             
             return (
               <Link key={campaign.id} href={`/campaign/${campaign.id}`}>
-                <div className="group relative bg-card rounded-2xl border overflow-hidden hover:shadow-xl hover:shadow-black/5 hover:border-foreground/20 transition-all duration-300 cursor-pointer">
-                  {/* Thumbnail area */}
-                  <div className="relative h-36 bg-gradient-to-br from-zinc-100 to-zinc-200 dark:from-zinc-800 dark:to-zinc-900 overflow-hidden">
+                <div className="group relative bg-card rounded-xl border overflow-hidden hover:shadow-xl hover:shadow-black/5 hover:border-foreground/20 transition-all duration-300 cursor-pointer">
+                  {/* Video area - Format 9:16 */}
+                  <div className="relative aspect-[9/16] bg-gradient-to-br from-zinc-100 to-zinc-200 dark:from-zinc-800 dark:to-zinc-900 overflow-hidden">
                     {campaign.final_video_url ? (
                       <video 
                         src={campaign.final_video_url} 
@@ -103,10 +102,16 @@ export default async function DashboardPage() {
                         muted
                         playsInline
                       />
+                    ) : actor?.soul_image_url ? (
+                      <img 
+                        src={actor.soul_image_url} 
+                        alt={actor.name}
+                        className="w-full h-full object-cover opacity-50"
+                      />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-16 h-16 rounded-2xl bg-white/10 dark:bg-black/20 backdrop-blur flex items-center justify-center">
-                          <Video className="w-7 h-7 text-zinc-400" />
+                        <div className="w-14 h-14 rounded-2xl bg-white/10 dark:bg-black/20 backdrop-blur flex items-center justify-center">
+                          <Video className="w-6 h-6 text-zinc-400" />
                         </div>
                       </div>
                     )}
@@ -119,26 +124,39 @@ export default async function DashboardPage() {
                     </div>
 
                     {/* Status badge */}
-                    <div className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-medium ${status.bg} ${status.color} backdrop-blur-sm`}>
+                    <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-medium ${status.bg} ${status.color} backdrop-blur-sm`}>
                       {status.label}
                     </div>
 
                     {/* Duration badge */}
-                    <div className="absolute bottom-3 left-3 px-2 py-1 rounded-md bg-black/60 backdrop-blur-sm text-white text-xs font-medium flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
+                    <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded-md bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5" />
                       {duration}s
                     </div>
+
+                    {/* Actor badge */}
+                    {actor && (
+                      <div className="absolute bottom-2 left-2 right-2 flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/60 backdrop-blur-sm">
+                        <img 
+                          src={actor.soul_image_url} 
+                          alt={actor.name}
+                          className="w-5 h-5 rounded-full object-cover ring-1 ring-white/30"
+                        />
+                        <span className="text-white text-[11px] font-medium truncate">{actor.name}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Content */}
-                  <div className="p-4">
-                    <h3 className="font-semibold text-foreground mb-1 line-clamp-2 group-hover:text-primary transition-colors">
-                      {title}
+                  <div className="p-3">
+                    {/* Intention */}
+                    <h3 className="font-medium text-sm text-foreground line-clamp-2 group-hover:text-primary transition-colors leading-tight">
+                      {intention}
                     </h3>
                     
-                    <div className="flex items-center gap-3 text-sm text-muted-foreground mt-3">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5" />
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-2">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
                         <span>
                           {new Date(campaign.created_at).toLocaleDateString('fr-FR', {
                             day: 'numeric',
@@ -150,14 +168,6 @@ export default async function DashboardPage() {
                         <>
                           <span className="text-border">•</span>
                           <span>{clipsCount} clip{clipsCount > 1 ? 's' : ''}</span>
-                        </>
-                      )}
-                      {hasProduct && (
-                        <>
-                          <span className="text-border">•</span>
-                          <Badge variant="outline" className="text-xs px-1.5 py-0">
-                            Produit
-                          </Badge>
                         </>
                       )}
                     </div>
