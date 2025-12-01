@@ -161,7 +161,7 @@ const STATUS_STEPS = [
 
 export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step6GenerateProps) {
   const { getActorById } = useActors()
-  const { generating, progress, generateAllClips, regenerateSingleClip, cancel, getOverallProgress } = useVideoGeneration()
+  const { generating, isClipRegenerating, progress, generateAllClips, regenerateSingleClip, cancel, getOverallProgress } = useVideoGeneration()
   const { saving } = useCampaignCreation()
   const supabase = createClient()
   
@@ -1051,7 +1051,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                             size="sm"
                             className="h-9 text-sm rounded-lg"
                             onClick={() => askRegenerate(index, 'all')}
-                            disabled={generating}
+                            disabled={isClipRegenerating(clip.id || `clip-${clip.order}`)}
                           >
                             🔄 Réessayer tout
                           </Button>
@@ -1156,7 +1156,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                 size="sm"
                                 className="h-8 text-xs rounded-lg border-orange-500/40 text-orange-600 hover:bg-orange-50 hover:border-orange-500"
                                 onClick={() => askRegenerate(index, 'video')}
-                                disabled={generating}
+                                disabled={isClipRegenerating(clip.id || `clip-${clip.order}`)}
                               >
                                 <Video className="w-3 h-3 mr-1" />
                                 Vidéo
@@ -1166,7 +1166,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                 size="sm"
                                 className="h-8 text-xs rounded-lg"
                                 onClick={() => askRegenerate(index, 'voice')}
-                                disabled={generating}
+                                disabled={isClipRegenerating(clip.id || `clip-${clip.order}`)}
                               >
                                 <Mic className="w-3 h-3 mr-1" />
                                 Voix
@@ -1176,7 +1176,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                 size="sm"
                                 className="h-8 text-xs rounded-lg"
                                 onClick={() => askRegenerate(index, 'ambient')}
-                                disabled={generating}
+                                disabled={isClipRegenerating(clip.id || `clip-${clip.order}`)}
                               >
                                 <Music className="w-3 h-3 mr-1" />
                                 Ambiance

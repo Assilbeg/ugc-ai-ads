@@ -18,9 +18,15 @@ export type VideoQuality = 'standard' | 'fast'
 
 export function useVideoGeneration() {
   const [generating, setGenerating] = useState(false)
+  const [regeneratingClips, setRegeneratingClips] = useState<Set<string>>(new Set())
   const [progress, setProgress] = useState<Record<string, GenerationProgress>>({})
   const [error, setError] = useState<string | null>(null)
-  const abortControllerRef = useRef<AbortController | null>(null)
+  const abortControllersRef = useRef<Map<string, AbortController>>(new Map())
+
+  // Vérifier si un clip spécifique est en cours de régénération
+  const isClipRegenerating = useCallback((clipId: string) => {
+    return regeneratingClips.has(clipId)
+  }, [regeneratingClips])
 
   // ══════════════════════════════════════════════════════════════
   // GÉNÉRATION COMPLÈTE D'UN CLIP
@@ -518,6 +524,7 @@ export function useVideoGeneration() {
 
   // ══════════════════════════════════════════════════════════════
   // RÉGÉNÉRATION D'UN SEUL CLIP (complet ou partiel)
+  // Permet les régénérations en parallèle de différents clips
   // ══════════════════════════════════════════════════════════════
   const regenerateSingleClip = useCallback(async (
     clip: CampaignClip,
@@ -528,19 +535,39 @@ export function useVideoGeneration() {
     presetId?: string,
     videoQuality: VideoQuality = 'standard'
   ): Promise<CampaignClip | null> => {
+    const clipId = clip.id || `clip-${clip.order}`
+    
+    // Créer un AbortController pour ce clip
+    const abortController = new AbortController()
+    abortControllersRef.current.set(clipId, abortController)
+    
+    // Marquer ce clip comme en cours de régénération
+    setRegeneratingClips(prev => new Set([...prev, clipId]))
     setGenerating(true)
     setError(null)
-    abortControllerRef.current = new AbortController()
 
     let result: CampaignClip | null = null
 
-    if (what === 'all') {
-      result = await generateClipAssets(clip, actor, campaignId, ambientPrompt, presetId, videoQuality)
-    } else {
-      result = await regenerateAsset(clip, actor, what, ambientPrompt, presetId, videoQuality)
+    try {
+      if (what === 'all') {
+        result = await generateClipAssets(clip, actor, campaignId, ambientPrompt, presetId, videoQuality)
+      } else {
+        result = await regenerateAsset(clip, actor, what, ambientPrompt, presetId, videoQuality)
+      }
+    } finally {
+      // Retirer ce clip de la liste des régénérations en cours
+      abortControllersRef.current.delete(clipId)
+      setRegeneratingClips(prev => {
+        const next = new Set(prev)
+        next.delete(clipId)
+        // generating = false seulement si plus aucun clip en cours
+        if (next.size === 0) {
+          setGenerating(false)
+        }
+        return next
+      })
     }
 
-    setGenerating(false)
     return result
   }, [generateClipAssets, regenerateAsset])
 
@@ -557,6 +584,8 @@ export function useVideoGeneration() {
 
   return {
     generating,
+    regeneratingClips,
+    isClipRegenerating,
     progress,
     error,
     generateAllClips,
