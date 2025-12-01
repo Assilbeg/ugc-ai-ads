@@ -370,12 +370,14 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                 // Mettre à jour avec l'URL traitée - trim/speed déjà appliqués
                 clipData.rawUrl = result.videoUrl
                 clipData.trimStart = 0
-                clipData.trimEnd = result.newDuration
+                clipData.trimEnd = result.newDuration ?? clipData.duration
                 clipData.speed = 1.0
-                clipData.duration = result.newDuration
+                // IMPORTANT: Garder la duration calculée si newDuration n'est pas retourné
+                clipData.duration = result.newDuration ?? clipData.duration
                 clipData.needsProcessing = false
                 console.log(`[Assemble] Clip ${clipData.clipOrder} after update:`, {
                   duration: clipData.duration,
+                  newDurationFromApi: result.newDuration,
                   rawUrl: clipData.rawUrl?.slice(0, 50)
                 })
               } else {
@@ -384,6 +386,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                   hasUrl: !!result.videoUrl,
                   error: result.error
                 })
+                // Garder la duration calculée même si le processing échoue
+                console.log(`[Assemble] Keeping calculated duration for clip ${clipData.clipOrder}:`, clipData.duration)
               }
             } else {
               const errorText = await response.text()

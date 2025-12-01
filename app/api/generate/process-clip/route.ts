@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
         robot: '/video/encode',
         use: 'imported',
         result: !hasSpeed, // Résultat final seulement si pas de speed
-        preset: 'ipad-high', // Preset standard pour le trim
+        preset: 'ipad-high', // Preset standard avec ré-encodage
         ffmpeg_stack: 'v7.0.0',
         clip: {
           offset_start: trimStart,
