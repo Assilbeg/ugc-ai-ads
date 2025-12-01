@@ -633,8 +633,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       const generationType = videoQuality === 'fast' ? 'video_veo31_fast' : 'video_veo31'
       const generations = [
         { type: generationType as any, count: clipsToGenerate.length },
-        { type: 'voice' as any, count: clipsToGenerate.length },
-        { type: 'ambient' as any, count: clipsToGenerate.length },
+        { type: 'voice_chatterbox' as any, count: clipsToGenerate.length },
+        { type: 'ambient_elevenlabs' as any, count: clipsToGenerate.length },
       ]
       
       const creditsCheck = await checkMultipleCredits(generations)
