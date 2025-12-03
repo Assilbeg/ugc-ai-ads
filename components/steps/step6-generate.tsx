@@ -315,12 +315,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           const speed = adj?.speed ?? 1.0
           const trimmedDuration = trimEnd - trimStart
           const duration = trimmedDuration / speed
-          // NE traiter avec Transloadit QUE si trim ou speed modifiés
-          // Sinon, utiliser la vidéo originale pour éviter les problèmes de ré-encodage
-          const hasTrimStart = trimStart > 0
-          const hasTrimEnd = trimEnd < originalDuration
-          const hasSpeedChange = speed !== 1.0
-          const needsProcessing = hasTrimStart || hasTrimEnd || hasSpeedChange
+          // TOUJOURS traiter avec Transloadit pour normaliser les timestamps
+          // Cela évite que le début du premier clip soit coupé lors de l'assemblage
+          const needsProcessing = true
           
           return {
             clip,

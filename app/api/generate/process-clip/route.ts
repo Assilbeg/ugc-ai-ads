@@ -81,35 +81,29 @@ export async function POST(request: NextRequest) {
     const videoFilters: string[] = []
     const audioFilters: string[] = []
     
-    // Gestion du trim : on sépare début et fin pour éviter les problèmes de timestamps
-    // Le problème avec trim=start=0:end=X est que si la vidéo a des timestamps qui ne commencent pas à 0,
-    // FFmpeg peut couper des frames au début même si start=0
-    
+    // Gestion du trim
     if (hasTrimStart && hasTrimEnd) {
-      // Trim début ET fin - setpts nécessaire car on change le point de départ
       videoFilters.push(`trim=start=${trimStart}:end=${effectiveTrimEnd}`)
-      videoFilters.push('setpts=PTS-STARTPTS')
       audioFilters.push(`atrim=start=${trimStart}:end=${effectiveTrimEnd}`)
-      audioFilters.push('asetpts=PTS-STARTPTS')
     } else if (hasTrimStart) {
-      // Trim du début uniquement - setpts nécessaire car on change le point de départ
       videoFilters.push(`trim=start=${trimStart}`)
-      videoFilters.push('setpts=PTS-STARTPTS')
       audioFilters.push(`atrim=start=${trimStart}`)
-      audioFilters.push('asetpts=PTS-STARTPTS')
-    } else if (hasTrimEnd && hasSpeed) {
-      // Trim de la fin + speed : on doit utiliser les filtres car -t ne marche pas avec les filtres speed
+    } else if (hasTrimEnd) {
       videoFilters.push(`trim=end=${effectiveTrimEnd}`)
       audioFilters.push(`atrim=end=${effectiveTrimEnd}`)
     }
-    // Note: si hasTrimEnd SEULEMENT (pas de trimStart, pas de speed), on utilise -t
-    // car -t limite la durée de sortie sans toucher au début (plus fiable que les filtres)
     
     // Speed via setpts (video) et atempo (audio)
     if (hasSpeed) {
       videoFilters.push(`setpts=${ptsFactor}*PTS`)
       audioFilters.push(`atempo=${speed}`)
     }
+    
+    // TOUJOURS reset les timestamps à 0 pour éviter les problèmes lors de l'assemblage
+    // C'est CRITIQUE : les vidéos IA ont souvent des timestamps qui ne commencent pas à 0
+    // et ça cause le "trim automatique" du début lors du concat
+    videoFilters.push('setpts=PTS-STARTPTS')
+    audioFilters.push('asetpts=PTS-STARTPTS')
     
     // Construire les paramètres FFmpeg
     const ffmpegParams: Record<string, unknown> = {}
@@ -138,12 +132,6 @@ export async function POST(request: NextRequest) {
     ffmpegParams['ac'] = 2       // Stéréo
     // Optimisation streaming
     ffmpegParams['movflags'] = '+faststart'
-    
-    // Si on trim SEULEMENT la fin (pas le début), utiliser -t au lieu des filtres
-    // -t limite la durée de sortie sans toucher au début (plus fiable)
-    if (hasTrimEnd && !hasTrimStart && !hasSpeed) {
-      ffmpegParams['t'] = effectiveTrimEnd
-    }
     
     const steps: Record<string, unknown> = {
       // 1. Importer la vidéo depuis l'URL

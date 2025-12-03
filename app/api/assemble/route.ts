@@ -90,48 +90,22 @@ export async function POST(request: NextRequest) {
       importStepNames.push(stepName)
     })
 
-    // 2. Pré-encoder chaque vidéo pour normaliser les timestamps AVANT concat
-    // Cela évite que le premier clip soit coupé à cause de timestamps qui ne commencent pas à 0
-    const normalizedStepNames: string[] = []
-    importStepNames.forEach((importName, index) => {
-      const normalizeName = `normalize_${index + 1}`
-      steps[normalizeName] = {
-        robot: '/video/encode',
-        use: importName,
-        // Pas de preset, on configure manuellement pour être sûr du format 9:16
-        ffmpeg_stack: 'v6.0.0',
-        width: 1080,
-        height: 1920,
-        resize_strategy: 'fillcrop',
-        background: '#000000',
-        // Encodage standard H.264/AAC
-        c_v: 'libx264',
-        preset: 'fast',
-        crf: 23,
-        c_a: 'aac',
-        b_a: '128k',
-        ar: 48000,
-        ac: 2,
-        // Reset des timestamps
-        ffmpeg: {
-          vf: 'setpts=PTS-STARTPTS',
-          af: 'asetpts=PTS-STARTPTS',
-        }
-      }
-      normalizedStepNames.push(normalizeName)
-    })
-
-    // 3. Concaténer les vidéos normalisées
+    // 2. Concaténer toutes les vidéos SANS ré-encodage agressif
+    // Doc: https://transloadit.com/docs/robots/video-concat/
+    // IMPORTANT: On NE spécifie PAS width/height/resize pour éviter le ré-encodage
+    // qui peut couper des frames au début. Les vidéos sont déjà en 9:16.
     steps['concatenated'] = {
       robot: '/video/concat',
       use: {
-        steps: normalizedStepNames.map((name, index) => ({ 
+        steps: importStepNames.map((name, index) => ({ 
           name, 
           as: `video_${index + 1}`
         }))
       },
       result: true,
       ffmpeg_stack: 'v6.0.0',
+      // Pas de preset = concat stream copy (plus rapide, pas de perte)
+      // Si les codecs sont compatibles, Transloadit fera un concat sans ré-encodage
     }
 
     // 3. Générer une thumbnail
