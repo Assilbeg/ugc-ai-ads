@@ -103,7 +103,11 @@ export async function POST(request: NextRequest) {
         }))
       },
       result: true,
-      preset: 'ipad-high',  // Force ré-encodage H.264 de qualité
+      // Format 9:16 vertical (1080x1920) pour TikTok/Reels/Shorts
+      width: 1080,
+      height: 1920,
+      resize_strategy: 'fillcrop',  // Remplit le cadre 9:16 en croppant si nécessaire
+      background: '#000000',
       ffmpeg_stack: 'v6.0.0',  // Recommandé par la doc
     }
 

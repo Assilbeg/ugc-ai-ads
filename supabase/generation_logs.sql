@@ -103,3 +103,5 @@ FROM generation_logs
 WHERE status = 'completed' AND actual_cost_cents IS NOT NULL
 GROUP BY generation_type;
 
+
+
