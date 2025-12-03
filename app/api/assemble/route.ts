@@ -98,20 +98,24 @@ export async function POST(request: NextRequest) {
       steps[normalizeName] = {
         robot: '/video/encode',
         use: importName,
-        preset: 'empty',
+        // Pas de preset, on configure manuellement pour être sûr du format 9:16
         ffmpeg_stack: 'v6.0.0',
+        width: 1080,
+        height: 1920,
+        resize_strategy: 'fillcrop',
+        background: '#000000',
+        // Encodage standard H.264/AAC
+        c_v: 'libx264',
+        preset: 'fast',
+        crf: 23,
+        c_a: 'aac',
+        b_a: '128k',
+        ar: 48000,
+        ac: 2,
+        // Reset des timestamps
         ffmpeg: {
-          'c:v': 'libx264',
-          'preset': 'fast',
-          'crf': 23,
-          'c:a': 'aac',
-          'b:a': '128k',
-          'ar': 48000,
-          'ac': 2,
-          // CRITIQUE: Reset les timestamps pour que chaque vidéo commence à 0
-          'video_filter': 'setpts=PTS-STARTPTS',
-          'audio_filter': 'asetpts=PTS-STARTPTS',
-          'movflags': '+faststart',
+          vf: 'setpts=PTS-STARTPTS',
+          af: 'asetpts=PTS-STARTPTS',
         }
       }
       normalizedStepNames.push(normalizeName)
