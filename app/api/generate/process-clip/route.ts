@@ -46,10 +46,12 @@ export async function POST(request: NextRequest) {
     }
 
     const effectiveTrimEnd = trimEnd ?? duration
-    const hasTrim = trimStart > 0 || effectiveTrimEnd < duration
+    // Séparer le trim début et fin pour éviter de couper le début accidentellement
+    const hasTrimStart = trimStart > 0
+    const hasTrimEnd = effectiveTrimEnd < duration
     const hasSpeed = speed !== 1.0
 
-    console.log('[ProcessClip] Will process - hasTrim:', hasTrim, 'hasSpeed:', hasSpeed, 'trimStart:', trimStart, 'trimEnd:', effectiveTrimEnd, 'duration:', duration)
+    console.log('[ProcessClip] Will process - hasTrimStart:', hasTrimStart, 'hasTrimEnd:', hasTrimEnd, 'hasSpeed:', hasSpeed, 'trimStart:', trimStart, 'trimEnd:', effectiveTrimEnd, 'duration:', duration)
 
     console.log('[ProcessClip] Processing with Transloadit:', {
       videoUrl: videoUrl.slice(0, 60),
@@ -74,18 +76,33 @@ export async function POST(request: NextRequest) {
     const ptsFactor = (1 / speed).toFixed(4)
     
     // Construire les filtres video et audio
-    // On utilise les filtres trim/atrim qui sont plus fiables que -ss/-t
+    // IMPORTANT: On sépare le trim début et fin pour éviter que trim=start=0 coupe des frames
+    // Les vidéos IA peuvent avoir des timestamps qui ne commencent pas exactement à 0
     const videoFilters: string[] = []
     const audioFilters: string[] = []
     
-    // Trim via filtres FFmpeg (plus précis que -ss/-t)
-    if (hasTrim) {
-      // trim pour la vidéo, atrim pour l'audio
-      // setpts=PTS-STARTPTS reset les timestamps après le trim
+    // Gestion du trim : on sépare début et fin pour éviter les problèmes de timestamps
+    // Le problème avec trim=start=0:end=X est que si la vidéo a des timestamps qui ne commencent pas à 0,
+    // FFmpeg peut couper des frames au début même si start=0
+    
+    if (hasTrimStart && hasTrimEnd) {
+      // Trim début ET fin - setpts nécessaire car on change le point de départ
       videoFilters.push(`trim=start=${trimStart}:end=${effectiveTrimEnd}`)
       videoFilters.push('setpts=PTS-STARTPTS')
       audioFilters.push(`atrim=start=${trimStart}:end=${effectiveTrimEnd}`)
       audioFilters.push('asetpts=PTS-STARTPTS')
+    } else if (hasTrimStart) {
+      // Trim du début uniquement - setpts nécessaire car on change le point de départ
+      videoFilters.push(`trim=start=${trimStart}`)
+      videoFilters.push('setpts=PTS-STARTPTS')
+      audioFilters.push(`atrim=start=${trimStart}`)
+      audioFilters.push('asetpts=PTS-STARTPTS')
+    } else if (hasTrimEnd) {
+      // Trim de la fin uniquement - PAS de setpts car on garde le début intact
+      // Utiliser trim=end=X sans start pour préserver le début exactement
+      videoFilters.push(`trim=end=${effectiveTrimEnd}`)
+      audioFilters.push(`atrim=end=${effectiveTrimEnd}`)
+      // Note: pas de setpts ici car on ne change pas le point de départ
     }
     
     // Speed via setpts (video) et atempo (audio)
