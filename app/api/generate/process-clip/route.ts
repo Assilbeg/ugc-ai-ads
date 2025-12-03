@@ -120,6 +120,12 @@ export async function POST(request: NextRequest) {
     
     // Paramètres de qualité pour le ré-encodage
     // IMPORTANT: Normaliser video ET audio pour une concaténation propre
+    
+    // CRITIQUE: Force la régénération des timestamps dès l'input
+    // Ça évite les problèmes de vidéos IA avec timestamps bizarres
+    ffmpegParams['fflags'] = '+genpts+igndts'
+    ffmpegParams['vsync'] = 'cfr'  // Constant frame rate
+    
     // Video
     ffmpegParams['c:v'] = 'libx264'
     ffmpegParams['preset'] = 'fast'
