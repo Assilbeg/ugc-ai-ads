@@ -8,6 +8,10 @@ import { AssemblingAnimation } from './assembling-animation'
 import { EditableTitle } from './editable-title'
 import { FailedCampaignState } from './failed-campaign-state'
 
+// Désactiver le cache pour toujours avoir la dernière version de la campagne
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 interface CampaignPageProps {
   params: Promise<{ id: string }>
   searchParams: Promise<{ assembling?: string }>
@@ -47,7 +51,14 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
   const latestAssembly = assemblies?.[0] as any
   
   // Utiliser l'URL du dernier assemblage si disponible, sinon celle de la campagne
-  const finalVideoUrl = latestAssembly?.final_video_url || campaign.final_video_url
+  // Ajouter un cache-buster basé sur la date de création pour forcer le refresh
+  const baseVideoUrl = latestAssembly?.final_video_url || campaign.final_video_url
+  const cacheBuster = latestAssembly?.created_at 
+    ? new Date(latestAssembly.created_at).getTime() 
+    : Date.now()
+  const finalVideoUrl = baseVideoUrl 
+    ? `${baseVideoUrl}${baseVideoUrl.includes('?') ? '&' : '?'}v=${cacheBuster}`
+    : null
 
   const preset = campaign.preset_id ? getPresetById(campaign.preset_id) : null
   const brief = campaign.brief as { what_selling?: string; target_duration?: number }
