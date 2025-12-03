@@ -90,25 +90,22 @@ export async function POST(request: NextRequest) {
       importStepNames.push(stepName)
     })
 
-    // 2. Concaténer toutes les vidéos
+    // 2. Concaténer toutes les vidéos SANS ré-encodage agressif
     // Doc: https://transloadit.com/docs/robots/video-concat/
-    // "It will pre-transcode the input videos if necessary before concatenation"
-    // → Résout automatiquement les problèmes de keyframes et timestamps !
+    // IMPORTANT: On NE spécifie PAS width/height/resize pour éviter le ré-encodage
+    // qui peut couper des frames au début. Les vidéos sont déjà en 9:16.
     steps['concatenated'] = {
       robot: '/video/concat',
       use: {
         steps: importStepNames.map((name, index) => ({ 
           name, 
-          as: `video_${index + 1}`  // Format requis par la doc
+          as: `video_${index + 1}`
         }))
       },
       result: true,
-      // Format 9:16 vertical (1080x1920) pour TikTok/Reels/Shorts
-      width: 1080,
-      height: 1920,
-      resize_strategy: 'fillcrop',  // Remplit le cadre 9:16 en croppant si nécessaire
-      background: '#000000',
-      ffmpeg_stack: 'v6.0.0',  // Recommandé par la doc
+      ffmpeg_stack: 'v6.0.0',
+      // Pas de preset = concat stream copy (plus rapide, pas de perte)
+      // Si les codecs sont compatibles, Transloadit fera un concat sans ré-encodage
     }
 
     // 3. Générer une thumbnail

@@ -243,23 +243,25 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   const [checkingCredits, setCheckingCredits] = useState(false)
 
   // Initialiser les ajustements quand les clips changent
+  // IMPORTANT: Utiliser generatedClips car clips peut ne pas avoir la durée correcte
   useEffect(() => {
     const newAdjustments: Record<number, ClipAdjustments> = {}
-    clips.forEach((clip, index) => {
-      if (!adjustments[index]) {
+    const clipsToUse = generatedClips.length > 0 ? generatedClips : clips
+    clipsToUse.forEach((clip, index) => {
+      // Utiliser la durée de la vidéo générée si disponible
+      const videoDuration = clip?.video?.duration
+      if (!adjustments[index] && videoDuration) {
         newAdjustments[index] = {
           trimStart: 0,
-          trimEnd: clip.video.duration,
+          trimEnd: videoDuration,
           speed: 1.0,
         }
-      } else {
-        newAdjustments[index] = adjustments[index]
       }
     })
     if (Object.keys(newAdjustments).length > 0) {
       setAdjustments(prev => ({ ...prev, ...newAdjustments }))
     }
-  }, [clips.length])
+  }, [clips.length, generatedClips])
 
   // Mettre à jour un ajustement
   const updateAdjustment = useCallback((index: number, update: Partial<ClipAdjustments>) => {

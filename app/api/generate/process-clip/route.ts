@@ -97,13 +97,13 @@ export async function POST(request: NextRequest) {
       videoFilters.push('setpts=PTS-STARTPTS')
       audioFilters.push(`atrim=start=${trimStart}`)
       audioFilters.push('asetpts=PTS-STARTPTS')
-    } else if (hasTrimEnd) {
-      // Trim de la fin uniquement - PAS de setpts car on garde le début intact
-      // Utiliser trim=end=X sans start pour préserver le début exactement
+    } else if (hasTrimEnd && hasSpeed) {
+      // Trim de la fin + speed : on doit utiliser les filtres car -t ne marche pas avec les filtres speed
       videoFilters.push(`trim=end=${effectiveTrimEnd}`)
       audioFilters.push(`atrim=end=${effectiveTrimEnd}`)
-      // Note: pas de setpts ici car on ne change pas le point de départ
     }
+    // Note: si hasTrimEnd SEULEMENT (pas de trimStart, pas de speed), on utilise -t
+    // car -t limite la durée de sortie sans toucher au début (plus fiable que les filtres)
     
     // Speed via setpts (video) et atempo (audio)
     if (hasSpeed) {
@@ -138,6 +138,12 @@ export async function POST(request: NextRequest) {
     ffmpegParams['ac'] = 2       // Stéréo
     // Optimisation streaming
     ffmpegParams['movflags'] = '+faststart'
+    
+    // Si on trim SEULEMENT la fin (pas le début), utiliser -t au lieu des filtres
+    // -t limite la durée de sortie sans toucher au début (plus fiable)
+    if (hasTrimEnd && !hasTrimStart && !hasSpeed) {
+      ffmpegParams['t'] = effectiveTrimEnd
+    }
     
     const steps: Record<string, unknown> = {
       // 1. Importer la vidéo depuis l'URL
