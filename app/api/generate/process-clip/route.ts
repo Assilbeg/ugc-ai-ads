@@ -158,16 +158,33 @@ export async function POST(request: NextRequest) {
       authSecret: TRANSLOADIT_SECRET,
     })
 
-    // Construire la commande FFmpeg
+    // Construire la commande FFmpeg selon les transformations nécessaires
+    // IMPORTANT: On utilise TOUJOURS preset: 'empty' car le param 'clip' ne fonctionne pas avec les presets
     const ptsFactor = (1 / speed).toFixed(4)
+    
+    // Construire les filtres video et audio
+    // ═══════════════════════════════════════════════════════════════
+    // ORDRE CRITIQUE DES FILTRES :
+    // 1. setpts=PTS-STARTPTS → Normaliser les timestamps à 0 AVANT tout
+    // 2. trim/atrim → Couper aux bonnes positions
+    // 3. setpts pour speed → Modifier la vitesse
+    // 4. setpts=PTS-STARTPTS → Reset final pour le concat
+    //
+    // Les vidéos IA (Veo, etc.) ont des timestamps qui ne commencent
+    // pas à 0, donc trim=end=5 peut couper le début par erreur !
+    // ═══════════════════════════════════════════════════════════════
     const videoFilters: string[] = []
     const audioFilters: string[] = []
     
-    // ÉTAPE 1 : Normaliser les timestamps
+    // ÉTAPE 1 : TOUJOURS normaliser les timestamps EN PREMIER
+    // C'est CRITIQUE pour que trim fonctionne correctement
     videoFilters.push('setpts=PTS-STARTPTS')
     audioFilters.push('asetpts=PTS-STARTPTS')
     
-    // ÉTAPE 2 : Gestion du trim
+    // ÉTAPE 2 : Gestion du trim (maintenant les timestamps sont normalisés)
+    // IMPORTANT: TOUJOURS ajouter un trim explicite pour forcer FFmpeg à garder
+    // toutes les frames depuis le début. Les vidéos Veo peuvent avoir des frames
+    // "cachées" avant le PTS 0 qui causent des problèmes.
     if (hasTrimStart && hasTrimEnd) {
       videoFilters.push(`trim=start=${trimStart}:end=${effectiveTrimEnd}`)
       audioFilters.push(`atrim=start=${trimStart}:end=${effectiveTrimEnd}`)
@@ -175,29 +192,31 @@ export async function POST(request: NextRequest) {
       videoFilters.push(`trim=start=${trimStart}`)
       audioFilters.push(`atrim=start=${trimStart}`)
     } else if (hasTrimEnd) {
+      // Ajouter start=0 explicite pour forcer le démarrage à 0
       videoFilters.push(`trim=start=0:end=${effectiveTrimEnd}`)
       audioFilters.push(`atrim=start=0:end=${effectiveTrimEnd}`)
     } else {
+      // Pas de trim demandé, mais on force quand même start=0 pour les vidéos Veo
       videoFilters.push('trim=start=0')
       audioFilters.push('atrim=start=0')
     }
     
-    // ÉTAPE 2.5 : Reset après trim
+    // ÉTAPE 2.5 : TOUJOURS normaliser APRÈS le trim et AVANT le speed
+    // C'est nécessaire même sans trim car les timestamps après trim peuvent être décalés
     videoFilters.push('setpts=PTS-STARTPTS')
     audioFilters.push('asetpts=PTS-STARTPTS')
     
-    // ÉTAPE 3 : Speed
+    // ÉTAPE 3 : Speed via setpts (video) et atempo (audio)
+    // Maintenant les timestamps commencent à 0, donc le calcul est correct
     if (hasSpeed) {
       videoFilters.push(`setpts=${ptsFactor}*PTS`)
       audioFilters.push(`atempo=${speed}`)
     }
     
-    // ÉTAPE 4 : Reset final
+    // ÉTAPE 4 : Reset final des timestamps pour l'assemblage
+    // Après trim/speed, les timestamps peuvent être décalés, on les remet à 0
     videoFilters.push('setpts=PTS-STARTPTS')
     audioFilters.push('asetpts=PTS-STARTPTS')
-    
-    // NOTE: Pas de resize ici - les vidéos Veo sont déjà en 9:16
-    // Si resize nécessaire, l'ajouter de manière contrôlée après tests
     
     // Construire les paramètres FFmpeg
     const ffmpegParams: Record<string, unknown> = {}
@@ -209,20 +228,32 @@ export async function POST(request: NextRequest) {
       ffmpegParams['map'] = ['[v]', '[a]']
     }
     
-    // Paramètres robustes
-    ffmpegParams['fflags'] = '+genpts+discardcorrupt+igndts'
-    ffmpegParams['vsync'] = 'cfr'
+    // Paramètres de qualité pour le ré-encodage
+    // IMPORTANT: Normaliser video ET audio pour une concaténation propre
+    
+    // ═══════════════════════════════════════════════════════════════
+    // TRIM PRÉCIS AU FRAME PRÈS - Important pour éviter de couper le début
+    // ═══════════════════════════════════════════════════════════════
+    // - genpts : Génère des PTS si manquants (vidéos IA)
+    // - discardcorrupt : Ignore les frames corrompues
+    // - On ne met PAS igndts car ça peut causer des problèmes de timing
+    ffmpegParams['fflags'] = '+genpts+discardcorrupt'
+    ffmpegParams['vsync'] = 'cfr'  // Constant frame rate pour précision
+    
+    // Video - avec keyframe forcé au début pour un assemblage propre
     ffmpegParams['c:v'] = 'libx264'
     ffmpegParams['preset'] = 'fast'
     ffmpegParams['crf'] = 23
-    ffmpegParams['r'] = 30
+    ffmpegParams['r'] = 30  // Framerate constant 30fps
+    // CRITIQUE: Force un keyframe à 0 pour éviter les problèmes d'assemblage
     ffmpegParams['force_key_frames'] = 'expr:eq(t,0)'
+    // Audio - CRITIQUE pour la concaténation !
     ffmpegParams['c:a'] = 'aac'
     ffmpegParams['b:a'] = '128k'
-    ffmpegParams['ar'] = 48000
-    ffmpegParams['ac'] = 2
+    ffmpegParams['ar'] = 48000   // Sample rate 48kHz (standard vidéo)
+    ffmpegParams['ac'] = 2       // Stéréo
+    // Optimisation streaming
     ffmpegParams['movflags'] = '+faststart'
-    ffmpegParams['strict'] = 'experimental'
     
     const steps: Record<string, unknown> = {
       imported: {
