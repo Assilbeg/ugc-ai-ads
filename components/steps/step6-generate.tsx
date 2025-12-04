@@ -123,10 +123,8 @@ function AssemblyModal({ isOpen, clipCount }: { isOpen: boolean; clipCount: numb
   )
 }
 
-// Vitesses disponibles
+// Vitesses disponibles (UGC TikTok = dynamique, pas de ralentissement)
 const SPEED_OPTIONS = [
-  { value: 0.8, label: '0.8x' },
-  { value: 0.9, label: '0.9x' },
   { value: 1.0, label: '1x' },
   { value: 1.1, label: '1.1x' },
   { value: 1.2, label: '1.2x' },

@@ -259,7 +259,7 @@ export interface ClipTranscription {
   speech_end?: number;          // Fin de la parole détectée (secondes)
   confidence?: 'high' | 'medium' | 'low';  // Confiance de l'analyse
   words_per_second?: number;    // Débit de parole mesuré
-  suggested_speed?: number;     // Vitesse suggérée (0.8 - 1.2)
+  suggested_speed?: number;     // Vitesse suggérée (1.0 - 1.2, UGC = pas de ralentissement)
 }
 
 export interface CampaignClip {

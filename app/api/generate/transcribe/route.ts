@@ -89,15 +89,14 @@ export async function POST(request: NextRequest) {
         confidence = 'low'
         reasoning = 'Claude analysis failed, using raw Whisper timestamps'
         
-        // Calcul basique du débit si Claude échoue
+        // Calcul basique du débit si Claude échoue (UGC TikTok = pas de ralentissement)
         const wordCount = whisperResult.text.split(/\s+/).filter((w: string) => w.length > 0).length
         const speechDuration = speech_end - speech_start
         if (speechDuration > 0) {
           words_per_second = Math.round((wordCount / speechDuration) * 10) / 10
           if (words_per_second < 2.5) suggested_speed = 1.2
           else if (words_per_second < 3.0) suggested_speed = 1.1
-          else if (words_per_second > 4.5) suggested_speed = 0.8
-          else if (words_per_second > 4.0) suggested_speed = 0.9
+          // Pas de 0.8x ou 0.9x - on garde 1.0x même si rapide
         }
       }
     }

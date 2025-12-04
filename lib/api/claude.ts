@@ -676,7 +676,7 @@ interface SpeechBoundariesOutput {
   confidence: 'high' | 'medium' | 'low'
   reasoning: string
   // Suggestions de vitesse basées sur le débit de parole
-  suggested_speed: number       // 0.8 à 1.2
+  suggested_speed: number       // 1.0 à 1.2 (UGC = pas de ralentissement)
   words_per_second: number      // Débit mesuré
 }
 
@@ -701,22 +701,45 @@ Tu dois :
 2. Calculer le débit de parole et suggérer une vitesse optimale
 
 CONTEXTE :
-- La transcription Whisper peut contenir du "gibberish" (bruits de fond, sons non-parole transcrits par erreur)
+- La transcription Whisper peut contenir du "gibberish" AU DÉBUT et/ou à la fin
 - Le script original est ce que l'acteur était CENSÉ dire
 - Les vidéos UGC doivent être dynamiques (débit idéal : 3-4 mots/seconde)
 
-RÈGLES POUR LES MARQUEURS :
-1. Trouve le premier mot de la transcription qui correspond au début du script
-2. Trouve le dernier mot de la transcription qui correspond à la fin du script
-3. Ignore les mots transcrits qui sont clairement du bruit
-4. Ajoute un petit padding (0.1-0.2s) pour ne pas couper trop serré
+═══════════════════════════════════════════════════════════════
+IDENTIFICATION DU GIBBERISH - C'EST CRITIQUE
+═══════════════════════════════════════════════════════════════
 
-RÈGLES POUR LA VITESSE :
+Le GIBBERISH, c'est du texte transcrit par Whisper qui N'EST PAS dans le script original :
+- Onomatopées : "hmm", "euh", "ah", "oh", "hum", "mhm", "uh"
+- Sons de respiration/bouche : "fff", "sss", "tsk", "*soupir*"
+- Mots random transcrits par erreur du bruit de fond
+- Mots répétés sans sens : "le le le", "je je"
+- Mots d'hésitation : "alors", "bon", "voilà" (quand pas dans le script)
+
+EXEMPLES CONCRETS :
+- Script: "Découvre ce produit incroyable"
+  Whisper: "[0.1s] hmm [0.4s] euh [0.7s] Découvre [1.0s] ce [1.2s] produit..."
+  → Le VRAI début est à 0.7s (pas 0.1s !)
+
+- Script: "J'adore cette crème"
+  Whisper: "[0.0s] ah [0.2s] oui [0.4s] J'adore [0.6s] cette [0.8s] crème [1.1s] voilà"
+  → DÉBUT = 0.4s, FIN = 1.1s (on ignore "voilà" à la fin)
+
+RÈGLES POUR LES MARQUEURS :
+1. Compare CHAQUE mot Whisper au script pour trouver où le script COMMENCE vraiment
+2. Le premier mot du script peut être légèrement déformé (prononciation) - fais du fuzzy matching
+3. IGNORE tout ce qui précède le premier mot du script = c'est du gibberish
+4. IGNORE tout ce qui suit le dernier mot du script = gibberish aussi
+5. Ajoute 0.15s de padding avant et après pour ne pas couper serré
+
+RÈGLES POUR LA VITESSE (IMPORTANT - COMPTE SEULEMENT LES MOTS DU SCRIPT) :
+- Calcule le débit en mots/seconde : NOMBRE DE MOTS DU SCRIPT ÷ DURÉE DE PAROLE
+- Ne compte PAS le gibberish dans les mots !
+- On fait du contenu UGC TikTok → le débit doit être DYNAMIQUE (3-4 mots/s minimum)
+- On n'utilise JAMAIS 0.8x ou 0.9x (pas de ralentissement, ça tue l'énergie)
 - Débit < 2.5 mots/s → trop lent → suggérer 1.2x
 - Débit 2.5-3.0 mots/s → un peu lent → suggérer 1.1x
-- Débit 3.0-4.0 mots/s → idéal → suggérer 1.0x
-- Débit 4.0-4.5 mots/s → un peu rapide → suggérer 0.9x
-- Débit > 4.5 mots/s → trop rapide → suggérer 0.8x
+- Débit ≥ 3.0 mots/s → bon débit → suggérer 1.0x
 
 IMPORTANT : Retourne TOUJOURS un JSON valide.`
 
@@ -725,9 +748,12 @@ IMPORTANT : Retourne TOUJOURS un JSON valide.`
     `[${c.timestamp[0].toFixed(2)}s - ${c.timestamp[1].toFixed(2)}s] "${c.text}"`
   ).join('\n')
 
+  // Compter les mots du script original (pour le calcul de débit)
+  const scriptWordCount = originalScript.split(/\s+/).filter(w => w.length > 0).length
+
   const userPrompt = `
 ══════════════════════════════════════════════════════════════════
-SCRIPT ORIGINAL (ce que l'acteur devait dire)
+SCRIPT ORIGINAL (ce que l'acteur devait dire) - ${scriptWordCount} mots
 ══════════════════════════════════════════════════════════════════
 "${originalScript}"
 
@@ -743,17 +769,28 @@ ${formattedChunks}
 DURÉE VIDÉO : ${videoDuration}s
 ══════════════════════════════════════════════════════════════════
 
-Analyse la transcription et trouve les VRAIS marqueurs de parole.
-Calcule aussi le débit de parole et suggère une vitesse optimale.
+ÉTAPES À SUIVRE :
+1. Parcours les chunks Whisper du DÉBUT et identifie où le SCRIPT ORIGINAL commence vraiment
+   - Ignore tout gibberish avant (hmm, euh, bruits, mots pas dans le script)
+   - speech_start = timestamp du premier mot qui correspond au script (- 0.15s de padding)
+
+2. Parcours les chunks Whisper de la FIN et identifie où le SCRIPT ORIGINAL finit
+   - Ignore tout gibberish après (voilà, hmm, bruits ajoutés)
+   - speech_end = timestamp du dernier mot qui correspond au script (+ 0.15s de padding)
+
+3. Calcule le débit : ${scriptWordCount} mots ÷ (speech_end - speech_start)
+   - C'est le nombre de mots du SCRIPT (${scriptWordCount}), PAS de Whisper !
+
+4. Déduis la vitesse suggérée selon les règles
 
 Réponds en JSON avec ce format exact :
 {
-  "speech_start": <secondes>,
-  "speech_end": <secondes>,
+  "speech_start": <secondes - début du vrai script, pas du gibberish>,
+  "speech_end": <secondes - fin du vrai script, pas du gibberish>,
   "confidence": "high" | "medium" | "low",
-  "reasoning": "<explication courte>",
-  "words_per_second": <nombre>,
-  "suggested_speed": <0.8 | 0.9 | 1.0 | 1.1 | 1.2>
+  "reasoning": "<explique quel gibberish tu as ignoré et pourquoi>",
+  "words_per_second": <${scriptWordCount} ÷ durée de parole>,
+  "suggested_speed": <1.0 | 1.1 | 1.2>
 }`
 
   try {
@@ -780,8 +817,8 @@ Réponds en JSON avec ce format exact :
     result.speech_start = Math.max(0, result.speech_start)
     result.speech_end = Math.min(videoDuration, result.speech_end)
     
-    // Validation de la vitesse suggérée (doit être entre 0.8 et 1.2)
-    const validSpeeds = [0.8, 0.9, 1.0, 1.1, 1.2]
+    // Validation de la vitesse suggérée (1.0 à 1.2 seulement - UGC TikTok = dynamique, pas de ralentissement)
+    const validSpeeds = [1.0, 1.1, 1.2]
     if (!validSpeeds.includes(result.suggested_speed)) {
       // Arrondir à la vitesse valide la plus proche
       result.suggested_speed = validSpeeds.reduce((prev, curr) => 
@@ -790,10 +827,10 @@ Réponds en JSON avec ce format exact :
     }
     
     // S'assurer que words_per_second est un nombre valide
+    // IMPORTANT: Utiliser le nombre de mots du SCRIPT, pas de la transcription Whisper !
     if (typeof result.words_per_second !== 'number' || isNaN(result.words_per_second)) {
-      const wordCount = transcription.text.split(/\s+/).filter(w => w.length > 0).length
       const speechDuration = result.speech_end - result.speech_start
-      result.words_per_second = speechDuration > 0 ? Math.round((wordCount / speechDuration) * 10) / 10 : 3.0
+      result.words_per_second = speechDuration > 0 ? Math.round((scriptWordCount / speechDuration) * 10) / 10 : 3.0
     }
     
     console.log('[Claude] Speech boundaries analysis:', result)
@@ -806,20 +843,18 @@ Réponds en JSON avec ce format exact :
     const firstChunk = transcription.chunks.find(c => c.text.trim().length > 0)
     const lastChunk = [...transcription.chunks].reverse().find(c => c.text.trim().length > 0)
     
-    const speech_start = firstChunk ? Math.max(0, firstChunk.timestamp[0] - 0.1) : 0
-    const speech_end = lastChunk ? Math.min(videoDuration, lastChunk.timestamp[1] + 0.1) : videoDuration
+    const speech_start = firstChunk ? Math.max(0, firstChunk.timestamp[0] - 0.15) : 0
+    const speech_end = lastChunk ? Math.min(videoDuration, lastChunk.timestamp[1] + 0.15) : videoDuration
     
-    // Calcul basique du débit
-    const wordCount = transcription.text.split(/\s+/).filter(w => w.length > 0).length
+    // Calcul du débit - IMPORTANT: utiliser le nombre de mots du SCRIPT, pas de Whisper !
     const speechDuration = speech_end - speech_start
-    const wps = speechDuration > 0 ? wordCount / speechDuration : 3.0
+    const wps = speechDuration > 0 ? scriptWordCount / speechDuration : 3.0
     
-    // Suggestion de vitesse basée sur le débit
+    // Suggestion de vitesse basée sur le débit (UGC TikTok = pas de ralentissement)
     let suggested_speed = 1.0
     if (wps < 2.5) suggested_speed = 1.2
     else if (wps < 3.0) suggested_speed = 1.1
-    else if (wps > 4.5) suggested_speed = 0.8
-    else if (wps > 4.0) suggested_speed = 0.9
+    // Pas de 0.8x ou 0.9x - on garde 1.0x même si rapide
     
     return {
       speech_start,

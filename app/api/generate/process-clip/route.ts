@@ -95,6 +95,7 @@ export async function POST(request: NextRequest) {
     audioFilters.push('asetpts=PTS-STARTPTS')
     
     // ÉTAPE 2 : Gestion du trim (maintenant les timestamps sont normalisés)
+    const hasTrim = hasTrimStart || hasTrimEnd
     if (hasTrimStart && hasTrimEnd) {
       videoFilters.push(`trim=start=${trimStart}:end=${effectiveTrimEnd}`)
       audioFilters.push(`atrim=start=${trimStart}:end=${effectiveTrimEnd}`)
@@ -106,7 +107,16 @@ export async function POST(request: NextRequest) {
       audioFilters.push(`atrim=end=${effectiveTrimEnd}`)
     }
     
+    // ÉTAPE 2.5 : CRITIQUE - Normaliser APRÈS le trim et AVANT le speed
+    // Sans ça, le calcul de vitesse est faussé car on multiplie des timestamps
+    // qui ne commencent pas à 0 (ex: trim start=2s → timestamps de 2s à 5s)
+    if (hasTrim) {
+      videoFilters.push('setpts=PTS-STARTPTS')
+      audioFilters.push('asetpts=PTS-STARTPTS')
+    }
+    
     // ÉTAPE 3 : Speed via setpts (video) et atempo (audio)
+    // Maintenant les timestamps commencent à 0, donc le calcul est correct
     if (hasSpeed) {
       videoFilters.push(`setpts=${ptsFactor}*PTS`)
       audioFilters.push(`atempo=${speed}`)
