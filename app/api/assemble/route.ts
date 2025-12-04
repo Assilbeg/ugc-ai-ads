@@ -15,6 +15,77 @@ interface ClipInput {
   clipOrder?: number      // Ordre du clip dans la campagne
 }
 
+interface ValidationResult {
+  valid: boolean
+  clipOrder: number
+  url: string
+  error?: string
+  contentType?: string
+  contentLength?: number
+}
+
+/**
+ * Valider une URL de vidéo (HEAD request)
+ * Retourne si l'URL est accessible et si c'est bien une vidéo
+ */
+async function validateVideoUrl(url: string, clipOrder: number): Promise<ValidationResult> {
+  try {
+    // Timeout de 10 secondes pour la validation
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 10000)
+    
+    const response = await fetch(url, {
+      method: 'HEAD',
+      signal: controller.signal,
+    })
+    clearTimeout(timeout)
+    
+    const contentType = response.headers.get('content-type') || ''
+    const contentLength = parseInt(response.headers.get('content-length') || '0', 10)
+    
+    if (!response.ok) {
+      return {
+        valid: false,
+        clipOrder,
+        url,
+        error: `HTTP ${response.status}: ${response.statusText}`,
+        contentType,
+        contentLength
+      }
+    }
+    
+    // Vérifier que c'est bien une vidéo
+    const isVideo = contentType.startsWith('video/') || 
+                   contentType.includes('mp4') || 
+                   contentType.includes('webm') ||
+                   contentType.includes('quicktime') ||
+                   contentType.includes('octet-stream') // Certains CDN retournent ce type
+    
+    if (!isVideo && contentLength < 10000) {
+      // Fichier trop petit et pas un type vidéo connu
+      return {
+        valid: false,
+        clipOrder,
+        url,
+        error: `Type de fichier invalide: ${contentType} (${contentLength} bytes)`,
+        contentType,
+        contentLength
+      }
+    }
+    
+    return { valid: true, clipOrder, url, contentType, contentLength }
+    
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue'
+    return {
+      valid: false,
+      clipOrder,
+      url,
+      error: `Impossible d'accéder à l'URL: ${errorMessage}`
+    }
+  }
+}
+
 /**
  * Helper pour mettre à jour le status de la campagne
  */
@@ -30,10 +101,81 @@ async function updateCampaignStatus(supabase: any, campaignId: string, status: s
 }
 
 /**
+ * Exécuter l'assemblage Transloadit avec retry automatique
+ * @param transloadit - Client Transloadit
+ * @param steps - Les steps Transloadit à exécuter
+ * @param maxRetries - Nombre max de tentatives (défaut: 3)
+ * @param baseDelay - Délai de base en ms pour le backoff (défaut: 2000)
+ */
+async function executeAssemblyWithRetry(
+  transloadit: Transloadit,
+  steps: Record<string, unknown>,
+  maxRetries = 3,
+  baseDelay = 2000
+): Promise<{ ok: string; assembly_id: string; results?: any; error?: string; message?: string }> {
+  let lastError: Error | null = null
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[Assemble] Tentative ${attempt}/${maxRetries}...`)
+      
+      const result = await transloadit.createAssembly({
+        params: { steps } as any,
+        waitForCompletion: true,
+      })
+      
+      // Si succès ou erreur non-retry-able, retourner
+      if (result.ok === 'ASSEMBLY_COMPLETED') {
+        console.log(`[Assemble] ✓ Assemblage réussi (tentative ${attempt})`)
+        return result
+      }
+      
+      // Erreurs qui ne valent pas la peine de retenter
+      const nonRetryableErrors = [
+        'INVALID_FORM_DATA',
+        'INVALID_FILE_META_DATA', 
+        'MISSING_REQUIRED_PARAM'
+      ]
+      
+      if (result.error && nonRetryableErrors.includes(result.error)) {
+        console.error(`[Assemble] Erreur non-retry-able: ${result.error}`)
+        return result
+      }
+      
+      // Sinon, c'est une erreur retry-able (INTERNAL_COMMAND_ERROR, timeout, etc.)
+      lastError = new Error(result.message || result.error || 'Assembly failed')
+      console.warn(`[Assemble] Échec tentative ${attempt}: ${result.error} - ${result.message}`)
+      
+      if (attempt < maxRetries) {
+        // Backoff exponentiel: 2s, 4s, 8s...
+        const delay = baseDelay * Math.pow(2, attempt - 1)
+        console.log(`[Assemble] Attente ${delay}ms avant retry...`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+      
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err))
+      console.error(`[Assemble] Erreur tentative ${attempt}:`, lastError.message)
+      
+      if (attempt < maxRetries) {
+        const delay = baseDelay * Math.pow(2, attempt - 1)
+        console.log(`[Assemble] Attente ${delay}ms avant retry...`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+    }
+  }
+  
+  // Toutes les tentatives ont échoué
+  throw lastError || new Error('Échec après toutes les tentatives')
+}
+
+/**
  * Assemble multiple video clips into a single video using Transloadit
- * - Force ré-encodage pour éviter les problèmes de keyframes
- * - Reset des timestamps pour une concaténation propre
- * - Normalise framerate et audio sample rate
+ * VERSION ROBUSTE avec:
+ * - Validation des URLs avant assemblage
+ * - Retry automatique avec backoff exponentiel
+ * - Logs détaillés pour debug
+ * - Identification du clip problématique
  */
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -61,40 +203,76 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('[Assemble] Starting assembly of', clipsToProcess.length, 'clips with Transloadit')
-    console.log('[Assemble] Clips data:', JSON.stringify(clipsToProcess, null, 2))
+    console.log('[Assemble] ════════════════════════════════════════════════')
+    console.log('[Assemble] Starting ROBUST assembly of', clipsToProcess.length, 'clips')
+    console.log('[Assemble] Campaign:', campaignId)
 
     // Trier par clipOrder
     const sortedClips = [...clipsToProcess].sort((a, b) => 
       (a.clipOrder || 0) - (b.clipOrder || 0)
     )
 
-    // Initialiser le client Transloadit
+    // ════════════════════════════════════════════════════════════════
+    // ÉTAPE 1: VALIDATION DES URLs (avant d'envoyer à Transloadit)
+    // ════════════════════════════════════════════════════════════════
+    console.log('[Assemble] 📋 Validation des URLs...')
+    
+    const validationResults = await Promise.all(
+      sortedClips.map((clip, index) => 
+        validateVideoUrl(clip.rawUrl, clip.clipOrder || index + 1)
+      )
+    )
+    
+    const invalidClips = validationResults.filter(r => !r.valid)
+    
+    if (invalidClips.length > 0) {
+      console.error('[Assemble] ❌ URLs invalides détectées:')
+      invalidClips.forEach(clip => {
+        console.error(`  - Clip ${clip.clipOrder}: ${clip.error}`)
+        console.error(`    URL: ${clip.url.slice(0, 100)}...`)
+      })
+      
+      if (campaignId) await updateCampaignStatus(supabase, campaignId, 'failed')
+      
+      return NextResponse.json({
+        error: `${invalidClips.length} clip(s) avec URL invalide`,
+        invalidClips: invalidClips.map(c => ({
+          clipOrder: c.clipOrder,
+          error: c.error
+        })),
+        suggestion: 'Essayez de régénérer les clips problématiques'
+      }, { status: 400 })
+    }
+    
+    console.log('[Assemble] ✓ Toutes les URLs sont valides')
+    validationResults.forEach(r => {
+      console.log(`  - Clip ${r.clipOrder}: ${r.contentType} (${Math.round((r.contentLength || 0) / 1024)}KB)`)
+    })
+
+    // ════════════════════════════════════════════════════════════════
+    // ÉTAPE 2: CONSTRUCTION DES STEPS TRANSLOADIT
+    // ════════════════════════════════════════════════════════════════
     const transloadit = new Transloadit({
       authKey: TRANSLOADIT_KEY,
       authSecret: TRANSLOADIT_SECRET,
     })
 
-    // Construire les steps Transloadit pour la concaténation
-    // Ref: https://transloadit.com/docs/transcoding/video-encoding/concatenate-videos/
     const steps: Record<string, unknown> = {}
     const importStepNames: string[] = []
 
-    // 1. Importer chaque vidéo
+    // Importer chaque vidéo avec timeout augmenté
     sortedClips.forEach((clip, index) => {
       const stepName = `import_${index + 1}`
       steps[stepName] = {
         robot: '/http/import',
-        url: clip.rawUrl
+        url: clip.rawUrl,
+        // Timeout de 5 min par vidéo (vidéos IA peuvent être lourdes)
+        max_retries: 3,
       }
       importStepNames.push(stepName)
     })
 
-    // 2. Concaténer toutes les vidéos avec ré-encodage pour normaliser les timestamps
-    // Doc: https://transloadit.com/docs/robots/video-concat/
-    // IMPORTANT: Les vidéos IA (Veo) ont des timestamps bizarres qui causent des
-    // pertes de frames au début lors d'un concat stream-copy. On force le ré-encodage.
-    // FORMAT: 9:16 portrait (1080x1920) pour TikTok/Reels/Shorts
+    // ÉTAPE 1: Concaténer SANS resize (le resize sur /video/concat cause des erreurs)
     steps['concatenated'] = {
       robot: '/video/concat',
       use: {
@@ -103,30 +281,38 @@ export async function POST(request: NextRequest) {
           as: `video_${index + 1}`
         }))
       },
-      result: true,
       ffmpeg_stack: 'v6.0.0',
-      // Format 9:16 portrait pour UGC (TikTok, Reels, Shorts)
-      width: 1080,
-      height: 1920,
-      resize_strategy: 'crop',  // Crop pour garder le ratio exact
-      // Options FFmpeg pour éviter la perte de frames au début
+      // Pas de resize ici ! Juste concat basique
       ffmpeg: {
         'fflags': '+genpts+discardcorrupt',
         'vsync': 'cfr',
-        'force_key_frames': 'expr:eq(t,0)',
         'r': 30,
         'c:v': 'libx264',
         'preset': 'fast',
         'crf': '23',
         'c:a': 'aac',
         'b:a': '128k',
+        'ar': '48000',
+        'ac': '2',
       }
     }
 
-    // 3. Générer une thumbnail
+    // ÉTAPE 2: Normaliser en 9:16 avec /video/encode (qui supporte width/height)
+    steps['normalized'] = {
+      robot: '/video/encode',
+      use: 'concatenated',
+      result: true,
+      ffmpeg_stack: 'v6.0.0',
+      width: 1080,
+      height: 1920,
+      resize_strategy: 'crop',  // Crop au centre pour 9:16 sans bandes noires
+      preset: 'ipad-high',      // Preset standard, bonne qualité
+    }
+
+    // Thumbnail (basée sur la vidéo normalisée)
     steps['thumbnail'] = {
       robot: '/video/thumbs',
-      use: 'concatenated',
+      use: 'normalized',
       result: true,
       count: 1,
       offsets: [0],
@@ -135,40 +321,51 @@ export async function POST(request: NextRequest) {
       height: 1280,
     }
 
-    console.log('[Assemble] Transloadit steps:', Object.keys(steps))
-    console.log('[Assemble] Import steps:', importStepNames)
+    console.log('[Assemble] 🎬 Steps créés:', Object.keys(steps))
 
-    // Créer et attendre l'assemblage
-    const result = await transloadit.createAssembly({
-      params: { steps } as any,
-      waitForCompletion: true,
-    })
-
-    console.log('[Assemble] Assembly result:', result.ok, result.assembly_id)
+    // ════════════════════════════════════════════════════════════════
+    // ÉTAPE 3: EXÉCUTION AVEC RETRY AUTOMATIQUE
+    // ════════════════════════════════════════════════════════════════
+    console.log('[Assemble] 🚀 Lancement assemblage avec retry automatique...')
+    
+    const result = await executeAssemblyWithRetry(transloadit, steps, 3, 2000)
 
     if (result.ok !== 'ASSEMBLY_COMPLETED') {
-      console.error('[Assemble] Assembly failed:', result.error, result.message)
-      throw new Error(result.message || 'Assembly failed')
+      console.error('[Assemble] ❌ Échec final:', result.error, result.message)
+      
+      // Essayer d'identifier le clip problématique
+      const errorDetails = result.message || result.error || 'Erreur inconnue'
+      
+      if (campaignId) await updateCampaignStatus(supabase, campaignId, 'failed')
+      
+      return NextResponse.json({
+        error: `Assemblage échoué après 3 tentatives: ${errorDetails}`,
+        assemblyId: result.assembly_id,
+        suggestion: 'Les vidéos peuvent avoir un format incompatible. Essayez de régénérer les clips.'
+      }, { status: 500 })
     }
 
-    // Récupérer les URLs de sortie
-    const videoUrl = result.results?.concatenated?.[0]?.ssl_url
+    // ════════════════════════════════════════════════════════════════
+    // ÉTAPE 4: RÉCUPÉRATION DES RÉSULTATS
+    // ════════════════════════════════════════════════════════════════
+    const videoUrl = result.results?.normalized?.[0]?.ssl_url
     const thumbnailUrl = result.results?.thumbnail?.[0]?.ssl_url
 
     if (!videoUrl) {
-      console.error('[Assemble] No video URL in result:', result.results)
+      console.error('[Assemble] ❌ Pas d\'URL vidéo dans le résultat:', result.results)
       throw new Error('No output video URL')
     }
 
-    console.log('[Assemble] ✓ Video:', videoUrl.slice(0, 60))
-    console.log('[Assemble] ✓ Thumbnail:', thumbnailUrl?.slice(0, 60) || 'none')
+    console.log('[Assemble] ✓ Vidéo:', videoUrl.slice(0, 60))
+    console.log('[Assemble] ✓ Thumbnail:', thumbnailUrl?.slice(0, 60) || 'aucune')
 
     // Calculer la durée totale
     const totalDuration = sortedClips.reduce((sum, c) => sum + (c.duration || 0), 0)
 
-    // Sauvegarder en base de données si on a un campaignId
+    // ════════════════════════════════════════════════════════════════
+    // ÉTAPE 5: SAUVEGARDE EN BASE
+    // ════════════════════════════════════════════════════════════════
     if (campaignId) {
-      // 1. Créer une entrée dans campaign_assemblies (historique)
       const clipAdjustments = sortedClips.map((c, i) => ({
         clipOrder: c.clipOrder || i + 1,
         duration: c.duration,
@@ -187,10 +384,10 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (assemblyError) {
-        console.error('[Assemble] Error saving assembly:', assemblyError)
-        // Fallback: mettre à jour la campagne directement si la table n'existe pas encore
+        console.error('[Assemble] Erreur sauvegarde assembly:', assemblyError)
+        // Fallback si la table n'existe pas
         if (assemblyError.code === '42P01') {
-          console.log('[Assemble] campaign_assemblies table not found, updating campaign directly')
+          console.log('[Assemble] Table campaign_assemblies non trouvée, mise à jour campagne directe')
           await (supabase
             .from('campaigns') as any)
             .update({ 
@@ -200,10 +397,10 @@ export async function POST(request: NextRequest) {
             .eq('id', campaignId)
         }
       } else {
-        console.log('[Assemble] Assembly saved with version:', assembly?.version || 'unknown')
+        console.log('[Assemble] ✓ Assembly sauvegardé, version:', assembly?.version || 'N/A')
       }
 
-      // 2. Mettre à jour la campagne avec le dernier assemblage
+      // Mettre à jour la campagne
       await (supabase
         .from('campaigns') as any)
         .update({ 
@@ -212,28 +409,34 @@ export async function POST(request: NextRequest) {
         })
         .eq('id', campaignId)
       
-      console.log('[Assemble] Campaign updated with final video')
+      console.log('[Assemble] ✓ Campagne mise à jour')
     }
+
+    console.log('[Assemble] ════════════════════════════════════════════════')
+    console.log('[Assemble] ✅ ASSEMBLAGE TERMINÉ AVEC SUCCÈS')
+    console.log('[Assemble] ════════════════════════════════════════════════')
 
     return NextResponse.json({
       videoUrl,
       thumbnailUrl: thumbnailUrl || null,
       duration: totalDuration,
       clipCount: sortedClips.length,
-      method: 'transloadit-concat',
+      method: 'transloadit-concat-robust',
       assemblyId: result.assembly_id
     })
 
   } catch (error) {
-    console.error('[Assemble] Error:', error)
+    console.error('[Assemble] ❌ ERREUR CRITIQUE:', error)
     
     if (campaignId) {
       await updateCampaignStatus(supabase, campaignId, 'failed')
     }
     
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Erreur assemblage vidéo' },
-      { status: 500 }
-    )
+    const errorMessage = error instanceof Error ? error.message : 'Erreur assemblage vidéo'
+    
+    return NextResponse.json({
+      error: errorMessage,
+      suggestion: 'Si le problème persiste, essayez de régénérer les clips ou contactez le support.'
+    }, { status: 500 })
   }
 }

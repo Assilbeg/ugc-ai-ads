@@ -656,6 +656,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       if (clipsNeedingProcessing.length > 0) {
         console.log('[Assemble] 🎬 Processing', clipsNeedingProcessing.length, 'clips with server-side FFmpeg...')
         
+        // Collecter les erreurs de processing
+        const processingErrors: { clipOrder: number; error: string }[] = []
+        
         // Traiter en parallèle pour plus de rapidité
         await Promise.all(clipsNeedingProcessing.map(async (clipData) => {
           try {
@@ -703,17 +706,43 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                   hasUrl: !!result.videoUrl,
                   error: result.error
                 })
+                processingErrors.push({
+                  clipOrder: clipData.clipOrder,
+                  error: result.error || 'Échec du traitement'
+                })
                 // Garder la duration calculée même si le processing échoue
                 console.log(`[Assemble] Keeping calculated duration for clip ${clipData.clipOrder}:`, clipData.duration)
               }
             } else {
-              const errorText = await response.text()
-              console.error(`[Assemble] ❌ Processing FAILED for clip ${clipData.clipOrder}:`, response.status, errorText)
+              const errorData = await response.json().catch(() => ({ error: 'Erreur serveur' }))
+              console.error(`[Assemble] ❌ Processing FAILED for clip ${clipData.clipOrder}:`, response.status, errorData)
+              processingErrors.push({
+                clipOrder: clipData.clipOrder,
+                error: errorData.error || `HTTP ${response.status}`
+              })
             }
           } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : 'Erreur inconnue'
             console.warn(`[Assemble] ⚠️ Error processing clip ${clipData.clipOrder}:`, err)
+            processingErrors.push({
+              clipOrder: clipData.clipOrder,
+              error: errorMsg
+            })
           }
         }))
+        
+        // Si trop d'erreurs de processing, arrêter avant l'assemblage
+        if (processingErrors.length > 0 && processingErrors.length >= clipsNeedingProcessing.length / 2) {
+          const errorDetails = processingErrors
+            .map(e => `Clip ${e.clipOrder}: ${e.error}`)
+            .join('\n')
+          throw new Error(`Échec du pré-traitement de ${processingErrors.length} clip(s):\n${errorDetails}`)
+        }
+        
+        // Logger les erreurs mais continuer si moins de la moitié ont échoué
+        if (processingErrors.length > 0) {
+          console.warn(`[Assemble] ⚠️ ${processingErrors.length} clip(s) avec erreur de processing, mais on continue...`)
+        }
       }
       
       // Préparer les clips pour l'assemblage final
@@ -771,7 +800,23 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       }
       
       if (!response.ok) {
-        throw new Error(result.error || 'Erreur assemblage')
+        // Gestion d'erreur améliorée avec détails
+        let errorMessage = result.error || 'Erreur assemblage'
+        
+        // Si des clips invalides sont identifiés
+        if (result.invalidClips?.length > 0) {
+          const clipDetails = result.invalidClips
+            .map((c: { clipOrder: number; error: string }) => `Clip ${c.clipOrder}: ${c.error}`)
+            .join('\n')
+          errorMessage = `${result.invalidClips.length} clip(s) avec problème:\n${clipDetails}`
+        }
+        
+        // Ajouter la suggestion si disponible
+        if (result.suggestion) {
+          errorMessage += `\n\n💡 ${result.suggestion}`
+        }
+        
+        throw new Error(errorMessage)
       }
       
       // ✅ Mettre le status à "completed" AVANT la redirection
@@ -786,7 +831,12 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       
     } catch (err) {
       console.error('[Assemble] Error caught:', err)
-      alert(`Erreur d'assemblage: ${err instanceof Error ? err.message : 'Erreur inconnue'}`)
+      const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue'
+      
+      // Afficher l'erreur de manière plus visible et formatée
+      const formattedError = `❌ Erreur d'assemblage\n\n${errorMessage}\n\nVous pouvez réessayer ou régénérer les clips problématiques.`
+      alert(formattedError)
+      
       setAssembling(false)
       // En cas d'erreur, mettre le status à failed
       await (supabase.from('campaigns') as any)
