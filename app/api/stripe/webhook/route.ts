@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { constructWebhookEvent, stripe } from '@/lib/stripe'
 import { addCredits, updateSubscription } from '@/lib/credits'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 
-// Use service role for webhook (no auth context)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy-load Supabase admin client (pour éviter erreur au build)
+let _getSupabaseAdmin(): SupabaseClient | null = null
+function getSupabaseAdmin() {
+  if (!_getSupabaseAdmin()) {
+    _getSupabaseAdmin() = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _getSupabaseAdmin()
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -84,7 +90,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   console.log(`[Stripe Webhook] ✓ Checkout completed for user ${userId}, plan ${planId}, customer ${customerId}`)
 
   // Update user's Stripe customer ID
-  const { error: updateError } = await supabaseAdmin
+  const { error: updateError } = await getSupabaseAdmin()
     .from('user_credits')
     .update({ stripe_customer_id: customerId })
     .eq('user_id', userId)
@@ -117,7 +123,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
 
   // Get plan details
   console.log(`[Stripe Webhook] Looking for plan: ${planId}`)
-  const { data: plan, error: planError } = await supabaseAdmin
+  const { data: plan, error: planError } = await getSupabaseAdmin()
     .from('subscription_plans')
     .select('*')
     .eq('id', planId)
@@ -191,7 +197,7 @@ async function handleOneTimePayment(
 
   // If Early Bird, mark as used
   if (plan.is_early_bird) {
-    const { error: ebError } = await supabaseAdmin
+    const { error: ebError } = await getSupabaseAdmin()
       .from('user_credits')
       .update({ 
         early_bird_used: true,
@@ -218,7 +224,7 @@ async function handleInvoicePaid(invoice: any) {
   const customerId = invoice.customer as string
   
   // Get user by Stripe customer ID
-  const { data: userCredits } = await supabaseAdmin
+  const { data: userCredits } = await getSupabaseAdmin()
     .from('user_credits')
     .select('user_id, subscription_tier')
     .eq('stripe_customer_id', customerId)
@@ -230,7 +236,7 @@ async function handleInvoicePaid(invoice: any) {
   }
 
   // Get plan details
-  const { data: plan } = await supabaseAdmin
+  const { data: plan } = await getSupabaseAdmin()
     .from('subscription_plans')
     .select('*')
     .eq('id', userCredits.subscription_tier)
@@ -269,7 +275,7 @@ async function handleSubscriptionUpdated(subscription: any) {
   const customerId = subscription.customer as string
   
   // Get user by Stripe customer ID
-  const { data: userCredits } = await supabaseAdmin
+  const { data: userCredits } = await getSupabaseAdmin()
     .from('user_credits')
     .select('user_id')
     .eq('stripe_customer_id', customerId)
@@ -283,7 +289,7 @@ async function handleSubscriptionUpdated(subscription: any) {
   // Get plan from price
   const priceId = subscription.items.data[0]?.price.id
   
-  const { data: plan } = await supabaseAdmin
+  const { data: plan } = await getSupabaseAdmin()
     .from('subscription_plans')
     .select('id')
     .eq('stripe_price_id', priceId)
@@ -311,7 +317,7 @@ async function handleSubscriptionDeleted(subscription: any) {
   const customerId = subscription.customer as string
   
   // Get user by Stripe customer ID
-  const { data: userCredits } = await supabaseAdmin
+  const { data: userCredits } = await getSupabaseAdmin()
     .from('user_credits')
     .select('user_id')
     .eq('stripe_customer_id', customerId)
