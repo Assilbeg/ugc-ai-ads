@@ -824,14 +824,10 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           const speed = adj?.speed ?? 1.0
           const trimmedDuration = trimEnd - trimStart
           const duration = trimmedDuration / speed
-          
-          // Ne pré-traiter QUE les clips avec des ajustements réels
-          // La normalisation des timestamps est faite par /api/assemble lors du concat
-          // (preset: ipad-high + fflags +genpts+discardcorrupt)
-          const hasTrimStart = trimStart > 0.1 // Tolérance de 0.1s
-          const hasTrimEnd = trimEnd < (originalDuration - 0.1)
-          const hasSpeed = Math.abs(speed - 1.0) > 0.01
-          const needsProcessing = hasTrimStart || hasTrimEnd || hasSpeed
+          // TOUJOURS traiter avec Transloadit pour normaliser les timestamps
+          // Les vidéos Veo ont des timestamps décalés qui causent des pertes de frames
+          // lors du concat si on ne les normalise pas d'abord
+          const needsProcessing = true
           
           return {
             clip,
@@ -1927,18 +1923,14 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                               <Clock className="w-3.5 h-3.5" />
                               <span>{clip.video.duration}s</span>
                             </div>
-                            {/* Indicateur de version - seulement si plusieurs versions dans clipsByBeat */}
+                            {/* Indicateur de version */}
                             {(() => {
-                              const versions = clipsByBeat.get(clip.order) || []
-                              const hasMultipleVersions = versions.length > 1
-                              if (!hasMultipleVersions) return null
-                              
-                              const versionIndex = displayedVersionIndex[clip.order] || 0
-                              return (
+                              const version = generatedClip?.current_version || clip.current_version || 1
+                              return version > 1 ? (
                                 <Badge variant="outline" className="text-xs px-1.5 py-0 text-muted-foreground">
-                                  v{versionIndex + 1}
+                                  v{version}
                                 </Badge>
-                              )
+                              ) : null
                             })()}
                             
                             {/* ══════════════════════════════════════════════════════════════ */}
