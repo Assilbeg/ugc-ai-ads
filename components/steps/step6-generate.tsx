@@ -484,9 +484,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           const speed = adj?.speed ?? 1.0
           const trimmedDuration = trimEnd - trimStart
           const duration = trimmedDuration / speed
-          // TOUJOURS traiter avec Transloadit pour normaliser les timestamps
-          // Cela évite que le début du premier clip soit coupé lors de l'assemblage
-          const needsProcessing = true
+          // Ne traiter que si vraiment nécessaire (trim ou speed modifié)
+          // Évite le ré-encodage inutile qui peut couper des frames au début
+          const needsProcessing = trimStart > 0 || trimEnd < originalDuration || speed !== 1.0
           
           return {
             clip,
@@ -501,8 +501,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           }
         })
       
-      // Pré-traiter TOUS les clips avec trim/speed via Transloadit
-      // Applique trim + speed avec audio synchronisé (100% fiable, pas de Cloudinary)
+      // Pré-traiter SEULEMENT les clips qui ont des ajustements (trim ou speed ≠ 1.0)
+      // Les clips sans ajustements gardent leur URL originale pour éviter un ré-encodage inutile
       const clipsNeedingProcessing = clipsData.filter(c => c.needsProcessing)
       
       console.log('[Assemble] Processing', clipsData.length, 'clips')

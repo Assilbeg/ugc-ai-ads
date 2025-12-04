@@ -143,16 +143,22 @@ export async function POST(request: NextRequest) {
     // Paramètres de qualité pour le ré-encodage
     // IMPORTANT: Normaliser video ET audio pour une concaténation propre
     
-    // CRITIQUE: Force la régénération des timestamps dès l'input
-    // Ça évite les problèmes de vidéos IA avec timestamps bizarres
-    ffmpegParams['fflags'] = '+genpts+igndts'
-    ffmpegParams['vsync'] = 'cfr'  // Constant frame rate
+    // ═══════════════════════════════════════════════════════════════
+    // TRIM PRÉCIS AU FRAME PRÈS - Important pour éviter de couper le début
+    // ═══════════════════════════════════════════════════════════════
+    // - genpts : Génère des PTS si manquants (vidéos IA)
+    // - discardcorrupt : Ignore les frames corrompues
+    // - On ne met PAS igndts car ça peut causer des problèmes de timing
+    ffmpegParams['fflags'] = '+genpts+discardcorrupt'
+    ffmpegParams['vsync'] = 'cfr'  // Constant frame rate pour précision
     
-    // Video
+    // Video - avec keyframe forcé au début pour un assemblage propre
     ffmpegParams['c:v'] = 'libx264'
     ffmpegParams['preset'] = 'fast'
     ffmpegParams['crf'] = 23
     ffmpegParams['r'] = 30  // Framerate constant 30fps
+    // CRITIQUE: Force un keyframe à 0 pour éviter les problèmes d'assemblage
+    ffmpegParams['force_key_frames'] = 'expr:eq(t,0)'
     // Audio - CRITIQUE pour la concaténation !
     ffmpegParams['c:a'] = 'aac'
     ffmpegParams['b:a'] = '128k'
