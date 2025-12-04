@@ -221,8 +221,46 @@ export function useVideoGeneration() {
             words_per_second: transcription.words_per_second,
             suggested_speed: transcription.suggested_speed,
           }
+          
+          // ═══════════════════════════════════════════════════════════
+          // AUTO-CALCUL DES AJUSTEMENTS (trim + speed) basé sur Whisper
+          // Ces ajustements sont sauvegardés dans le clip pour persistance
+          // ═══════════════════════════════════════════════════════════
+          const speechStart = transcription.speech_start
+          const speechEnd = transcription.speech_end
+          const videoDuration = clip.video.duration
+          
+          if (typeof speechStart === 'number' && typeof speechEnd === 'number' && speechEnd > speechStart) {
+            const trimStart = Math.max(0, speechStart)
+            const trimEnd = Math.min(speechEnd, videoDuration)
+            // IMPORTANT: Pas de vitesse < 1.0 (pas de ralentissement pour UGC TikTok)
+            const suggestedSpeed = Math.max(1.0, transcription.suggested_speed || 1.0)
+            
+            console.log('[Generation] ✓ Auto-adjustments calculated:', {
+              trimStart, trimEnd, speed: suggestedSpeed
+            })
+            
+            updatedClip.adjustments = {
+              trimStart,
+              trimEnd,
+              speed: suggestedSpeed,
+            }
+          } else {
+            // Pas de parole détectée, valeurs par défaut
+            updatedClip.adjustments = {
+              trimStart: 0,
+              trimEnd: videoDuration,
+              speed: 1.0,
+            }
+          }
         } else {
-          console.warn('[Generation] Transcription failed, continuing without auto-trim')
+          console.warn('[Generation] Transcription failed, using default adjustments')
+          // Valeurs par défaut si la transcription échoue
+          updatedClip.adjustments = {
+            trimStart: 0,
+            trimEnd: clip.video.duration,
+            speed: 1.0,
+          }
         }
       } catch (transcribeErr) {
         console.warn('[Generation] Transcription error, continuing:', transcribeErr)

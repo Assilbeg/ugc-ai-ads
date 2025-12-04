@@ -272,6 +272,7 @@ export interface CampaignClip {
   video: ClipVideo;
   audio: ClipAudio;
   transcription?: ClipTranscription;  // Transcription Whisper avec timestamps
+  adjustments?: ClipAdjustments;      // Ajustements sauvegardés (trim + speed)
   status: ClipStatus;
   created_at: string;
   updated_at: string;
@@ -309,7 +310,8 @@ export interface GeneratedFirstFrames {
 export interface ClipAdjustments {
   trimStart: number;      // Secondes depuis le début
   trimEnd: number;        // Secondes depuis le début (fin du clip)
-  speed: number;          // 0.8, 0.9, 1.0, 1.1, 1.2
+  speed: number;          // 1.0, 1.1, 1.2 UNIQUEMENT (pas de ralentissement pour UGC TikTok)
+  processedUrl?: string;  // URL de la vidéo après traitement (Transloadit)
 }
 
 export interface NewCampaignState {

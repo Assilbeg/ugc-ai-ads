@@ -817,7 +817,7 @@ Réponds en JSON avec ce format exact :
     result.speech_start = Math.max(0, result.speech_start)
     result.speech_end = Math.min(videoDuration, result.speech_end)
     
-    // Validation de la vitesse suggérée (1.0 à 1.2 seulement - UGC TikTok = dynamique, pas de ralentissement)
+    // Validation de la vitesse suggérée (1.0 à 1.2 seulement - UGC TikTok = dynamique, JAMAIS de ralentissement)
     const validSpeeds = [1.0, 1.1, 1.2]
     if (!validSpeeds.includes(result.suggested_speed)) {
       // Arrondir à la vitesse valide la plus proche
@@ -825,6 +825,8 @@ Réponds en JSON avec ce format exact :
         Math.abs(curr - result.suggested_speed) < Math.abs(prev - result.suggested_speed) ? curr : prev
       )
     }
+    // IMPORTANT: Garantir un minimum de 1.0 (pas de 0.8x ou 0.9x)
+    result.suggested_speed = Math.max(1.0, result.suggested_speed)
     
     // S'assurer que words_per_second est un nombre valide
     // IMPORTANT: Utiliser le nombre de mots du SCRIPT, pas de la transcription Whisper !

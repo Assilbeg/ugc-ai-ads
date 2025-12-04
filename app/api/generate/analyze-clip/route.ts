@@ -74,7 +74,8 @@ export async function POST(request: NextRequest) {
         speech_end = analysis.speech_end
         confidence = analysis.confidence
         words_per_second = analysis.words_per_second
-        suggested_speed = analysis.suggested_speed
+        // IMPORTANT: Pas de vitesse < 1.0 (pas de ralentissement pour UGC TikTok)
+        suggested_speed = Math.max(1.0, analysis.suggested_speed)
 
         console.log('[Analyze] Claude analysis:', {
           speech_start,
@@ -111,18 +112,30 @@ export async function POST(request: NextRequest) {
         words_per_second,
         suggested_speed,
       }
+      
+      // Calculer les ajustements automatiques basés sur la transcription
+      const trimStart = Math.max(0, speech_start)
+      const trimEnd = Math.min(speech_end, videoDuration)
+      const adjustmentsData = {
+        trimStart,
+        trimEnd,
+        speed: suggested_speed,
+      }
 
-      // Note: transcription est un champ JSONB ajouté récemment
+      // Sauvegarder transcription + ajustements
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await (supabase as any)
         .from('campaign_clips')
-        .update({ transcription: transcriptionData })
+        .update({ 
+          transcription: transcriptionData,
+          adjustments: adjustmentsData,
+        })
         .eq('id', clipId)
 
       if (error) {
-        console.error('[Analyze] Failed to save transcription:', error)
+        console.error('[Analyze] Failed to save transcription/adjustments:', error)
       } else {
-        console.log('[Analyze] ✓ Transcription saved to DB')
+        console.log('[Analyze] ✓ Transcription + adjustments saved to DB')
       }
     }
 

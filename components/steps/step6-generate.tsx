@@ -123,12 +123,16 @@ function AssemblyModal({ isOpen, clipCount }: { isOpen: boolean; clipCount: numb
   )
 }
 
-// Vitesses disponibles (UGC TikTok = dynamique, pas de ralentissement)
+// Vitesses disponibles (UGC TikTok = dynamique, JAMAIS de ralentissement)
+// On n'utilise JAMAIS 0.8x ou 0.9x - ça tue l'énergie du contenu
 const SPEED_OPTIONS = [
   { value: 1.0, label: '1x' },
   { value: 1.1, label: '1.1x' },
   { value: 1.2, label: '1.2x' },
 ]
+
+// Garantit une vitesse minimum de 1.0 (pas de ralentissement)
+const ensureMinSpeed = (speed: number): number => Math.max(1.0, speed)
 
 interface Step6GenerateProps {
   state: NewCampaignState
@@ -244,8 +248,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   const [checkingCredits, setCheckingCredits] = useState(false)
 
   // Initialiser les ajustements quand les clips changent
+  // PRIORITÉ: 1) Ajustements sauvegardés en BDD 2) Transcription Whisper 3) Valeurs par défaut
   // IMPORTANT: Utiliser clip.order comme clé (pas l'index) pour éviter les décalages
-  // Si transcription disponible, auto-configurer le trim sur début/fin de la parole
   useEffect(() => {
     const newAdjustments: Record<number, ClipAdjustments> = {}
     const clipsToUse = generatedClips.length > 0 ? generatedClips : clips
@@ -256,7 +260,26 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       // Utiliser la durée de la vidéo générée si disponible
       const videoDuration = clip?.video?.duration
       if (!adjustments[clipOrder] && videoDuration) {
-        // Vérifier si on a une transcription avec timestamps
+        
+        // ═══════════════════════════════════════════════════════════════
+        // PRIORITÉ 1: Utiliser les ajustements déjà sauvegardés en BDD
+        // C'est le cas normal quand on revient sur une campagne existante
+        // ═══════════════════════════════════════════════════════════════
+        if (clip.adjustments?.trimStart !== undefined && clip.adjustments?.trimEnd !== undefined) {
+          console.log(`[Adjustments] ✓ Loading saved adjustments for clip order=${clipOrder}:`, clip.adjustments)
+          newAdjustments[clipOrder] = {
+            trimStart: clip.adjustments.trimStart,
+            trimEnd: clip.adjustments.trimEnd,
+            speed: ensureMinSpeed(clip.adjustments.speed || 1.0),
+            processedUrl: clip.adjustments.processedUrl,
+          }
+          return
+        }
+        
+        // ═══════════════════════════════════════════════════════════════
+        // PRIORITÉ 2: Calculer depuis la transcription Whisper
+        // C'est le cas lors de la première génération
+        // ═══════════════════════════════════════════════════════════════
         const transcription = clip?.transcription
         const speechStart = transcription?.speech_start
         const speechEnd = transcription?.speech_end
@@ -267,21 +290,12 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         
         if (hasTranscription && speechStart !== undefined && speechEnd !== undefined) {
           // Auto-trim basé sur la transcription Whisper
-          // Garder la précision max de Whisper (~20-50ms) pour un trim précis
           const trimStart = Math.max(0, speechStart)
           const trimEnd = Math.min(speechEnd, videoDuration)
+          const suggestedSpeed = ensureMinSpeed(transcription.suggested_speed || 1.0)
           
-          // Vitesse suggérée basée sur le débit de parole (1.0, 1.1 ou 1.2)
-          const suggestedSpeed = transcription.suggested_speed || 1.0
-          
-          console.log(`[Adjustments] Auto-config clip order=${clipOrder} based on transcription:`, {
-            speech_start: speechStart,
-            speech_end: speechEnd,
-            trimStart,
-            trimEnd,
-            words_per_second: transcription.words_per_second,
-            suggested_speed: suggestedSpeed,
-            videoDuration
+          console.log(`[Adjustments] Auto-config from transcription, clip order=${clipOrder}:`, {
+            trimStart, trimEnd, speed: suggestedSpeed
           })
           
           newAdjustments[clipOrder] = {
@@ -290,7 +304,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
             speed: suggestedSpeed,
           }
         } else {
-          // Pas de transcription, valeurs par défaut
+          // ═══════════════════════════════════════════════════════════════
+          // PRIORITÉ 3: Valeurs par défaut
+          // ═══════════════════════════════════════════════════════════════
           newAdjustments[clipOrder] = {
             trimStart: 0,
             trimEnd: videoDuration,
@@ -304,13 +320,42 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     }
   }, [clips.length, generatedClips])
 
+  // Sauvegarder un ajustement en BDD (pour persistance)
+  const saveAdjustmentToDb = useCallback(async (clipId: string, adjustment: ClipAdjustments) => {
+    if (!clipId) return
+    
+    try {
+      const { error } = await (supabase
+        .from('campaign_clips') as any)
+        .update({ adjustments: adjustment })
+        .eq('id', clipId)
+      
+      if (error) {
+        console.error('[Adjustments] Failed to save to DB:', error)
+      } else {
+        console.log('[Adjustments] ✓ Saved to DB for clip:', clipId)
+      }
+    } catch (err) {
+      console.error('[Adjustments] Error saving to DB:', err)
+    }
+  }, [supabase])
+
   // Mettre à jour un ajustement (par clip.order, pas par index)
+  // Sauvegarde aussi en BDD pour persistance
   const updateAdjustment = useCallback((clipOrder: number, update: Partial<ClipAdjustments>) => {
-    setAdjustments(prev => ({
-      ...prev,
-      [clipOrder]: { ...prev[clipOrder], ...update, isApplied: false }
-    }))
-  }, [])
+    setAdjustments(prev => {
+      const newAdjustment = { ...prev[clipOrder], ...update, isApplied: false }
+      
+      // Trouver l'ID du clip pour sauvegarder en BDD
+      const clip = [...generatedClips, ...clips].find(c => c?.order === clipOrder)
+      if (clip?.id) {
+        // Sauvegarder en BDD (async, fire-and-forget)
+        saveAdjustmentToDb(clip.id, newAdjustment)
+      }
+      
+      return { ...prev, [clipOrder]: newAdjustment }
+    })
+  }, [saveAdjustmentToDb, generatedClips, clips])
 
   // Reset les ajustements à leurs valeurs par défaut (par clip.order, pas par index)
   const resetAdjustments = useCallback((clipOrder: number) => {
@@ -318,15 +363,22 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     const clip = [...clips, ...generatedClips].find(c => c?.order === clipOrder)
     if (!clip) return
     
+    const defaultAdjustment: ClipAdjustments = {
+      trimStart: 0,
+      trimEnd: clip.video?.duration || 6,
+      speed: 1.0,
+    }
+    
     setAdjustments(prev => ({
       ...prev,
-      [clipOrder]: {
-        trimStart: 0,
-        trimEnd: clip.video?.duration || 6,
-        speed: 1.0,
-      }
+      [clipOrder]: defaultAdjustment
     }))
-  }, [clips, generatedClips])
+    
+    // Sauvegarder en BDD
+    if (clip.id) {
+      saveAdjustmentToDb(clip.id, defaultAdjustment)
+    }
+  }, [clips, generatedClips, saveAdjustmentToDb])
 
   // Analyser un clip existant (transcription Whisper + analyse Claude)
   // Utile pour les clips générés avant l'ajout de cette feature
@@ -384,7 +436,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         // Garder la précision max de Whisper pour un trim précis
         const trimStart = Math.max(0, result.speech_start)
         const trimEnd = Math.min(result.speech_end, clip.video.duration)
-        const speed = result.suggested_speed || 1.0
+        const speed = ensureMinSpeed(result.suggested_speed || 1.0)
 
         setAdjustments(prev => ({
           ...prev,
@@ -665,6 +717,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         script: clip.script,
         video: clip.video,
         audio: clip.audio || {},
+        transcription: clip.transcription || null,
+        adjustments: clip.adjustments || null,
         status: clip.status || 'pending',
       }))
 

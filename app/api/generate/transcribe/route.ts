@@ -74,7 +74,8 @@ export async function POST(request: NextRequest) {
         confidence = analysis.confidence
         reasoning = analysis.reasoning
         words_per_second = analysis.words_per_second
-        suggested_speed = analysis.suggested_speed
+        // IMPORTANT: Pas de vitesse < 1.0 (pas de ralentissement pour UGC TikTok)
+        suggested_speed = Math.max(1.0, analysis.suggested_speed)
 
         console.log('[Transcribe] Claude analysis:', {
           speech_start,
