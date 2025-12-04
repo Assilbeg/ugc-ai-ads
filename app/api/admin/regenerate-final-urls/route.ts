@@ -31,9 +31,9 @@ export async function GET() {
     }
     
     // Trouver les clips avec raw_url mais sans final_url
-    const { data: clips, error } = await supabase
-      .from('campaign_clips')
-      .select('id, campaign_id, beat, "order", video, audio, status')
+    const { data: clips, error } = await (supabase
+      .from('campaign_clips') as any)
+      .select('id, campaign_id, beat, order, video, audio, status')
       .not('video->raw_url', 'is', null)
       .is('video->final_url', null)
       .eq('status', 'completed')
@@ -43,7 +43,7 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
     
-    const clipsToRegenerate: ClipToRegenerate[] = (clips || []).map(clip => ({
+    const clipsToRegenerate: ClipToRegenerate[] = ((clips || []) as any[]).map((clip: any) => ({
       id: clip.id,
       campaign_id: clip.campaign_id,
       beat: clip.beat,
@@ -84,9 +84,9 @@ export async function POST(request: NextRequest) {
     const singleClipId = body.clipId
     
     // Trouver les clips avec raw_url mais sans final_url
-    let query = supabase
-      .from('campaign_clips')
-      .select('id, campaign_id, beat, "order", video, audio, status')
+    let query = (supabase
+      .from('campaign_clips') as any)
+      .select('id, campaign_id, beat, order, video, audio, status')
       .not('video->raw_url', 'is', null)
       .is('video->final_url', null)
       .eq('status', 'completed')
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       query = query.eq('id', singleClipId)
     }
     
-    const { data: clips, error } = await query
+    const { data: clips, error } = await query as { data: any[] | null; error: any }
     
     if (error) {
       console.error('[Admin] Error fetching clips:', error)
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
     const results: { id: string; success: boolean; final_url?: string; error?: string }[] = []
     
     // Traiter chaque clip séquentiellement
-    for (const clip of clips) {
+    for (const clip of clips as any[]) {
       const rawUrl = clip.video?.raw_url
       const voiceUrl = clip.audio?.transformed_voice_url
       const ambientUrl = clip.audio?.ambient_url
@@ -153,8 +153,8 @@ export async function POST(request: NextRequest) {
         if (!mixData.mixed || !mixData.videoUrl) {
           // Pas de mixage nécessaire (pas d'audio à mixer)
           // Dans ce cas, utiliser raw_url comme final_url
-          const { error: updateError } = await supabase
-            .from('campaign_clips')
+          const { error: updateError } = await (supabase
+            .from('campaign_clips') as any)
             .update({
               video: { ...clip.video, final_url: rawUrl }
             })
@@ -166,8 +166,8 @@ export async function POST(request: NextRequest) {
           console.log(`[Admin] ✓ Clip ${clip.id}: using raw_url as final_url`)
         } else {
           // Mixage réussi - mettre à jour la DB
-          const { error: updateError } = await supabase
-            .from('campaign_clips')
+          const { error: updateError } = await (supabase
+            .from('campaign_clips') as any)
             .update({
               video: { ...clip.video, final_url: mixData.videoUrl },
               audio: { ...clip.audio, final_audio_url: mixData.videoUrl }
