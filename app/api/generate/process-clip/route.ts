@@ -230,13 +230,25 @@ export async function POST(request: NextRequest) {
         url: videoUrl,
         max_retries: 3,
       },
-      processed: {
+      // Étape 1: Trim + Speed avec FFmpeg custom
+      trimmed: {
         robot: '/video/encode',
         use: 'imported',
-        result: true,
         preset: 'empty',
         ffmpeg_stack: 'v6.0.0',
         ffmpeg: ffmpegParams
+      },
+      // Étape 2: Normaliser en 9:16 (1080x1920) pour le concat
+      // On utilise un preset standard avec width/height (pas preset: 'empty')
+      processed: {
+        robot: '/video/encode',
+        use: 'trimmed',
+        result: true,
+        ffmpeg_stack: 'v6.0.0',
+        preset: 'ipad-high',
+        width: 1080,
+        height: 1920,
+        resize_strategy: 'crop',  // Crop au centre, pas de bandes noires
       }
     }
 

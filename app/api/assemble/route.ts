@@ -272,7 +272,8 @@ export async function POST(request: NextRequest) {
       importStepNames.push(stepName)
     })
 
-    // ÉTAPE 1: Concaténer SANS resize (le resize sur /video/concat cause des erreurs)
+    // Concaténer - VERSION SIMPLE sans paramètres custom FFmpeg
+    // Les vidéos sont déjà traitées par process-clip, on fait juste le concat
     steps['concatenated'] = {
       robot: '/video/concat',
       use: {
@@ -281,38 +282,14 @@ export async function POST(request: NextRequest) {
           as: `video_${index + 1}`
         }))
       },
-      ffmpeg_stack: 'v6.0.0',
-      // Pas de resize ici ! Juste concat basique
-      ffmpeg: {
-        'fflags': '+genpts+discardcorrupt',
-        'vsync': 'cfr',
-        'r': 30,
-        'c:v': 'libx264',
-        'preset': 'fast',
-        'crf': '23',
-        'c:a': 'aac',
-        'b:a': '128k',
-        'ar': '48000',
-        'ac': '2',
-      }
-    }
-
-    // ÉTAPE 2: Normaliser en 9:16 avec /video/encode (qui supporte width/height)
-    steps['normalized'] = {
-      robot: '/video/encode',
-      use: 'concatenated',
       result: true,
       ffmpeg_stack: 'v6.0.0',
-      width: 1080,
-      height: 1920,
-      resize_strategy: 'crop',  // Crop au centre pour 9:16 sans bandes noires
-      preset: 'ipad-high',      // Preset standard, bonne qualité
     }
 
-    // Thumbnail (basée sur la vidéo normalisée)
+    // Thumbnail
     steps['thumbnail'] = {
       robot: '/video/thumbs',
-      use: 'normalized',
+      use: 'concatenated',
       result: true,
       count: 1,
       offsets: [0],
@@ -348,7 +325,7 @@ export async function POST(request: NextRequest) {
     // ════════════════════════════════════════════════════════════════
     // ÉTAPE 4: RÉCUPÉRATION DES RÉSULTATS
     // ════════════════════════════════════════════════════════════════
-    const videoUrl = result.results?.normalized?.[0]?.ssl_url
+    const videoUrl = result.results?.concatenated?.[0]?.ssl_url
     const thumbnailUrl = result.results?.thumbnail?.[0]?.ssl_url
 
     if (!videoUrl) {
