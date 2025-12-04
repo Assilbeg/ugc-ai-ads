@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { speechToSpeech } from '@/lib/api/falai'
 import { checkCredits, deductCredits, getGenerationCost } from '@/lib/credits'
-import { createGenerationLog, markGenerationCompleted, markGenerationFailed } from '@/lib/generation-logger'
+import { createGenerationLog, markGenerationCompleted, markGenerationFailed, updateGenerationLog } from '@/lib/generation-logger'
 
 export async function POST(request: NextRequest) {
   let logId: string | null = null
@@ -74,14 +74,19 @@ export async function POST(request: NextRequest) {
       target: targetVoiceUrl.slice(0, 50)
     })
 
-    const audioUrl = await speechToSpeech(sourceAudioUrl, targetVoiceUrl)
+    const { result: audioUrl, requestId } = await speechToSpeech(sourceAudioUrl, targetVoiceUrl)
+
+    // Update log with FAL request_id for recovery
+    if (logId && requestId) {
+      await updateGenerationLog(logId, { falRequestId: requestId })
+    }
 
     // Get billed cost
     const billedCost = await getGenerationCost('voice_chatterbox')
 
     // Mark log as completed
     if (logId) {
-      await markGenerationCompleted(logId, audioUrl, startTime, billedCost)
+      await markGenerationCompleted(logId, audioUrl, startTime, billedCost, { falRequestId: requestId })
     }
 
     // Deduct credits after successful generation
@@ -100,7 +105,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ audioUrl, logId })
+    return NextResponse.json({ audioUrl, logId, requestId })
   } catch (error) {
     console.error('Error in speech-to-speech:', error)
     

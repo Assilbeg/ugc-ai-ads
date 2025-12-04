@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateVideo, getVeo31Endpoint, VideoQuality } from '@/lib/api/falai'
 import { getUserCredits, getGenerationCost, GenerationType, isAdminEmail } from '@/lib/credits'
-import { createGenerationLog, markGenerationCompleted, markGenerationFailed } from '@/lib/generation-logger'
+import { createGenerationLog, markGenerationCompleted, markGenerationFailed, updateGenerationLog } from '@/lib/generation-logger'
 import { VideoEngine } from '@/types'
 
 // Map quality to generation type for credits
@@ -95,12 +95,18 @@ export async function POST(request: NextRequest) {
     })
 
     // Generate video
-    const videoUrl = await generateVideo(prompt, firstFrameUrl, engine, duration, videoQuality)
+    const { result: videoUrl, requestId } = await generateVideo(prompt, firstFrameUrl, engine, duration, videoQuality)
+
+    // Update log with FAL request_id for recovery
+    if (logId && requestId) {
+      await updateGenerationLog(logId, { falRequestId: requestId })
+    }
 
     // Mark log as completed
     if (logId) {
       await markGenerationCompleted(logId, videoUrl, startTime, totalCost, {
         durationSeconds: duration,
+        falRequestId: requestId,
       })
     }
 
@@ -121,7 +127,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ videoUrl, logId, quality: videoQuality, cost: totalCost })
+    return NextResponse.json({ videoUrl, logId, quality: videoQuality, cost: totalCost, requestId })
   } catch (error) {
     console.error('Error generating video:', error)
     

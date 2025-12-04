@@ -120,6 +120,12 @@ async function pollUntilCompleteWithUrls<T>(
   throw new Error('Timeout waiting for generation')
 }
 
+// Result type with request_id for tracking
+export interface FalGenerationResult<T> {
+  result: T
+  requestId: string
+}
+
 // ─────────────────────────────────────────────────────────────────
 // NANO BANANA PRO - Image-to-Image with Character Consistency
 // Docs: https://fal.ai/models/fal-ai/nano-banana-pro/edit
@@ -220,7 +226,7 @@ export async function generateVideoVeo31(
   firstFrameUrl: string,
   duration: 4 | 6 | 8 = 6,
   quality: VideoQuality = 'standard'
-): Promise<string> {
+): Promise<FalGenerationResult<string>> {
   const path = getVeo31Endpoint(quality)
   
   const input: Veo31Input = {
@@ -250,9 +256,9 @@ export async function generateVideoVeo31(
     10000
   )
   
-  console.log(`[Veo3.1 ${quality.toUpperCase()}] Video generated:`, result.video?.url?.slice(0, 80))
+  console.log(`[Veo3.1 ${quality.toUpperCase()}] Video generated:`, result.video?.url?.slice(0, 80), `(request_id: ${queue.request_id})`)
   
-  return result.video.url
+  return { result: result.video.url, requestId: queue.request_id }
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -272,7 +278,7 @@ interface ChatterboxS2SOutput {
 export async function speechToSpeech(
   sourceAudioUrl: string,
   targetVoiceUrl: string
-): Promise<string> {
+): Promise<FalGenerationResult<string>> {
   const path = 'resemble-ai/chatterboxhd/speech-to-speech'
   
   const input: ChatterboxS2SInput = {
@@ -289,7 +295,9 @@ export async function speechToSpeech(
   const queue = await falRequest<FalQueueResponse>({ path, input })
   const result = await pollUntilCompleteWithUrls<ChatterboxS2SOutput>(queue.status_url, queue.response_url, 120, 5000)
   
-  return result.audio.url
+  console.log(`[Chatterbox S2S] Voice converted (request_id: ${queue.request_id})`)
+  
+  return { result: result.audio.url, requestId: queue.request_id }
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -310,7 +318,7 @@ interface ElevenLabsSFXOutput {
 export async function generateAmbientAudio(
   description: string,
   durationSeconds: number = 10
-): Promise<string> {
+): Promise<FalGenerationResult<string>> {
   const path = 'fal-ai/elevenlabs/sound-effects/v2'
   
   const input: ElevenLabsSFXInput = {
@@ -327,9 +335,9 @@ export async function generateAmbientAudio(
   const queue = await falRequest<FalQueueResponse>({ path, input })
   const result = await pollUntilCompleteWithUrls<ElevenLabsSFXOutput>(queue.status_url, queue.response_url, 60, 3000)
   
-  console.log('[ElevenLabs v2] Audio generated:', result.audio?.url?.slice(0, 80))
+  console.log('[ElevenLabs v2] Audio generated:', result.audio?.url?.slice(0, 80), `(request_id: ${queue.request_id})`)
   
-  return result.audio.url
+  return { result: result.audio.url, requestId: queue.request_id }
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -341,7 +349,7 @@ export async function generateVideo(
   _engine: 'veo3.1', // On garde le paramètre pour compatibilité mais on force Veo3.1
   duration: number,
   quality: VideoQuality = 'standard'
-): Promise<string> {
+): Promise<FalGenerationResult<string>> {
   // Utiliser Veo3.1 avec la qualité choisie
   return generateVideoVeo31(prompt, firstFrameUrl, duration as 4 | 6 | 8, quality)
 }
@@ -389,7 +397,7 @@ export interface TranscriptionResult {
 export async function transcribeAudio(
   audioUrl: string,
   language: string | null = null
-): Promise<TranscriptionResult> {
+): Promise<TranscriptionResult & { requestId: string }> {
   const path = 'fal-ai/whisper'
   
   const input: WhisperInput = {
@@ -412,7 +420,8 @@ export async function transcribeAudio(
   console.log('[Whisper] Transcription done:', {
     text: result.text.slice(0, 80) + '...',
     chunks: result.chunks.length,
-    languages: result.inferred_languages
+    languages: result.inferred_languages,
+    requestId: queue.request_id
   })
 
   // Calculer le début et la fin de la parole avec un petit padding
@@ -442,5 +451,6 @@ export async function transcribeAudio(
     chunks: result.chunks,
     speech_start,
     speech_end,
+    requestId: queue.request_id,
   }
 }
