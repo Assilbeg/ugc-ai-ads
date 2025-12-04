@@ -181,6 +181,55 @@ export function useVideoGeneration() {
       }
 
       // ────────────────────────────────────────────────────────────
+      // ÉTAPE 2.5 : Transcription Whisper + Analyse Claude
+      // Whisper transcrit l'audio, puis Claude compare avec le script
+      // original pour trouver les VRAIS marqueurs (ignore le gibberish)
+      // ────────────────────────────────────────────────────────────
+      try {
+        updateProgress('generating_voice', 50, 'Analyse de la parole...')
+        
+        const transcribeResponse = await fetch('/api/generate/transcribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            audioUrl: rawVideoUrl,
+            language: null, // Auto-detect
+            originalScript: clip.script?.text, // Script original pour comparaison
+            videoDuration: clip.video.duration,
+          }),
+          signal: abortControllerRef.current?.signal,
+        })
+
+        if (transcribeResponse.ok) {
+          const transcription = await transcribeResponse.json()
+          console.log('[Generation] ✓ Transcription + Analysis done:', {
+            text: transcription.text?.slice(0, 50),
+            speech_start: transcription.speech_start,
+            speech_end: transcription.speech_end,
+            confidence: transcription.confidence,
+            words_per_second: transcription.words_per_second,
+            suggested_speed: transcription.suggested_speed,
+            chunks: transcription.chunks?.length
+          })
+          
+          // Ajouter la transcription au clip avec toutes les données d'analyse
+          updatedClip.transcription = {
+            text: transcription.text,
+            chunks: transcription.chunks,
+            speech_start: transcription.speech_start,
+            speech_end: transcription.speech_end,
+            words_per_second: transcription.words_per_second,
+            suggested_speed: transcription.suggested_speed,
+          }
+        } else {
+          console.warn('[Generation] Transcription failed, continuing without auto-trim')
+        }
+      } catch (transcribeErr) {
+        console.warn('[Generation] Transcription error, continuing:', transcribeErr)
+        // On continue même si la transcription échoue
+      }
+
+      // ────────────────────────────────────────────────────────────
       // ÉTAPE 3 : Speech-to-Speech (Chatterbox HD)
       // On passe l'URL de la vidéo comme source audio
       // ────────────────────────────────────────────────────────────

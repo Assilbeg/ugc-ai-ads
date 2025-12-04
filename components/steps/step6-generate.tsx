@@ -236,6 +236,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   // Qualité vidéo sélectionnée
   const [videoQuality, setVideoQuality] = useState<VideoQuality>('standard')
   
+  // Analyse de clips (transcription + auto-trim)
+  const [analyzingClips, setAnalyzingClips] = useState<Set<number>>(new Set())
+  
   // Modal d'achat de crédits
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [creditsNeeded, setCreditsNeeded] = useState<{ required: number; current: number } | null>(null)
@@ -244,6 +247,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
 
   // Initialiser les ajustements quand les clips changent
   // IMPORTANT: Utiliser generatedClips car clips peut ne pas avoir la durée correcte
+  // Si transcription disponible, auto-configurer le trim sur début/fin de la parole
   useEffect(() => {
     const newAdjustments: Record<number, ClipAdjustments> = {}
     const clipsToUse = generatedClips.length > 0 ? generatedClips : clips
@@ -251,10 +255,50 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       // Utiliser la durée de la vidéo générée si disponible
       const videoDuration = clip?.video?.duration
       if (!adjustments[index] && videoDuration) {
-        newAdjustments[index] = {
-          trimStart: 0,
-          trimEnd: videoDuration,
-          speed: 1.0,
+        // Vérifier si on a une transcription avec timestamps
+        const transcription = clip?.transcription
+        const speechStart = transcription?.speech_start
+        const speechEnd = transcription?.speech_end
+        const hasTranscription = transcription && 
+          typeof speechStart === 'number' && 
+          typeof speechEnd === 'number' &&
+          speechEnd > speechStart
+        
+        if (hasTranscription && speechStart !== undefined && speechEnd !== undefined) {
+          // Auto-trim basé sur la transcription Whisper
+          // Arrondir à 0.1s près pour une meilleure UX
+          const trimStart = Math.round(speechStart * 10) / 10
+          const trimEnd = Math.min(
+            Math.round(speechEnd * 10) / 10,
+            videoDuration
+          )
+          
+          // Vitesse suggérée basée sur le débit de parole
+          // (0.8, 0.9, 1.0, 1.1 ou 1.2)
+          const suggestedSpeed = transcription.suggested_speed || 1.0
+          
+          console.log(`[Adjustments] Auto-config clip ${index} based on transcription:`, {
+            speech_start: speechStart,
+            speech_end: speechEnd,
+            trimStart,
+            trimEnd,
+            words_per_second: transcription.words_per_second,
+            suggested_speed: suggestedSpeed,
+            videoDuration
+          })
+          
+          newAdjustments[index] = {
+            trimStart,
+            trimEnd,
+            speed: suggestedSpeed,
+          }
+        } else {
+          // Pas de transcription, valeurs par défaut
+          newAdjustments[index] = {
+            trimStart: 0,
+            trimEnd: videoDuration,
+            speed: 1.0,
+          }
         }
       }
     })
@@ -284,6 +328,78 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         speed: 1.0,
       }
     }))
+  }, [clips, generatedClips])
+
+  // Analyser un clip existant (transcription Whisper + analyse Claude)
+  // Utile pour les clips générés avant l'ajout de cette feature
+  const analyzeClip = useCallback(async (index: number) => {
+    const clip = generatedClips[index] || clips[index]
+    if (!clip?.video?.raw_url && !clip?.video?.final_url) {
+      console.error('[Analyze] No video URL for clip', index)
+      return
+    }
+
+    setAnalyzingClips(prev => new Set([...prev, index]))
+
+    try {
+      const videoUrl = clip.video.final_url || clip.video.raw_url
+      const response = await fetch('/api/generate/analyze-clip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clipId: clip.id,
+          videoUrl,
+          originalScript: clip.script?.text,
+          videoDuration: clip.video.duration,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Analyse failed')
+      }
+
+      const result = await response.json()
+      console.log('[Analyze] ✓ Clip', index, 'analyzed:', result)
+
+      // Mettre à jour le clip avec la transcription
+      setGeneratedClips(prev => prev.map((c, i) => {
+        if (i === index) {
+          return {
+            ...c,
+            transcription: {
+              text: result.text,
+              chunks: result.chunks,
+              speech_start: result.speech_start,
+              speech_end: result.speech_end,
+              words_per_second: result.words_per_second,
+              suggested_speed: result.suggested_speed,
+            }
+          }
+        }
+        return c
+      }))
+
+      // Appliquer les ajustements suggérés
+      if (result.speech_start !== undefined && result.speech_end !== undefined) {
+        const trimStart = Math.round(result.speech_start * 10) / 10
+        const trimEnd = Math.min(Math.round(result.speech_end * 10) / 10, clip.video.duration)
+        const speed = result.suggested_speed || 1.0
+
+        setAdjustments(prev => ({
+          ...prev,
+          [index]: { trimStart, trimEnd, speed }
+        }))
+      }
+
+    } catch (error) {
+      console.error('[Analyze] Error:', error)
+    } finally {
+      setAnalyzingClips(prev => {
+        const next = new Set(prev)
+        next.delete(index)
+        return next
+      })
+    }
   }, [clips, generatedClips])
 
   // Assembler la vidéo finale (applique les ajustements automatiquement)
@@ -1262,6 +1378,27 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                               <Badge variant="outline" className="text-xs ml-auto">gratuit</Badge>
                             </div>
                             
+                            {/* Bouton Analyser (si pas de transcription) */}
+                            {!generatedClip?.transcription?.speech_start && (
+                              <button
+                                onClick={() => analyzeClip(index)}
+                                disabled={analyzingClips.has(index)}
+                                className="w-full mb-3 px-3 py-2 text-xs rounded-lg border border-dashed border-primary/50 bg-primary/5 hover:bg-primary/10 transition-colors flex items-center justify-center gap-2 text-primary disabled:opacity-50"
+                              >
+                                {analyzingClips.has(index) ? (
+                                  <>
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                    Analyse en cours...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Sparkles className="w-3 h-3" />
+                                    Auto-détecter trim & vitesse
+                                  </>
+                                )}
+                              </button>
+                            )}
+                            
                             {/* Trim Slider */}
                             <div className="mb-3">
                               <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
@@ -1290,21 +1427,44 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                               <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
                                 <Gauge className="w-3 h-3" />
                                 <span>Vitesse</span>
+                                {/* Indicateur de débit de parole */}
+                                {generatedClip?.transcription?.words_per_second && (
+                                  <span className={`ml-auto px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                    generatedClip.transcription.words_per_second < 2.5 
+                                      ? 'bg-orange-500/20 text-orange-600' 
+                                      : generatedClip.transcription.words_per_second > 4.0 
+                                        ? 'bg-blue-500/20 text-blue-600'
+                                        : 'bg-green-500/20 text-green-600'
+                                  }`}>
+                                    {generatedClip.transcription.words_per_second.toFixed(1)} mots/s
+                                    {generatedClip.transcription.words_per_second < 2.5 && ' (lent)'}
+                                    {generatedClip.transcription.words_per_second > 4.0 && ' (rapide)'}
+                                  </span>
+                                )}
                               </div>
                               <div className="flex items-center gap-1">
-                                {SPEED_OPTIONS.map((opt) => (
-                                  <button
-                                    key={opt.value}
-                                    onClick={() => updateAdjustment(index, { speed: opt.value })}
-                                    className={`px-2 py-1 text-xs rounded-md transition-colors ${
-                                      (adjustments[index]?.speed || 1.0) === opt.value
-                                        ? 'bg-foreground text-background font-medium'
-                                        : 'bg-muted hover:bg-muted/80'
-                                    }`}
-                                  >
-                                    {opt.label}
-                                  </button>
-                                ))}
+                                {SPEED_OPTIONS.map((opt) => {
+                                  const isSuggested = generatedClip?.transcription?.suggested_speed === opt.value
+                                  const isSelected = (adjustments[index]?.speed || 1.0) === opt.value
+                                  return (
+                                    <button
+                                      key={opt.value}
+                                      onClick={() => updateAdjustment(index, { speed: opt.value })}
+                                      className={`px-2 py-1 text-xs rounded-md transition-colors relative ${
+                                        isSelected
+                                          ? 'bg-foreground text-background font-medium'
+                                          : isSuggested
+                                            ? 'bg-primary/20 ring-1 ring-primary/50 hover:bg-primary/30'
+                                            : 'bg-muted hover:bg-muted/80'
+                                      }`}
+                                    >
+                                      {opt.label}
+                                      {isSuggested && !isSelected && (
+                                        <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />
+                                      )}
+                                    </button>
+                                  )
+                                })}
                               </div>
                             </div>
                             

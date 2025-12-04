@@ -76,12 +76,25 @@ export async function POST(request: NextRequest) {
     const ptsFactor = (1 / speed).toFixed(4)
     
     // Construire les filtres video et audio
-    // IMPORTANT: On sépare le trim début et fin pour éviter que trim=start=0 coupe des frames
-    // Les vidéos IA peuvent avoir des timestamps qui ne commencent pas exactement à 0
+    // ═══════════════════════════════════════════════════════════════
+    // ORDRE CRITIQUE DES FILTRES :
+    // 1. setpts=PTS-STARTPTS → Normaliser les timestamps à 0 AVANT tout
+    // 2. trim/atrim → Couper aux bonnes positions
+    // 3. setpts pour speed → Modifier la vitesse
+    // 4. setpts=PTS-STARTPTS → Reset final pour le concat
+    //
+    // Les vidéos IA (Veo, etc.) ont des timestamps qui ne commencent
+    // pas à 0, donc trim=end=5 peut couper le début par erreur !
+    // ═══════════════════════════════════════════════════════════════
     const videoFilters: string[] = []
     const audioFilters: string[] = []
     
-    // Gestion du trim
+    // ÉTAPE 1 : TOUJOURS normaliser les timestamps EN PREMIER
+    // C'est CRITIQUE pour que trim fonctionne correctement
+    videoFilters.push('setpts=PTS-STARTPTS')
+    audioFilters.push('asetpts=PTS-STARTPTS')
+    
+    // ÉTAPE 2 : Gestion du trim (maintenant les timestamps sont normalisés)
     if (hasTrimStart && hasTrimEnd) {
       videoFilters.push(`trim=start=${trimStart}:end=${effectiveTrimEnd}`)
       audioFilters.push(`atrim=start=${trimStart}:end=${effectiveTrimEnd}`)
@@ -93,15 +106,14 @@ export async function POST(request: NextRequest) {
       audioFilters.push(`atrim=end=${effectiveTrimEnd}`)
     }
     
-    // Speed via setpts (video) et atempo (audio)
+    // ÉTAPE 3 : Speed via setpts (video) et atempo (audio)
     if (hasSpeed) {
       videoFilters.push(`setpts=${ptsFactor}*PTS`)
       audioFilters.push(`atempo=${speed}`)
     }
     
-    // TOUJOURS reset les timestamps à 0 pour éviter les problèmes lors de l'assemblage
-    // C'est CRITIQUE : les vidéos IA ont souvent des timestamps qui ne commencent pas à 0
-    // et ça cause le "trim automatique" du début lors du concat
+    // ÉTAPE 4 : Reset final des timestamps pour l'assemblage
+    // Après trim/speed, les timestamps peuvent être décalés, on les remet à 0
     videoFilters.push('setpts=PTS-STARTPTS')
     audioFilters.push('asetpts=PTS-STARTPTS')
     

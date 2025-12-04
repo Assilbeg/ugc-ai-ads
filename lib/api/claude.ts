@@ -649,3 +649,185 @@ RAPPEL CRITIQUE :
 
   return JSON.parse(jsonMatch[0])
 }
+
+// ═══════════════════════════════════════════════════════════════
+// ANALYSE DES MARQUEURS DE PAROLE
+// Compare la transcription Whisper avec le script original
+// pour trouver les vrais timestamps de début/fin de parole
+// ═══════════════════════════════════════════════════════════════
+
+interface WhisperChunk {
+  timestamp: [number, number]
+  text: string
+}
+
+interface SpeechBoundariesInput {
+  transcription: {
+    text: string
+    chunks: WhisperChunk[]
+  }
+  originalScript: string
+  videoDuration: number
+}
+
+interface SpeechBoundariesOutput {
+  speech_start: number
+  speech_end: number
+  confidence: 'high' | 'medium' | 'low'
+  reasoning: string
+  // Suggestions de vitesse basées sur le débit de parole
+  suggested_speed: number       // 0.8 à 1.2
+  words_per_second: number      // Débit mesuré
+}
+
+/**
+ * Utilise Claude pour analyser la transcription Whisper et trouver
+ * les vrais marqueurs de parole en comparant avec le script original.
+ * 
+ * Ça permet de :
+ * - Ignorer le "gibberish" (bruits transcrits par erreur)
+ * - Trouver où le script commence vraiment
+ * - Suggérer un trim intelligent
+ */
+export async function analyzeSpeechBoundaries({
+  transcription,
+  originalScript,
+  videoDuration,
+}: SpeechBoundariesInput): Promise<SpeechBoundariesOutput> {
+  
+  const systemPrompt = `Tu es un expert en analyse audio/vidéo pour contenus UGC (TikTok, Reels, Shorts).
+Tu dois :
+1. Comparer une transcription Whisper (avec timestamps) au script original pour trouver les VRAIS moments de parole
+2. Calculer le débit de parole et suggérer une vitesse optimale
+
+CONTEXTE :
+- La transcription Whisper peut contenir du "gibberish" (bruits de fond, sons non-parole transcrits par erreur)
+- Le script original est ce que l'acteur était CENSÉ dire
+- Les vidéos UGC doivent être dynamiques (débit idéal : 3-4 mots/seconde)
+
+RÈGLES POUR LES MARQUEURS :
+1. Trouve le premier mot de la transcription qui correspond au début du script
+2. Trouve le dernier mot de la transcription qui correspond à la fin du script
+3. Ignore les mots transcrits qui sont clairement du bruit
+4. Ajoute un petit padding (0.1-0.2s) pour ne pas couper trop serré
+
+RÈGLES POUR LA VITESSE :
+- Débit < 2.5 mots/s → trop lent → suggérer 1.2x
+- Débit 2.5-3.0 mots/s → un peu lent → suggérer 1.1x
+- Débit 3.0-4.0 mots/s → idéal → suggérer 1.0x
+- Débit 4.0-4.5 mots/s → un peu rapide → suggérer 0.9x
+- Débit > 4.5 mots/s → trop rapide → suggérer 0.8x
+
+IMPORTANT : Retourne TOUJOURS un JSON valide.`
+
+  // Formatter les chunks pour une meilleure lisibilité
+  const formattedChunks = transcription.chunks.map((c, i) => 
+    `[${c.timestamp[0].toFixed(2)}s - ${c.timestamp[1].toFixed(2)}s] "${c.text}"`
+  ).join('\n')
+
+  const userPrompt = `
+══════════════════════════════════════════════════════════════════
+SCRIPT ORIGINAL (ce que l'acteur devait dire)
+══════════════════════════════════════════════════════════════════
+"${originalScript}"
+
+══════════════════════════════════════════════════════════════════
+TRANSCRIPTION WHISPER (avec timestamps)
+══════════════════════════════════════════════════════════════════
+Texte complet : "${transcription.text}"
+
+Détail mot par mot :
+${formattedChunks}
+
+══════════════════════════════════════════════════════════════════
+DURÉE VIDÉO : ${videoDuration}s
+══════════════════════════════════════════════════════════════════
+
+Analyse la transcription et trouve les VRAIS marqueurs de parole.
+Calcule aussi le débit de parole et suggère une vitesse optimale.
+
+Réponds en JSON avec ce format exact :
+{
+  "speech_start": <secondes>,
+  "speech_end": <secondes>,
+  "confidence": "high" | "medium" | "low",
+  "reasoning": "<explication courte>",
+  "words_per_second": <nombre>,
+  "suggested_speed": <0.8 | 0.9 | 1.0 | 1.1 | 1.2>
+}`
+
+  try {
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 500,
+      messages: [{ role: 'user', content: userPrompt }],
+      system: systemPrompt,
+    })
+
+    const textContent = response.content.find(c => c.type === 'text')
+    if (!textContent || textContent.type !== 'text') {
+      throw new Error('No text response from Claude')
+    }
+
+    const jsonMatch = textContent.text.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      throw new Error('Could not parse JSON from Claude response')
+    }
+
+    const result = JSON.parse(jsonMatch[0]) as SpeechBoundariesOutput
+    
+    // Validation des valeurs
+    result.speech_start = Math.max(0, result.speech_start)
+    result.speech_end = Math.min(videoDuration, result.speech_end)
+    
+    // Validation de la vitesse suggérée (doit être entre 0.8 et 1.2)
+    const validSpeeds = [0.8, 0.9, 1.0, 1.1, 1.2]
+    if (!validSpeeds.includes(result.suggested_speed)) {
+      // Arrondir à la vitesse valide la plus proche
+      result.suggested_speed = validSpeeds.reduce((prev, curr) => 
+        Math.abs(curr - result.suggested_speed) < Math.abs(prev - result.suggested_speed) ? curr : prev
+      )
+    }
+    
+    // S'assurer que words_per_second est un nombre valide
+    if (typeof result.words_per_second !== 'number' || isNaN(result.words_per_second)) {
+      const wordCount = transcription.text.split(/\s+/).filter(w => w.length > 0).length
+      const speechDuration = result.speech_end - result.speech_start
+      result.words_per_second = speechDuration > 0 ? Math.round((wordCount / speechDuration) * 10) / 10 : 3.0
+    }
+    
+    console.log('[Claude] Speech boundaries analysis:', result)
+    
+    return result
+  } catch (error) {
+    console.error('[Claude] Error analyzing speech boundaries:', error)
+    
+    // Fallback : utiliser les timestamps bruts de Whisper
+    const firstChunk = transcription.chunks.find(c => c.text.trim().length > 0)
+    const lastChunk = [...transcription.chunks].reverse().find(c => c.text.trim().length > 0)
+    
+    const speech_start = firstChunk ? Math.max(0, firstChunk.timestamp[0] - 0.1) : 0
+    const speech_end = lastChunk ? Math.min(videoDuration, lastChunk.timestamp[1] + 0.1) : videoDuration
+    
+    // Calcul basique du débit
+    const wordCount = transcription.text.split(/\s+/).filter(w => w.length > 0).length
+    const speechDuration = speech_end - speech_start
+    const wps = speechDuration > 0 ? wordCount / speechDuration : 3.0
+    
+    // Suggestion de vitesse basée sur le débit
+    let suggested_speed = 1.0
+    if (wps < 2.5) suggested_speed = 1.2
+    else if (wps < 3.0) suggested_speed = 1.1
+    else if (wps > 4.5) suggested_speed = 0.8
+    else if (wps > 4.0) suggested_speed = 0.9
+    
+    return {
+      speech_start,
+      speech_end,
+      confidence: 'low',
+      reasoning: 'Fallback to raw Whisper timestamps due to analysis error',
+      words_per_second: Math.round(wps * 10) / 10,
+      suggested_speed,
+    }
+  }
+}

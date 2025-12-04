@@ -244,6 +244,24 @@ export interface ClipAudio {
   final_audio_url?: string;
 }
 
+// ─────────────────────────────────────────────────────────────────
+// TRANSCRIPTION (Whisper)
+// ─────────────────────────────────────────────────────────────────
+export interface WhisperChunk {
+  timestamp: [number, number];  // [start, end] en secondes
+  text: string;
+}
+
+export interface ClipTranscription {
+  text: string;                 // Texte complet transcrit
+  chunks: WhisperChunk[];       // Timestamps mot par mot
+  speech_start?: number;        // Début de la parole détecté (secondes)
+  speech_end?: number;          // Fin de la parole détectée (secondes)
+  confidence?: 'high' | 'medium' | 'low';  // Confiance de l'analyse
+  words_per_second?: number;    // Débit de parole mesuré
+  suggested_speed?: number;     // Vitesse suggérée (0.8 - 1.2)
+}
+
 export interface CampaignClip {
   id: string;
   campaign_id: string;
@@ -253,6 +271,7 @@ export interface CampaignClip {
   script: ClipScript;
   video: ClipVideo;
   audio: ClipAudio;
+  transcription?: ClipTranscription;  // Transcription Whisper avec timestamps
   status: ClipStatus;
   created_at: string;
   updated_at: string;

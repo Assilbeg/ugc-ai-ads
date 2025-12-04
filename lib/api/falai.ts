@@ -345,3 +345,102 @@ export async function generateVideo(
   // Utiliser Veo3.1 avec la qualité choisie
   return generateVideoVeo31(prompt, firstFrameUrl, duration as 4 | 6 | 8, quality)
 }
+
+// ─────────────────────────────────────────────────────────────────
+// WHISPER - Speech to Text avec timestamps mot par mot
+// Docs: https://fal.ai/models/fal-ai/whisper/api
+// ─────────────────────────────────────────────────────────────────
+interface WhisperInput {
+  audio_url: string
+  task?: 'transcribe' | 'translate'
+  language?: string | null    // null = auto-detect
+  chunk_level?: 'none' | 'segment' | 'word'
+  version?: '3'
+  batch_size?: number
+}
+
+interface WhisperChunk {
+  timestamp: [number, number]  // [start, end]
+  text: string
+}
+
+interface WhisperOutput {
+  text: string
+  chunks: WhisperChunk[]
+  inferred_languages: string[]
+}
+
+export interface TranscriptionResult {
+  text: string
+  chunks: WhisperChunk[]
+  speech_start: number   // Début de la parole (premier mot)
+  speech_end: number     // Fin de la parole (dernier mot)
+}
+
+/**
+ * Transcrit l'audio d'une vidéo avec timestamps mot par mot
+ * Utilisé pour détecter automatiquement où commence/finit la parole
+ * et suggérer un trim intelligent
+ * 
+ * @param audioUrl URL de la vidéo ou de l'audio à transcrire
+ * @param language Langue de l'audio (null = auto-detect)
+ * @returns Transcription avec timestamps et détection début/fin parole
+ */
+export async function transcribeAudio(
+  audioUrl: string,
+  language: string | null = null
+): Promise<TranscriptionResult> {
+  const path = 'fal-ai/whisper'
+  
+  const input: WhisperInput = {
+    audio_url: audioUrl,
+    task: 'transcribe',
+    chunk_level: 'word',      // Timestamps mot par mot !
+    language: language,       // null = auto-detect
+    version: '3',             // Whisper Large v3
+    batch_size: 64,
+  }
+
+  console.log('[Whisper] Transcribing audio:', { 
+    url: audioUrl.slice(0, 50) + '...',
+    language: language || 'auto-detect'
+  })
+
+  const queue = await falRequest<FalQueueResponse>({ path, input })
+  const result = await pollUntilCompleteWithUrls<WhisperOutput>(queue.status_url, queue.response_url, 60, 2000)
+  
+  console.log('[Whisper] Transcription done:', {
+    text: result.text.slice(0, 80) + '...',
+    chunks: result.chunks.length,
+    languages: result.inferred_languages
+  })
+
+  // Calculer le début et la fin de la parole avec un petit padding
+  const PADDING = 0.1 // 100ms de marge
+  
+  let speech_start = 0
+  let speech_end = 0
+  
+  if (result.chunks && result.chunks.length > 0) {
+    // Trouver le premier chunk avec du texte non-vide
+    const firstChunk = result.chunks.find(c => c.text.trim().length > 0)
+    // Trouver le dernier chunk avec du texte non-vide
+    const lastChunk = [...result.chunks].reverse().find(c => c.text.trim().length > 0)
+    
+    if (firstChunk) {
+      speech_start = Math.max(0, firstChunk.timestamp[0] - PADDING)
+    }
+    if (lastChunk) {
+      speech_end = lastChunk.timestamp[1] + PADDING
+    }
+  }
+
+  console.log('[Whisper] Speech boundaries:', { speech_start, speech_end })
+
+  return {
+    text: result.text,
+    chunks: result.chunks,
+    speech_start,
+    speech_end,
+  }
+}
