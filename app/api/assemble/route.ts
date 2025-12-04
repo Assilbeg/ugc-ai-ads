@@ -272,8 +272,10 @@ export async function POST(request: NextRequest) {
       importStepNames.push(stepName)
     })
 
-    // Concaténer - VERSION SIMPLE sans paramètres custom FFmpeg
-    // Les vidéos sont déjà traitées par process-clip, on fait juste le concat
+    // Concaténer avec ré-encodage pour normaliser les timestamps
+    // IMPORTANT: Les vidéos IA (Veo) ont des timestamps bizarres qui causent des
+    // pertes de frames au début lors d'un concat stream-copy. On force le ré-encodage.
+    // NOTE: PAS de width/height ici - ça cause des INTERNAL_COMMAND_ERROR
     steps['concatenated'] = {
       robot: '/video/concat',
       use: {
@@ -284,6 +286,15 @@ export async function POST(request: NextRequest) {
       },
       result: true,
       ffmpeg_stack: 'v6.0.0',
+      // Forcer le ré-encodage pour normaliser les timestamps
+      preset: 'ipad-high',
+      // Options FFmpeg pour éviter la perte de frames au début
+      ffmpeg: {
+        'fflags': '+genpts+discardcorrupt',
+        'vsync': 'cfr',
+        'force_key_frames': 'expr:eq(t,0)',
+        'r': 30,
+      }
     }
 
     // Thumbnail
