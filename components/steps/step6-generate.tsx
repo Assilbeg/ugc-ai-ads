@@ -264,15 +264,11 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         
         if (hasTranscription && speechStart !== undefined && speechEnd !== undefined) {
           // Auto-trim basé sur la transcription Whisper
-          // Arrondir à 0.1s près pour une meilleure UX
-          const trimStart = Math.round(speechStart * 10) / 10
-          const trimEnd = Math.min(
-            Math.round(speechEnd * 10) / 10,
-            videoDuration
-          )
+          // Garder la précision max de Whisper (~20-50ms) pour un trim précis
+          const trimStart = Math.max(0, speechStart)
+          const trimEnd = Math.min(speechEnd, videoDuration)
           
-          // Vitesse suggérée basée sur le débit de parole
-          // (0.8, 0.9, 1.0, 1.1 ou 1.2)
+          // Vitesse suggérée basée sur le débit de parole (1.0, 1.1 ou 1.2)
           const suggestedSpeed = transcription.suggested_speed || 1.0
           
           console.log(`[Adjustments] Auto-config clip ${index} based on transcription:`, {
@@ -379,8 +375,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
 
       // Appliquer les ajustements suggérés
       if (result.speech_start !== undefined && result.speech_end !== undefined) {
-        const trimStart = Math.round(result.speech_start * 10) / 10
-        const trimEnd = Math.min(Math.round(result.speech_end * 10) / 10, clip.video.duration)
+        // Garder la précision max de Whisper pour un trim précis
+        const trimStart = Math.max(0, result.speech_start)
+        const trimEnd = Math.min(result.speech_end, clip.video.duration)
         const speed = result.suggested_speed || 1.0
 
         setAdjustments(prev => ({
@@ -1402,7 +1399,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                               <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                                 <span>Trim</span>
                                 <span>
-                                  {adjustments[index]?.trimStart?.toFixed(1) || '0.0'}s → {adjustments[index]?.trimEnd?.toFixed(1) || clip.video.duration}s
+                                  {adjustments[index]?.trimStart?.toFixed(2) || '0.00'}s → {adjustments[index]?.trimEnd?.toFixed(2) || clip.video.duration.toFixed(2)}s
                                 </span>
                               </div>
                               <Slider
@@ -1412,7 +1409,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                 ]}
                                 min={0}
                                 max={clip.video.duration}
-                                step={0.1}
+                                step={0.01}
                                 onValueChange={([start, end]) => {
                                   updateAdjustment(index, { trimStart: start, trimEnd: end })
                                 }}
@@ -1474,7 +1471,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                   adjustments[index].trimStart,
                                   adjustments[index].trimEnd,
                                   adjustments[index].speed
-                                ).toFixed(1)}s
+                                ).toFixed(2)}s
                               </div>
                             )}
                             
@@ -1627,7 +1624,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           {previewingClip !== null && adjustments[previewingClip] && (
             <div className="absolute top-4 left-4 bg-black/70 backdrop-blur-sm rounded-xl px-4 py-2 text-white text-sm">
               <div className="flex items-center gap-4">
-                <span>⏱ {adjustments[previewingClip].trimStart?.toFixed(1)}s → {adjustments[previewingClip].trimEnd?.toFixed(1)}s</span>
+                <span>⏱ {adjustments[previewingClip].trimStart?.toFixed(2)}s → {adjustments[previewingClip].trimEnd?.toFixed(2)}s</span>
                 <span>⚡ {adjustments[previewingClip].speed}x</span>
               </div>
             </div>
