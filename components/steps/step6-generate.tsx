@@ -1132,14 +1132,14 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           }
           updatedClipsWithIds.push(clip)
         } else {
-          // PRIORITÉ 2: Chercher si le clip existe par campaign_id + order (seulement le sélectionné)
-          // Utiliser .limit(1) au lieu de .single() pour gérer plusieurs versions
+          // PRIORITÉ 2: Chercher si le clip existe par campaign_id + order
+          // Prioriser is_selected=true, sinon prendre le premier clip trouvé
           const { data: existingList } = await (supabase
             .from('campaign_clips') as any)
             .select('id')
             .eq('campaign_id', dbCampaignId)
             .eq('order', clip.order)
-            .eq('is_selected', true)  // Chercher seulement le clip sélectionné
+            .order('is_selected', { ascending: false, nullsFirst: false })  // true first
             .limit(1)
 
           const existingClip = existingList?.[0]

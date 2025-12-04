@@ -730,13 +730,13 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
         if (hasValidId) {
           existingClipId = clip.id
         } else {
-          // Utiliser .limit(1) au lieu de .single() pour gérer plusieurs versions
+          // Chercher par campaign_id + order - prioriser is_selected=true, sinon prendre le premier
           const { data: foundList } = await (supabase
             .from('campaign_clips') as any)
-            .select('id, video')
+            .select('id, video, is_selected')
             .eq('campaign_id', state.campaign_id)
             .eq('order', clip.order)
-            .eq('is_selected', true)  // Chercher seulement le clip sélectionné
+            .order('is_selected', { ascending: false, nullsFirst: false })  // true first
             .limit(1)
           
           const found = foundList?.[0]

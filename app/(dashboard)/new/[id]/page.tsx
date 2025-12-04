@@ -134,22 +134,25 @@ export default function ExistingCampaignPage() {
           // Pas de clips générés → step 5
           step = 5
         } else {
-          // On a des clips - vérifier s'ils ont des vidéos générées
-          // Checker raw_url OU final_url (après mixage)
+          // On a des clips - vérifier s'ils ont des vidéos OU des first frames générées
           const hasGeneratedVideos = clips.some((c: any) => c.video?.raw_url || c.video?.final_url)
+          const hasFirstFrames = clips.some((c: any) => c.first_frame?.image_url)
           
           console.log('[/new/[id]] Step detection:', {
             hasGeneratedVideos,
+            hasFirstFrames,
             campaignStatus: campaign.status,
             clipsCount: clips.length,
             clipsWithVideo: clips.filter((c: any) => c.video?.raw_url || c.video?.final_url).length,
+            clipsWithFirstFrame: clips.filter((c: any) => c.first_frame?.image_url).length,
           })
           
           // Aller à step 6 si :
           // - Des vidéos ont été générées
+          // - OU des first frames ont été générées (on est passé par step 5)
           // - OU la campagne est en cours de génération/assemblage
-          // - OU la campagne est terminée
-          if (hasGeneratedVideos || campaign.status === 'completed' || campaign.status === 'generating') {
+          // - OU la campagne est terminée ou en échec (pour reprendre)
+          if (hasGeneratedVideos || hasFirstFrames || campaign.status === 'completed' || campaign.status === 'generating' || campaign.status === 'failed') {
             step = 6
           } else {
             step = 5
