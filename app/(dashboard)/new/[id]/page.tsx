@@ -78,41 +78,44 @@ export default function ExistingCampaignPage() {
           return
         }
 
-      // Charger les clips associés
-      // IMPORTANT: Filtrer par is_selected=true pour ne garder qu'UN clip par beat
-      // (le système de versioning crée plusieurs clips par beat)
+      // Charger TOUS les clips associés (y compris les versions non-sélectionnées)
+      // Le système de versioning crée plusieurs clips par beat - on les garde TOUS
+      // pour permettre la navigation entre versions avec les flèches
       const { data: allClips, error: clipsError } = await (supabase
         .from('campaign_clips') as any)
         .select('*')
         .eq('campaign_id', campaignId)
         .order('order', { ascending: true })
-        .order('created_at', { ascending: false })
+        .order('is_selected', { ascending: false }) // is_selected = true en premier
+        .order('created_at', { ascending: false }) // Plus récents d'abord
       
-      // Filtrer pour ne garder qu'UN clip par beat (order)
-      // Priorité: is_selected=true, sinon le plus récent
-      const clipsByBeat = new Map<number, any>()
-      allClips?.forEach((clip: any) => {
-        const existing = clipsByBeat.get(clip.order)
-        if (!existing) {
-          clipsByBeat.set(clip.order, clip)
-        } else if (clip.is_selected && !existing.is_selected) {
-          // Prendre le clip sélectionné plutôt que le non-sélectionné
-          clipsByBeat.set(clip.order, clip)
-        }
-        // Sinon garder le premier (qui est le plus récent grâce à l'ordre)
+      // Garder TOUS les clips - step6 gère le groupement par beat (clipsByBeat)
+      // et affiche les flèches de navigation quand il y a plusieurs versions
+      const clips = (allClips || []).sort((a: any, b: any) => {
+        if (a.order !== b.order) return a.order - b.order
+        // Pour le même beat, le sélectionné en premier
+        if (a.is_selected && !b.is_selected) return -1
+        if (!a.is_selected && b.is_selected) return 1
+        // Sinon par date de création (plus récent en premier)
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       })
-      const clips = Array.from(clipsByBeat.values()).sort((a, b) => a.order - b.order)
 
       if (clipsError) {
         console.error('[/new/[id]] Erreur chargement clips:', clipsError)
       }
       
+      // Pour les stats, compter les clips SELECTIONNÉS (un par beat)
+      const selectedClips = clips?.filter((c: any) => c.is_selected) || []
+      const nonSelectedClips = clips?.filter((c: any) => !c.is_selected) || []
+      
       console.log('[/new/[id]] Clips chargés depuis DB:', {
-        count: clips?.length || 0,
+        totalClips: clips?.length || 0,
+        selectedClips: selectedClips.length,
+        nonSelectedVersions: nonSelectedClips.length,
         hasError: !!clipsError,
-        hasFirstFrames: clips?.filter((c: any) => c.first_frame?.image_url).length || 0,
-        hasRawVideos: clips?.filter((c: any) => c.video?.raw_url).length || 0,
-        hasFinalVideos: clips?.filter((c: any) => c.video?.final_url).length || 0,
+        hasFirstFrames: selectedClips.filter((c: any) => c.first_frame?.image_url).length,
+        hasRawVideos: selectedClips.filter((c: any) => c.video?.raw_url).length,
+        hasFinalVideos: selectedClips.filter((c: any) => c.video?.final_url).length,
         campaignStatus: campaign.status,
       })
 
@@ -124,27 +127,29 @@ export default function ExistingCampaignPage() {
         const briefData = campaign.brief || {}
 
         // Déterminer l'étape en fonction de ce qui est rempli
+        // Note: utiliser selectedClips pour les vérifications (pas toutes les versions)
         if (!presetId) {
           // Pas de preset → step 3 (ou 2 si pas de product choice fait)
           step = 2
         } else if (!(briefData as any).what_selling) {
           // Pas de brief → step 4
           step = 4
-        } else if (!clips || clips.length === 0) {
+        } else if (selectedClips.length === 0) {
           // Pas de clips générés → step 5
           step = 5
         } else {
           // On a des clips - vérifier s'ils ont des vidéos OU des first frames générées
-          const hasGeneratedVideos = clips.some((c: any) => c.video?.raw_url || c.video?.final_url)
-          const hasFirstFrames = clips.some((c: any) => c.first_frame?.image_url)
+          const hasGeneratedVideos = selectedClips.some((c: any) => c.video?.raw_url || c.video?.final_url)
+          const hasFirstFrames = selectedClips.some((c: any) => c.first_frame?.image_url)
           
           console.log('[/new/[id]] Step detection:', {
             hasGeneratedVideos,
             hasFirstFrames,
             campaignStatus: campaign.status,
-            clipsCount: clips.length,
-            clipsWithVideo: clips.filter((c: any) => c.video?.raw_url || c.video?.final_url).length,
-            clipsWithFirstFrame: clips.filter((c: any) => c.first_frame?.image_url).length,
+            selectedClipsCount: selectedClips.length,
+            totalVersionsCount: clips.length,
+            clipsWithVideo: selectedClips.filter((c: any) => c.video?.raw_url || c.video?.final_url).length,
+            clipsWithFirstFrame: selectedClips.filter((c: any) => c.first_frame?.image_url).length,
           })
           
           // Aller à step 6 si :

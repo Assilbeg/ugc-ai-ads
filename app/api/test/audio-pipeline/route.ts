@@ -76,7 +76,8 @@ export async function POST(request: NextRequest) {
     const s2sStart = Date.now()
     try {
       console.log('[Test Pipeline] Step 1: Speech-to-Speech...')
-      transformedVoiceUrl = await speechToSpeech(sourceAudioUrl, targetVoiceUrl)
+      const s2sResult = await speechToSpeech(sourceAudioUrl, targetVoiceUrl)
+      transformedVoiceUrl = s2sResult.result
       timing.speechToSpeech = Date.now() - s2sStart
       console.log('[Test Pipeline] ✓ Speech-to-Speech done:', transformedVoiceUrl?.slice(0, 50))
     } catch (err) {
@@ -91,7 +92,8 @@ export async function POST(request: NextRequest) {
     const ambientStart = Date.now()
     try {
       console.log('[Test Pipeline] Step 2: Generating ambient audio...')
-      ambientUrl = await generateAmbientAudio(ambientPrompt, ambientDuration)
+      const ambientResult = await generateAmbientAudio(ambientPrompt, ambientDuration)
+      ambientUrl = ambientResult.result
       timing.ambient = Date.now() - ambientStart
       console.log('[Test Pipeline] ✓ Ambient audio done:', ambientUrl?.slice(0, 50))
     } catch (err) {

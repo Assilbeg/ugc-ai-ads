@@ -192,11 +192,15 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   
   // Resynchroniser generatedClips quand state.generated_clips change
   // (ex: quand on revient de step5 avec des first frames modifiées)
+  // Note: On fusionne par ID et beat, PAS par index (car on a plusieurs versions par beat)
   useEffect(() => {
     if (clips.length > 0) {
-      // Fusionner les nouvelles données (first frames) avec les vidéos générées existantes
-      const mergedClips = clips.map((clip, index) => {
-        const existingGenerated = generatedClips[index]
+      // Créer une map des clips existants par ID pour une fusion rapide
+      const existingById = new Map(generatedClips.map(c => [c.id, c]))
+      
+      // Fusionner les nouvelles données avec les vidéos générées existantes
+      const mergedClips = clips.map(clip => {
+        const existingGenerated = existingById.get(clip.id)
         // Si on a une vidéo générée (raw_url OU final_url), garder les données de génération
         // mais mettre à jour la first frame si elle a changé
         if (existingGenerated?.video?.raw_url || existingGenerated?.video?.final_url) {
@@ -209,16 +213,21 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         return clip
       })
       
-      // Ne mettre à jour que si quelque chose a changé
-      const hasChanges = mergedClips.some((clip, index) => {
-        const existing = generatedClips[index]
-        return !existing || 
-               clip.first_frame?.image_url !== existing.first_frame?.image_url ||
-               clip.script?.text !== existing.script?.text
-      })
+      // Ne mettre à jour que si quelque chose a changé (comparer les IDs et les données clés)
+      const hasChanges = mergedClips.length !== generatedClips.length || 
+        mergedClips.some(clip => {
+          const existing = existingById.get(clip.id)
+          return !existing || 
+                 clip.first_frame?.image_url !== existing.first_frame?.image_url ||
+                 clip.script?.text !== existing.script?.text
+        })
       
       if (hasChanges) {
-        console.log('[Step6] Resync clips from state:', mergedClips.length, 'clips')
+        console.log('[Step6] Resync clips from state:', {
+          total: mergedClips.length,
+          selected: mergedClips.filter(c => c.is_selected).length,
+          versions: mergedClips.filter(c => !c.is_selected).length
+        })
         setGeneratedClips(mergedClips)
       }
     }
