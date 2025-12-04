@@ -236,7 +236,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   } | null>(null)
   
   // Qualité vidéo sélectionnée
-  const [videoQuality, setVideoQuality] = useState<VideoQuality>('standard')
+  const [videoQuality, setVideoQuality] = useState<VideoQuality>('fast')
   
   // Analyse de clips (transcription + auto-trim)
   const [analyzingClips, setAnalyzingClips] = useState<Set<number>>(new Set())
