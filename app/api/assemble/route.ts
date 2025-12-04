@@ -272,7 +272,7 @@ export async function POST(request: NextRequest) {
       importStepNames.push(stepName)
     })
 
-    // Concaténer avec ré-encodage pour normaliser les timestamps
+    // ÉTAPE 1: Concaténer avec ré-encodage pour normaliser les timestamps
     // IMPORTANT: Les vidéos IA (Veo) ont des timestamps bizarres qui causent des
     // pertes de frames au début lors d'un concat stream-copy. On force le ré-encodage.
     // NOTE: PAS de width/height ici - ça cause des INTERNAL_COMMAND_ERROR
@@ -284,7 +284,6 @@ export async function POST(request: NextRequest) {
           as: `video_${index + 1}`
         }))
       },
-      result: true,
       ffmpeg_stack: 'v6.0.0',
       // Forcer le ré-encodage pour normaliser les timestamps
       preset: 'ipad-high',
@@ -297,10 +296,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Thumbnail
+    // ÉTAPE 2: Forcer format 9:16 (1080x1920) avec /video/encode
+    // Séparé du concat pour éviter les erreurs INTERNAL_COMMAND_ERROR
+    steps['final'] = {
+      robot: '/video/encode',
+      use: 'concatenated',
+      result: true,
+      ffmpeg_stack: 'v6.0.0',
+      preset: 'empty',  // Custom FFmpeg params
+      ffmpeg: {
+        // Scale + crop pour forcer 9:16 sans bandes noires
+        // 1. Scale pour que la plus petite dimension couvre la cible
+        // 2. Crop au centre pour exactement 1080x1920
+        'vf': 'scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920',
+        'c:v': 'libx264',
+        'preset': 'fast',
+        'crf': '23',
+        'c:a': 'copy',  // On ne touche pas à l'audio
+        'movflags': '+faststart',
+      }
+    }
+
+    // Thumbnail (basé sur la vidéo finale en 9:16)
     steps['thumbnail'] = {
       robot: '/video/thumbs',
-      use: 'concatenated',
+      use: 'final',
       result: true,
       count: 1,
       offsets: [0],
@@ -336,7 +356,7 @@ export async function POST(request: NextRequest) {
     // ════════════════════════════════════════════════════════════════
     // ÉTAPE 4: RÉCUPÉRATION DES RÉSULTATS
     // ════════════════════════════════════════════════════════════════
-    const videoUrl = result.results?.concatenated?.[0]?.ssl_url
+    const videoUrl = result.results?.final?.[0]?.ssl_url
     const thumbnailUrl = result.results?.thumbnail?.[0]?.ssl_url
 
     if (!videoUrl) {
