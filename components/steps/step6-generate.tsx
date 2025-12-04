@@ -484,9 +484,10 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           const speed = adj?.speed ?? 1.0
           const trimmedDuration = trimEnd - trimStart
           const duration = trimmedDuration / speed
-          // Ne traiter que si vraiment nécessaire (trim ou speed modifié)
-          // Évite le ré-encodage inutile qui peut couper des frames au début
-          const needsProcessing = trimStart > 0 || trimEnd < originalDuration || speed !== 1.0
+          // TOUJOURS traiter avec Transloadit pour normaliser les timestamps
+          // Les vidéos Veo ont des timestamps décalés qui causent des pertes de frames
+          // lors du concat si on ne les normalise pas d'abord
+          const needsProcessing = true
           
           return {
             clip,
@@ -501,8 +502,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           }
         })
       
-      // Pré-traiter SEULEMENT les clips qui ont des ajustements (trim ou speed ≠ 1.0)
-      // Les clips sans ajustements gardent leur URL originale pour éviter un ré-encodage inutile
+      // Pré-traiter TOUS les clips pour normaliser les timestamps
+      // Les vidéos Veo ont des timestamps décalés qui causent des pertes de frames au concat
       const clipsNeedingProcessing = clipsData.filter(c => c.needsProcessing)
       
       console.log('[Assemble] Processing', clipsData.length, 'clips')

@@ -95,7 +95,9 @@ export async function POST(request: NextRequest) {
     audioFilters.push('asetpts=PTS-STARTPTS')
     
     // ÉTAPE 2 : Gestion du trim (maintenant les timestamps sont normalisés)
-    const hasTrim = hasTrimStart || hasTrimEnd
+    // IMPORTANT: TOUJOURS ajouter un trim explicite pour forcer FFmpeg à garder
+    // toutes les frames depuis le début. Les vidéos Veo peuvent avoir des frames
+    // "cachées" avant le PTS 0 qui causent des problèmes.
     if (hasTrimStart && hasTrimEnd) {
       videoFilters.push(`trim=start=${trimStart}:end=${effectiveTrimEnd}`)
       audioFilters.push(`atrim=start=${trimStart}:end=${effectiveTrimEnd}`)
@@ -103,17 +105,19 @@ export async function POST(request: NextRequest) {
       videoFilters.push(`trim=start=${trimStart}`)
       audioFilters.push(`atrim=start=${trimStart}`)
     } else if (hasTrimEnd) {
-      videoFilters.push(`trim=end=${effectiveTrimEnd}`)
-      audioFilters.push(`atrim=end=${effectiveTrimEnd}`)
+      // Ajouter start=0 explicite pour forcer le démarrage à 0
+      videoFilters.push(`trim=start=0:end=${effectiveTrimEnd}`)
+      audioFilters.push(`atrim=start=0:end=${effectiveTrimEnd}`)
+    } else {
+      // Pas de trim demandé, mais on force quand même start=0 pour les vidéos Veo
+      videoFilters.push('trim=start=0')
+      audioFilters.push('atrim=start=0')
     }
     
-    // ÉTAPE 2.5 : CRITIQUE - Normaliser APRÈS le trim et AVANT le speed
-    // Sans ça, le calcul de vitesse est faussé car on multiplie des timestamps
-    // qui ne commencent pas à 0 (ex: trim start=2s → timestamps de 2s à 5s)
-    if (hasTrim) {
-      videoFilters.push('setpts=PTS-STARTPTS')
-      audioFilters.push('asetpts=PTS-STARTPTS')
-    }
+    // ÉTAPE 2.5 : TOUJOURS normaliser APRÈS le trim et AVANT le speed
+    // C'est nécessaire même sans trim car les timestamps après trim peuvent être décalés
+    videoFilters.push('setpts=PTS-STARTPTS')
+    audioFilters.push('asetpts=PTS-STARTPTS')
     
     // ÉTAPE 3 : Speed via setpts (video) et atempo (audio)
     // Maintenant les timestamps commencent à 0, donc le calcul est correct
