@@ -276,74 +276,79 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   // Initialiser les ajustements quand les clips changent
   // LOGIQUE V2: user_adjustments > auto_adjustments (si timestamp plus récent)
   // IMPORTANT: Utiliser clip.order comme clé (pas l'index) pour éviter les décalages
+  // NOTE: Ne PAS inclure 'adjustments' dans les dépendances pour éviter boucle infinie
   useEffect(() => {
-    const newAdjustments: Record<number, ClipAdjustments> = {}
     const clipsToUse = generatedClips.length > 0 ? generatedClips : clips
-    clipsToUse.forEach((clip) => {
-      const clipOrder = clip.order
-      if (!clipOrder) return
+    
+    // Utiliser setAdjustments avec prev pour éviter la dépendance sur adjustments
+    setAdjustments(prev => {
+      const newAdjustments: Record<number, ClipAdjustments> = { ...prev }
+      let hasChanges = false
       
-      // Utiliser la durée de la vidéo générée si disponible
-      const videoDuration = clip?.video?.duration
-      if (!videoDuration) return
-      
-      // ═══════════════════════════════════════════════════════════════
-      // V2: Utiliser getEffectiveAdjustments pour déterminer la source
-      // Priorité: user_adjustments (si plus récent) > auto_adjustments > default
-      // ═══════════════════════════════════════════════════════════════
-      const effective = getEffectiveAdjustments(
-        clip.auto_adjustments,
-        clip.user_adjustments,
-        videoDuration
-      )
-      
-      // Vérifier si les ajustements ont changé
-      const current = adjustments[clipOrder]
-      const hasChanged = !current || 
-        current.trimStart !== effective.trimStart ||
-        current.trimEnd !== effective.trimEnd ||
-        current.speed !== effective.speed
-      
-      if (hasChanged) {
-        console.log(`[Adjustments] ✓ Loading ${effective.source} adjustments for clip order=${clipOrder}:`, {
-          trimStart: effective.trimStart,
-          trimEnd: effective.trimEnd,
-          speed: effective.speed,
-        })
-        newAdjustments[clipOrder] = {
-          trimStart: effective.trimStart,
-          trimEnd: effective.trimEnd,
-          speed: ensureMinSpeed(effective.speed),
-        }
-      }
-      
-      // ═══════════════════════════════════════════════════════════════
-      // FALLBACK LEGACY: Si pas de V2 mais ancien adjustments existe
-      // ═══════════════════════════════════════════════════════════════
-      if (!clip.auto_adjustments && !clip.user_adjustments && clip.adjustments) {
-        const clipAdjustments: ClipAdjustments = {
-          trimStart: clip.adjustments.trimStart,
-          trimEnd: clip.adjustments.trimEnd,
-          speed: ensureMinSpeed(clip.adjustments.speed || 1.0),
-          processedUrl: clip.adjustments.processedUrl,
+      clipsToUse.forEach((clip) => {
+        const clipOrder = clip.order
+        if (!clipOrder) return
+        
+        // Utiliser la durée de la vidéo générée si disponible
+        const videoDuration = clip?.video?.duration
+        if (!videoDuration) return
+        
+        // ═══════════════════════════════════════════════════════════════
+        // V2: Utiliser getEffectiveAdjustments pour déterminer la source
+        // Priorité: user_adjustments (si plus récent) > auto_adjustments > default
+        // ═══════════════════════════════════════════════════════════════
+        const effective = getEffectiveAdjustments(
+          clip.auto_adjustments,
+          clip.user_adjustments,
+          videoDuration
+        )
+        
+        // Vérifier si les ajustements ont changé
+        const current = prev[clipOrder]
+        const hasChanged = !current || 
+          current.trimStart !== effective.trimStart ||
+          current.trimEnd !== effective.trimEnd ||
+          current.speed !== effective.speed
+        
+        if (hasChanged) {
+          console.log(`[Adjustments] ✓ Loading ${effective.source} adjustments for clip order=${clipOrder}`)
+          newAdjustments[clipOrder] = {
+            trimStart: effective.trimStart,
+            trimEnd: effective.trimEnd,
+            speed: ensureMinSpeed(effective.speed),
+          }
+          hasChanges = true
         }
         
-        const currentLegacy = adjustments[clipOrder]
-        const hasChangedLegacy = !currentLegacy || 
-          currentLegacy.trimStart !== clipAdjustments.trimStart ||
-          currentLegacy.trimEnd !== clipAdjustments.trimEnd ||
-          currentLegacy.speed !== clipAdjustments.speed
-        
-        if (hasChangedLegacy) {
-          console.log(`[Adjustments] ✓ Loading LEGACY adjustments for clip order=${clipOrder}`)
-          newAdjustments[clipOrder] = clipAdjustments
+        // ═══════════════════════════════════════════════════════════════
+        // FALLBACK LEGACY: Si pas de V2 mais ancien adjustments existe
+        // ═══════════════════════════════════════════════════════════════
+        if (!clip.auto_adjustments && !clip.user_adjustments && clip.adjustments) {
+          const clipAdjustments: ClipAdjustments = {
+            trimStart: clip.adjustments.trimStart,
+            trimEnd: clip.adjustments.trimEnd,
+            speed: ensureMinSpeed(clip.adjustments.speed || 1.0),
+            processedUrl: clip.adjustments.processedUrl,
+          }
+          
+          const currentLegacy = prev[clipOrder]
+          const hasChangedLegacy = !currentLegacy || 
+            currentLegacy.trimStart !== clipAdjustments.trimStart ||
+            currentLegacy.trimEnd !== clipAdjustments.trimEnd ||
+            currentLegacy.speed !== clipAdjustments.speed
+          
+          if (hasChangedLegacy) {
+            console.log(`[Adjustments] ✓ Loading LEGACY adjustments for clip order=${clipOrder}`)
+            newAdjustments[clipOrder] = clipAdjustments
+            hasChanges = true
+          }
         }
-      }
+      })
+      
+      // Ne retourner un nouvel objet que si quelque chose a changé
+      return hasChanges ? newAdjustments : prev
     })
-    if (Object.keys(newAdjustments).length > 0) {
-      setAdjustments(prev => ({ ...prev, ...newAdjustments }))
-    }
-  }, [clips.length, generatedClips, adjustments])
+  }, [clips.length, generatedClips]) // Retiré 'adjustments' des dépendances
 
   // Sauvegarder un ajustement LEGACY en BDD (pour compatibilité)
   const saveAdjustmentToDb = useCallback(async (clipId: string, adjustment: ClipAdjustments) => {
