@@ -90,10 +90,10 @@ export async function POST(request: NextRequest) {
       importStepNames.push(stepName)
     })
 
-    // 2. Concaténer toutes les vidéos SANS ré-encodage agressif
+    // 2. Concaténer toutes les vidéos avec ré-encodage pour normaliser les timestamps
     // Doc: https://transloadit.com/docs/robots/video-concat/
-    // IMPORTANT: On NE spécifie PAS width/height/resize pour éviter le ré-encodage
-    // qui peut couper des frames au début. Les vidéos sont déjà en 9:16.
+    // IMPORTANT: Les vidéos IA (Veo) ont des timestamps bizarres qui causent des
+    // pertes de frames au début lors d'un concat stream-copy. On force le ré-encodage.
     steps['concatenated'] = {
       robot: '/video/concat',
       use: {
@@ -104,8 +104,15 @@ export async function POST(request: NextRequest) {
       },
       result: true,
       ffmpeg_stack: 'v6.0.0',
-      // Pas de preset = concat stream copy (plus rapide, pas de perte)
-      // Si les codecs sont compatibles, Transloadit fera un concat sans ré-encodage
+      // Forcer le ré-encodage pour normaliser les timestamps
+      preset: 'ipad-high',
+      // Options FFmpeg pour éviter la perte de frames au début
+      ffmpeg: {
+        'fflags': '+genpts+discardcorrupt',
+        'vsync': 'cfr',
+        'force_key_frames': 'expr:eq(t,0)',
+        'r': 30,
+      }
     }
 
     // 3. Générer une thumbnail
