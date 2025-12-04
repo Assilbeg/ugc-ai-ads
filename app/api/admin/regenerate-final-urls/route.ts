@@ -35,17 +35,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
     
-    // Trouver les clips avec raw_url mais sans final_url
-    // Utiliser SQL brut car les filtres JSONB Supabase ne fonctionnent pas bien
+    // Trouver tous les clips
     const { data: clips, error } = await supabase
       .from('campaign_clips')
-      .select('id, campaign_id, beat, order, video, audio, status')
-      .eq('status', 'completed') as { data: any[] | null; error: any }
+      .select('id, campaign_id, beat, order, video, audio, status') as { data: any[] | null; error: any }
+    
+    // Debug: log total clips
+    console.log(`[Admin] Total clips: ${clips?.length || 0}`)
     
     // Filtrer manuellement les clips avec raw_url mais sans final_url
-    const filteredClips = (clips || []).filter((clip: any) => 
-      clip.video?.raw_url && !clip.video?.final_url
-    )
+    const filteredClips = (clips || []).filter((clip: any) => {
+      const hasRaw = !!clip.video?.raw_url
+      const hasFinal = !!clip.video?.final_url
+      if (hasRaw && !hasFinal) {
+        console.log(`[Admin] Clip ${clip.id} needs regeneration: raw=${hasRaw}, final=${hasFinal}`)
+      }
+      return hasRaw && !hasFinal
+    })
     
     if (error) {
       console.error('[Admin] Error fetching clips:', error)
@@ -94,11 +100,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}))
     const singleClipId = body.clipId
     
-    // Trouver les clips avec raw_url mais sans final_url
+    // Trouver tous les clips
     let query = supabase
       .from('campaign_clips')
       .select('id, campaign_id, beat, order, video, audio, status')
-      .eq('status', 'completed')
     
     if (singleClipId) {
       query = query.eq('id', singleClipId)
@@ -111,10 +116,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
     
+    console.log(`[Admin POST] Total clips: ${allClips?.length || 0}`)
+    
     // Filtrer manuellement les clips avec raw_url mais sans final_url
     const clips = (allClips || []).filter((clip: any) => 
       clip.video?.raw_url && !clip.video?.final_url
     )
+    
+    console.log(`[Admin POST] Clips to regenerate: ${clips.length}`)
     
     if (clips.length === 0) {
       return NextResponse.json({ 
