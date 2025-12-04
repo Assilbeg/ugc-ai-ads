@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { NewCampaignState, CampaignClip, ClipStatus, ClipAdjustments, ClipVersionAction, ClipVersion } from '@/types'
+import { NewCampaignState, CampaignClip, ClipStatus, ClipAdjustments, ClipVersionAction, ClipVersion, AutoAdjustments, UserAdjustments, getEffectiveAdjustments } from '@/types'
 import { useVideoGeneration, RegenerateWhat, VideoQuality, GenerationProgress } from '@/hooks/use-video-generation'
 import { useCredits } from '@/hooks/use-credits'
 import { triggerCreditsRefresh } from '@/components/credits-display'
@@ -179,9 +179,15 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   // Vérifier si des vidéos ont déjà été générées (clips avec raw_url OU final_url)
   const hasExistingVideos = clips.some(c => c.video?.raw_url || c.video?.final_url)
   
-  // Initialiser avec les clips existants s'ils ont des vidéos
+  // La campagne est déjà "started" si elle a un status qui indique une génération passée
+  const campaignAlreadyStarted = state.campaign_status === 'completed' || 
+                                  state.campaign_status === 'generating' || 
+                                  state.campaign_status === 'assembling' ||
+                                  state.campaign_status === 'failed'
+  
+  // Initialiser avec les clips existants s'ils ont des vidéos OU si la campagne est déjà complétée
   const [generatedClips, setGeneratedClips] = useState<CampaignClip[]>(() => {
-    return hasExistingVideos ? clips : []
+    return (hasExistingVideos || campaignAlreadyStarted) ? clips : []
   })
   
   // Resynchroniser generatedClips quand state.generated_clips change
@@ -191,9 +197,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       // Fusionner les nouvelles données (first frames) avec les vidéos générées existantes
       const mergedClips = clips.map((clip, index) => {
         const existingGenerated = generatedClips[index]
-        // Si on a une vidéo générée, garder les données de génération
+        // Si on a une vidéo générée (raw_url OU final_url), garder les données de génération
         // mais mettre à jour la first frame si elle a changé
-        if (existingGenerated?.video?.raw_url) {
+        if (existingGenerated?.video?.raw_url || existingGenerated?.video?.final_url) {
           return {
             ...existingGenerated,
             first_frame: clip.first_frame, // Toujours prendre la first frame la plus récente
@@ -218,7 +224,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     }
   }, [clips])
   const [campaignId, setCampaignId] = useState<string | null>(state.campaign_id || null)
-  const [started, setStarted] = useState(hasExistingVideos) // Déjà "started" si on a des vidéos
+  const [started, setStarted] = useState(hasExistingVideos || campaignAlreadyStarted) // Déjà "started" si on a des vidéos OU si la campagne est completed/generating
   const [fullscreenVideo, setFullscreenVideo] = useState<string | null>(null)
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   
@@ -248,7 +254,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   const [checkingCredits, setCheckingCredits] = useState(false)
 
   // Initialiser les ajustements quand les clips changent
-  // PRIORITÉ: 1) Ajustements sauvegardés en BDD 2) Transcription Whisper 3) Valeurs par défaut
+  // LOGIQUE V2: user_adjustments > auto_adjustments (si timestamp plus récent)
   // IMPORTANT: Utiliser clip.order comme clé (pas l'index) pour éviter les décalages
   useEffect(() => {
     const newAdjustments: Record<number, ClipAdjustments> = {}
@@ -259,68 +265,67 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       
       // Utiliser la durée de la vidéo générée si disponible
       const videoDuration = clip?.video?.duration
-      if (!adjustments[clipOrder] && videoDuration) {
-        
-        // ═══════════════════════════════════════════════════════════════
-        // PRIORITÉ 1: Utiliser les ajustements déjà sauvegardés en BDD
-        // C'est le cas normal quand on revient sur une campagne existante
-        // ═══════════════════════════════════════════════════════════════
-        if (clip.adjustments?.trimStart !== undefined && clip.adjustments?.trimEnd !== undefined) {
-          console.log(`[Adjustments] ✓ Loading saved adjustments for clip order=${clipOrder}:`, clip.adjustments)
-          newAdjustments[clipOrder] = {
-            trimStart: clip.adjustments.trimStart,
-            trimEnd: clip.adjustments.trimEnd,
-            speed: ensureMinSpeed(clip.adjustments.speed || 1.0),
-            processedUrl: clip.adjustments.processedUrl,
-          }
-          return
+      if (!videoDuration) return
+      
+      // ═══════════════════════════════════════════════════════════════
+      // V2: Utiliser getEffectiveAdjustments pour déterminer la source
+      // Priorité: user_adjustments (si plus récent) > auto_adjustments > default
+      // ═══════════════════════════════════════════════════════════════
+      const effective = getEffectiveAdjustments(
+        clip.auto_adjustments,
+        clip.user_adjustments,
+        videoDuration
+      )
+      
+      // Vérifier si les ajustements ont changé
+      const current = adjustments[clipOrder]
+      const hasChanged = !current || 
+        current.trimStart !== effective.trimStart ||
+        current.trimEnd !== effective.trimEnd ||
+        current.speed !== effective.speed
+      
+      if (hasChanged) {
+        console.log(`[Adjustments] ✓ Loading ${effective.source} adjustments for clip order=${clipOrder}:`, {
+          trimStart: effective.trimStart,
+          trimEnd: effective.trimEnd,
+          speed: effective.speed,
+        })
+        newAdjustments[clipOrder] = {
+          trimStart: effective.trimStart,
+          trimEnd: effective.trimEnd,
+          speed: ensureMinSpeed(effective.speed),
+        }
+      }
+      
+      // ═══════════════════════════════════════════════════════════════
+      // FALLBACK LEGACY: Si pas de V2 mais ancien adjustments existe
+      // ═══════════════════════════════════════════════════════════════
+      if (!clip.auto_adjustments && !clip.user_adjustments && clip.adjustments) {
+        const clipAdjustments: ClipAdjustments = {
+          trimStart: clip.adjustments.trimStart,
+          trimEnd: clip.adjustments.trimEnd,
+          speed: ensureMinSpeed(clip.adjustments.speed || 1.0),
+          processedUrl: clip.adjustments.processedUrl,
         }
         
-        // ═══════════════════════════════════════════════════════════════
-        // PRIORITÉ 2: Calculer depuis la transcription Whisper
-        // C'est le cas lors de la première génération
-        // ═══════════════════════════════════════════════════════════════
-        const transcription = clip?.transcription
-        const speechStart = transcription?.speech_start
-        const speechEnd = transcription?.speech_end
-        const hasTranscription = transcription && 
-          typeof speechStart === 'number' && 
-          typeof speechEnd === 'number' &&
-          speechEnd > speechStart
+        const currentLegacy = adjustments[clipOrder]
+        const hasChangedLegacy = !currentLegacy || 
+          currentLegacy.trimStart !== clipAdjustments.trimStart ||
+          currentLegacy.trimEnd !== clipAdjustments.trimEnd ||
+          currentLegacy.speed !== clipAdjustments.speed
         
-        if (hasTranscription && speechStart !== undefined && speechEnd !== undefined) {
-          // Auto-trim basé sur la transcription Whisper
-          const trimStart = Math.max(0, speechStart)
-          const trimEnd = Math.min(speechEnd, videoDuration)
-          const suggestedSpeed = ensureMinSpeed(transcription.suggested_speed || 1.0)
-          
-          console.log(`[Adjustments] Auto-config from transcription, clip order=${clipOrder}:`, {
-            trimStart, trimEnd, speed: suggestedSpeed
-          })
-          
-          newAdjustments[clipOrder] = {
-            trimStart,
-            trimEnd,
-            speed: suggestedSpeed,
-          }
-        } else {
-          // ═══════════════════════════════════════════════════════════════
-          // PRIORITÉ 3: Valeurs par défaut
-          // ═══════════════════════════════════════════════════════════════
-          newAdjustments[clipOrder] = {
-            trimStart: 0,
-            trimEnd: videoDuration,
-            speed: 1.0,
-          }
+        if (hasChangedLegacy) {
+          console.log(`[Adjustments] ✓ Loading LEGACY adjustments for clip order=${clipOrder}`)
+          newAdjustments[clipOrder] = clipAdjustments
         }
       }
     })
     if (Object.keys(newAdjustments).length > 0) {
       setAdjustments(prev => ({ ...prev, ...newAdjustments }))
     }
-  }, [clips.length, generatedClips])
+  }, [clips.length, generatedClips, adjustments])
 
-  // Sauvegarder un ajustement en BDD (pour persistance)
+  // Sauvegarder un ajustement LEGACY en BDD (pour compatibilité)
   const saveAdjustmentToDb = useCallback(async (clipId: string, adjustment: ClipAdjustments) => {
     if (!clipId) return
     
@@ -331,12 +336,32 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         .eq('id', clipId)
       
       if (error) {
-        console.error('[Adjustments] Failed to save to DB:', error)
+        console.error('[Adjustments] Failed to save LEGACY to DB:', error)
       } else {
-        console.log('[Adjustments] ✓ Saved to DB for clip:', clipId)
+        console.log('[Adjustments] ✓ Saved LEGACY to DB for clip:', clipId)
       }
     } catch (err) {
-      console.error('[Adjustments] Error saving to DB:', err)
+      console.error('[Adjustments] Error saving LEGACY to DB:', err)
+    }
+  }, [supabase])
+
+  // V2: Sauvegarder user_adjustments en BDD (modifications utilisateur)
+  const saveUserAdjustmentsToDb = useCallback(async (clipId: string, userAdj: UserAdjustments) => {
+    if (!clipId) return
+    
+    try {
+      const { error } = await (supabase
+        .from('campaign_clips') as any)
+        .update({ user_adjustments: userAdj })
+        .eq('id', clipId)
+      
+      if (error) {
+        console.error('[Adjustments] Failed to save user_adjustments to DB:', error)
+      } else {
+        console.log('[Adjustments] ✓ Saved user_adjustments to DB for clip:', clipId, 'at', userAdj.updated_at)
+      }
+    } catch (err) {
+      console.error('[Adjustments] Error saving user_adjustments to DB:', err)
     }
   }, [supabase])
 
@@ -476,44 +501,81 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   }, [supabase, archiveClipVersion])
 
   // Mettre à jour un ajustement (par clip.order, pas par index)
-  // Sauvegarde aussi en BDD pour persistance
+  // V2: Sauvegarde dans user_adjustments avec timestamp pour tracking
   const updateAdjustment = useCallback((clipOrder: number, update: Partial<ClipAdjustments>) => {
     setAdjustments(prev => {
       const newAdjustment = { ...prev[clipOrder], ...update, isApplied: false }
       
-      // Trouver l'ID du clip pour sauvegarder en BDD
+      // Trouver le clip pour sauvegarder en BDD
       const clip = [...generatedClips, ...clips].find(c => c?.order === clipOrder)
       if (clip?.id) {
-        // Sauvegarder en BDD (async, fire-and-forget)
+        // V2: Créer user_adjustments avec timestamp
+        const userAdjustments: UserAdjustments = {
+          trim_start: newAdjustment.trimStart,
+          trim_end: newAdjustment.trimEnd,
+          speed: newAdjustment.speed,
+          updated_at: new Date().toISOString(),
+        }
+        
+        // Sauvegarder user_adjustments en BDD (async)
+        saveUserAdjustmentsToDb(clip.id, userAdjustments)
+        
+        // LEGACY: Aussi sauvegarder dans adjustments pour compatibilité
         saveAdjustmentToDb(clip.id, newAdjustment)
       }
       
       return { ...prev, [clipOrder]: newAdjustment }
     })
-  }, [saveAdjustmentToDb, generatedClips, clips])
+  }, [saveAdjustmentToDb, saveUserAdjustmentsToDb, generatedClips, clips])
 
-  // Reset les ajustements à leurs valeurs par défaut (par clip.order, pas par index)
+  // Reset les ajustements aux valeurs IA (auto_adjustments) ou par défaut
+  // V2: Supprime user_adjustments pour revenir aux valeurs auto
   const resetAdjustments = useCallback((clipOrder: number) => {
     // Trouver le clip par son order
     const clip = [...clips, ...generatedClips].find(c => c?.order === clipOrder)
     if (!clip) return
     
-    const defaultAdjustment: ClipAdjustments = {
-      trimStart: 0,
-      trimEnd: clip.video?.duration || 6,
-      speed: 1.0,
+    // V2: Utiliser auto_adjustments si disponible, sinon valeurs par défaut
+    let resetAdjustment: ClipAdjustments
+    if (clip.auto_adjustments) {
+      resetAdjustment = {
+        trimStart: clip.auto_adjustments.trim_start,
+        trimEnd: clip.auto_adjustments.trim_end,
+        speed: ensureMinSpeed(clip.auto_adjustments.speed),
+      }
+      console.log(`[Adjustments] Reset to AUTO values for clip order=${clipOrder}:`, resetAdjustment)
+    } else {
+      resetAdjustment = {
+        trimStart: 0,
+        trimEnd: clip.video?.duration || 6,
+        speed: 1.0,
+      }
+      console.log(`[Adjustments] Reset to DEFAULT values for clip order=${clipOrder}:`, resetAdjustment)
     }
     
     setAdjustments(prev => ({
       ...prev,
-      [clipOrder]: defaultAdjustment
+      [clipOrder]: resetAdjustment
     }))
     
-    // Sauvegarder en BDD
+    // V2: Supprimer user_adjustments en BDD (revenir aux valeurs auto)
     if (clip.id) {
-      saveAdjustmentToDb(clip.id, defaultAdjustment)
+      // Supprimer user_adjustments (null)
+      ;(supabase.from('campaign_clips') as any)
+        .update({ user_adjustments: null })
+        .eq('id', clip.id)
+        .then(({ error }: { error: Error | null }) => {
+          if (error) {
+            console.error('[Adjustments] Failed to reset user_adjustments:', error)
+          } else {
+            console.log('[Adjustments] ✓ Reset user_adjustments to null for clip:', clip.id)
+          }
+        })
+      
+      // LEGACY: Aussi mettre à jour adjustments
+      saveAdjustmentToDb(clip.id, resetAdjustment)
     }
-  }, [clips, generatedClips, saveAdjustmentToDb])
+  }, [clips, generatedClips, saveAdjustmentToDb, supabase])
 
   // Analyser un clip existant (transcription Whisper + analyse Claude)
   // Utile pour les clips générés avant l'ajout de cette feature
@@ -903,7 +965,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           video: clip.video,
           audio: clip.audio || {},
           transcription: clip.transcription || null,
-          adjustments: clip.adjustments || null,
+          adjustments: clip.adjustments || null,        // LEGACY
+          auto_adjustments: clip.auto_adjustments || null,  // V2: auto (Whisper/Claude)
+          user_adjustments: clip.user_adjustments || null,  // V2: user (personnalisé)
           status: clip.status || 'pending',
         }
 
@@ -1208,15 +1272,43 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       // Déclencher la sauvegarde automatique
       setHasNewlyGeneratedClips(true)
       
-      // Reset les ajustements pour ce clip (la vidéo a changé)
-      setAdjustments(prev => ({
-        ...prev,
-        [result.order]: {
-          trimStart: 0,
-          trimEnd: result.video.duration,
-          speed: 1.0,
-        }
-      }))
+      // ═══════════════════════════════════════════════════════════════
+      // V2: APPLIQUER auto_adjustments calculés par Whisper/Claude
+      // user_adjustments est reset car nouvelle vidéo générée
+      // ═══════════════════════════════════════════════════════════════
+      if (result.auto_adjustments) {
+        console.log(`[Regenerate] Applying auto_adjustments from Whisper:`, result.auto_adjustments)
+        setAdjustments(prev => ({
+          ...prev,
+          [result.order]: {
+            trimStart: result.auto_adjustments!.trim_start,
+            trimEnd: result.auto_adjustments!.trim_end,
+            speed: ensureMinSpeed(result.auto_adjustments!.speed || 1.0),
+          }
+        }))
+      } else if (result.adjustments?.trimStart !== undefined && result.adjustments?.trimEnd !== undefined) {
+        // LEGACY fallback
+        console.log(`[Regenerate] Applying LEGACY adjustments:`, result.adjustments)
+        setAdjustments(prev => ({
+          ...prev,
+          [result.order]: {
+            trimStart: result.adjustments!.trimStart,
+            trimEnd: result.adjustments!.trimEnd,
+            speed: ensureMinSpeed(result.adjustments!.speed || 1.0),
+          }
+        }))
+      } else {
+        // Fallback: valeurs par défaut si pas de transcription
+        console.log(`[Regenerate] No auto-adjustments, using defaults`)
+        setAdjustments(prev => ({
+          ...prev,
+          [result.order]: {
+            trimStart: 0,
+            trimEnd: result.video.duration,
+            speed: 1.0,
+          }
+        }))
+      }
     }
   }
 
@@ -1244,7 +1336,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   }
 
   // Nombre de clips avec vidéo générée
-  const clipsWithVideo = generatedClips.filter(c => c.video?.raw_url).length
+  const clipsWithVideo = generatedClips.filter(c => c.video?.raw_url || c.video?.final_url).length
   const allClipsHaveVideo = clipsWithVideo === clips.length && clips.length > 0
   
   const allCompleted = generatedClips.length > 0 && 
@@ -1258,7 +1350,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   const getClipStatus = (index: number): ClipStatus => {
     const clipProgress = progress[clips[index]?.id || `clip-${clips[index]?.order}`]
     // Si on a une vidéo générée, c'est completed
-    const hasVideo = generatedClips[index]?.video?.raw_url || clips[index]?.video?.raw_url
+    const hasVideo = generatedClips[index]?.video?.raw_url || generatedClips[index]?.video?.final_url || clips[index]?.video?.raw_url || clips[index]?.video?.final_url
     if (hasVideo && !clipProgress) return 'completed'
     return clipProgress?.status || generatedClips[index]?.status || 'pending'
   }
@@ -1312,8 +1404,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         </p>
       </div>
 
-      {/* Not started state - seulement si aucune vidéo n'existe */}
-      {!started && !hasExistingVideos && (
+      {/* Not started state - seulement si aucune vidéo n'existe ET la campagne n'est pas déjà démarrée */}
+      {!started && !hasExistingVideos && !campaignAlreadyStarted && (
         <Card className="rounded-2xl">
           <CardContent className="p-12 text-center">
             <div className="w-24 h-24 mx-auto mb-8 rounded-2xl bg-muted flex items-center justify-center">

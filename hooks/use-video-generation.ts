@@ -224,11 +224,13 @@ export function useVideoGeneration() {
           
           // ═══════════════════════════════════════════════════════════
           // AUTO-CALCUL DES AJUSTEMENTS (trim + speed) basé sur Whisper
-          // Ces ajustements sont sauvegardés dans le clip pour persistance
+          // Ces ajustements sont sauvegardés dans auto_adjustments
+          // L'utilisateur peut les personnaliser dans user_adjustments
           // ═══════════════════════════════════════════════════════════
           const speechStart = transcription.speech_start
           const speechEnd = transcription.speech_end
           const videoDuration = clip.video.duration
+          const now = new Date().toISOString()
           
           if (typeof speechStart === 'number' && typeof speechEnd === 'number' && speechEnd > speechStart) {
             const trimStart = Math.max(0, speechStart)
@@ -240,6 +242,15 @@ export function useVideoGeneration() {
               trimStart, trimEnd, speed: suggestedSpeed
             })
             
+            // V2: Stocker dans auto_adjustments avec timestamp
+            updatedClip.auto_adjustments = {
+              trim_start: trimStart,
+              trim_end: trimEnd,
+              speed: suggestedSpeed,
+              updated_at: now,
+            }
+            
+            // LEGACY: Garder aussi dans adjustments pour compatibilité
             updatedClip.adjustments = {
               trimStart,
               trimEnd,
@@ -247,15 +258,33 @@ export function useVideoGeneration() {
             }
           } else {
             // Pas de parole détectée, valeurs par défaut
+            updatedClip.auto_adjustments = {
+              trim_start: 0,
+              trim_end: videoDuration,
+              speed: 1.0,
+              updated_at: now,
+            }
+            
+            // LEGACY
             updatedClip.adjustments = {
               trimStart: 0,
               trimEnd: videoDuration,
               speed: 1.0,
             }
           }
+          
+          // Reset user_adjustments car nouvelle génération
+          updatedClip.user_adjustments = undefined
         } else {
           console.warn('[Generation] Transcription failed, using default adjustments')
           // Valeurs par défaut si la transcription échoue
+          const now = new Date().toISOString()
+          updatedClip.auto_adjustments = {
+            trim_start: 0,
+            trim_end: clip.video.duration,
+            speed: 1.0,
+            updated_at: now,
+          }
           updatedClip.adjustments = {
             trimStart: 0,
             trimEnd: clip.video.duration,
@@ -264,7 +293,19 @@ export function useVideoGeneration() {
         }
       } catch (transcribeErr) {
         console.warn('[Generation] Transcription error, continuing:', transcribeErr)
-        // On continue même si la transcription échoue
+        // Valeurs par défaut si erreur
+        const now = new Date().toISOString()
+        updatedClip.auto_adjustments = {
+          trim_start: 0,
+          trim_end: clip.video.duration,
+          speed: 1.0,
+          updated_at: now,
+        }
+        updatedClip.adjustments = {
+          trimStart: 0,
+          trimEnd: clip.video.duration,
+          speed: 1.0,
+        }
       }
 
       // ────────────────────────────────────────────────────────────
@@ -524,6 +565,121 @@ export function useVideoGeneration() {
           source_audio_url: videoData.videoUrl,
           voice_volume: updatedClip.audio?.voice_volume ?? 100,
           ambient_volume: updatedClip.audio?.ambient_volume ?? 20,
+        }
+
+        // ────────────────────────────────────────────────────────────
+        // TRANSCRIPTION + AUTO-AJUSTEMENTS après regénération vidéo
+        // Whisper analyse la parole pour calculer trim et speed optimaux
+        // ────────────────────────────────────────────────────────────
+        try {
+          updateProgress('generating_voice', 55, 'Analyse de la parole...')
+          
+          const transcribeResponse = await fetch('/api/generate/transcribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              audioUrl: videoData.videoUrl,
+              language: null, // Auto-detect
+              originalScript: clip.script?.text,
+              videoDuration: clip.video.duration,
+            }),
+            signal: abortControllerRef.current?.signal,
+          })
+
+          if (transcribeResponse.ok) {
+            const transcription = await transcribeResponse.json()
+            console.log('[Regenerate] ✓ Transcription done:', {
+              speech_start: transcription.speech_start,
+              speech_end: transcription.speech_end,
+              suggested_speed: transcription.suggested_speed,
+            })
+            
+            // Ajouter la transcription
+            updatedClip.transcription = {
+              text: transcription.text,
+              chunks: transcription.chunks,
+              speech_start: transcription.speech_start,
+              speech_end: transcription.speech_end,
+              words_per_second: transcription.words_per_second,
+              suggested_speed: transcription.suggested_speed,
+            }
+            
+            // Calculer les ajustements automatiques
+            const speechStart = transcription.speech_start
+            const speechEnd = transcription.speech_end
+            const videoDuration = clip.video.duration
+            const now = new Date().toISOString()
+            
+            if (typeof speechStart === 'number' && typeof speechEnd === 'number' && speechEnd > speechStart) {
+              const trimStart = Math.max(0, speechStart)
+              const trimEnd = Math.min(speechEnd, videoDuration)
+              const suggestedSpeed = Math.max(1.0, transcription.suggested_speed || 1.0)
+              
+              console.log('[Regenerate] ✓ Auto-adjustments:', { trimStart, trimEnd, speed: suggestedSpeed })
+              
+              // V2: Stocker dans auto_adjustments avec timestamp
+              updatedClip.auto_adjustments = {
+                trim_start: trimStart,
+                trim_end: trimEnd,
+                speed: suggestedSpeed,
+                updated_at: now,
+              }
+              
+              // LEGACY
+              updatedClip.adjustments = {
+                trimStart,
+                trimEnd,
+                speed: suggestedSpeed,
+              }
+            } else {
+              updatedClip.auto_adjustments = {
+                trim_start: 0,
+                trim_end: videoDuration,
+                speed: 1.0,
+                updated_at: now,
+              }
+              
+              // LEGACY
+              updatedClip.adjustments = {
+                trimStart: 0,
+                trimEnd: videoDuration,
+                speed: 1.0,
+              }
+            }
+            
+            // Reset user_adjustments car nouvelle vidéo
+            updatedClip.user_adjustments = undefined
+          } else {
+            console.warn('[Regenerate] Transcription failed, using defaults')
+            const now = new Date().toISOString()
+            updatedClip.auto_adjustments = {
+              trim_start: 0,
+              trim_end: clip.video.duration,
+              speed: 1.0,
+              updated_at: now,
+            }
+            updatedClip.adjustments = {
+              trimStart: 0,
+              trimEnd: clip.video.duration,
+              speed: 1.0,
+            }
+            updatedClip.user_adjustments = undefined
+          }
+        } catch (transcribeErr) {
+          console.warn('[Regenerate] Transcription error:', transcribeErr)
+          const now = new Date().toISOString()
+          updatedClip.auto_adjustments = {
+            trim_start: 0,
+            trim_end: clip.video.duration,
+            speed: 1.0,
+            updated_at: now,
+          }
+          updatedClip.adjustments = {
+            trimStart: 0,
+            trimEnd: clip.video.duration,
+            speed: 1.0,
+          }
+          updatedClip.user_adjustments = undefined
         }
       }
 

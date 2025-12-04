@@ -153,6 +153,7 @@ export default function ExistingCampaignPage() {
         setState({
           step,
           campaign_id: campaignId,
+          campaign_status: campaign.status, // Passer le status pour que step6 sache si la campagne est completed
           actor_id: campaign.actor_id,
           preset_id: presetId,
           product: campaign.product || { has_product: false },

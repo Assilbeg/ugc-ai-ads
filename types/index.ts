@@ -272,7 +272,9 @@ export interface CampaignClip {
   video: ClipVideo;
   audio: ClipAudio;
   transcription?: ClipTranscription;  // Transcription Whisper avec timestamps
-  adjustments?: ClipAdjustments;      // Ajustements sauvegardés (trim + speed)
+  adjustments?: ClipAdjustments;      // LEGACY - Ajustements sauvegardés (pour compatibilité)
+  auto_adjustments?: AutoAdjustments; // Ajustements calculés par Whisper/Claude
+  user_adjustments?: UserAdjustments; // Ajustements modifiés par l'utilisateur
   current_version?: number;           // Numéro de version actuelle
   status: ClipStatus;
   created_at: string;
@@ -299,7 +301,9 @@ export interface ClipVersion {
   video: ClipVideo;
   audio: ClipAudio;
   transcription?: ClipTranscription;
-  adjustments?: ClipAdjustments;
+  adjustments?: ClipAdjustments;       // LEGACY
+  auto_adjustments?: AutoAdjustments;  // Snapshot des ajustements auto
+  user_adjustments?: UserAdjustments;  // Snapshot des ajustements user
   created_at: string;
   created_by_action: ClipVersionAction;
 }
@@ -332,17 +336,88 @@ export interface GeneratedFirstFrames {
   };
 }
 
-// Ajustements vidéo (trim + vitesse) par clip
+// Ajustements vidéo (trim + vitesse) par clip - LEGACY (deprecated)
 export interface ClipAdjustments {
   trimStart: number;      // Secondes depuis le début
   trimEnd: number;        // Secondes depuis le début (fin du clip)
   speed: number;          // 1.0, 1.1, 1.2 UNIQUEMENT (pas de ralentissement pour UGC TikTok)
   processedUrl?: string;  // URL de la vidéo après traitement (Transloadit)
+  isApplied?: boolean;    // Déjà appliqué via Transloadit (legacy)
+}
+
+// ─────────────────────────────────────────────────────────────────
+// AJUSTEMENTS V2 - Auto vs User avec timestamps
+// ─────────────────────────────────────────────────────────────────
+
+// Ajustements calculés automatiquement par Whisper/Claude
+export interface AutoAdjustments {
+  trim_start: number;     // Début du trim (secondes) - basé sur speech_start
+  trim_end: number;       // Fin du trim (secondes) - basé sur speech_end
+  speed: number;          // Vitesse suggérée (1.0, 1.1, 1.2) - basée sur words_per_second
+  updated_at: string;     // ISO timestamp de la dernière mise à jour (génération/regénération)
+}
+
+// Ajustements modifiés manuellement par l'utilisateur
+export interface UserAdjustments {
+  trim_start: number;     // Début du trim personnalisé
+  trim_end: number;       // Fin du trim personnalisé  
+  speed: number;          // Vitesse personnalisée
+  updated_at: string;     // ISO timestamp de la dernière modification
+}
+
+// Helper pour obtenir les ajustements effectifs (user > auto si plus récent)
+export function getEffectiveAdjustments(
+  autoAdj?: AutoAdjustments | null,
+  userAdj?: UserAdjustments | null,
+  videoDuration?: number
+): { trimStart: number; trimEnd: number; speed: number; source: 'auto' | 'user' | 'default' } {
+  const defaultDuration = videoDuration || 6
+  
+  // Si user_adjustments existe et est plus récent
+  if (userAdj?.updated_at && autoAdj?.updated_at) {
+    if (new Date(userAdj.updated_at) > new Date(autoAdj.updated_at)) {
+      return {
+        trimStart: userAdj.trim_start,
+        trimEnd: userAdj.trim_end,
+        speed: userAdj.speed,
+        source: 'user'
+      }
+    }
+  }
+  
+  // Si seulement user_adjustments existe
+  if (userAdj?.updated_at && !autoAdj?.updated_at) {
+    return {
+      trimStart: userAdj.trim_start,
+      trimEnd: userAdj.trim_end,
+      speed: userAdj.speed,
+      source: 'user'
+    }
+  }
+  
+  // Sinon utiliser auto_adjustments
+  if (autoAdj?.updated_at) {
+    return {
+      trimStart: autoAdj.trim_start,
+      trimEnd: autoAdj.trim_end,
+      speed: autoAdj.speed,
+      source: 'auto'
+    }
+  }
+  
+  // Valeurs par défaut
+  return {
+    trimStart: 0,
+    trimEnd: defaultDuration,
+    speed: 1.0,
+    source: 'default'
+  }
 }
 
 export interface NewCampaignState {
   step: 1 | 2 | 3 | 4 | 5 | 6;
   campaign_id?: string; // ID de la campagne une fois créée (pour persistance URL)
+  campaign_status?: 'draft' | 'generating' | 'assembling' | 'completed' | 'failed'; // Status de la campagne en BDD
   actor_id?: string;
   product: ProductConfig;
   preset_id?: string;
