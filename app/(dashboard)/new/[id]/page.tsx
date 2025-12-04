@@ -79,11 +79,29 @@ export default function ExistingCampaignPage() {
         }
 
       // Charger les clips associés
-      const { data: clips, error: clipsError } = await (supabase
+      // IMPORTANT: Filtrer par is_selected=true pour ne garder qu'UN clip par beat
+      // (le système de versioning crée plusieurs clips par beat)
+      const { data: allClips, error: clipsError } = await (supabase
         .from('campaign_clips') as any)
         .select('*')
         .eq('campaign_id', campaignId)
         .order('order', { ascending: true })
+        .order('created_at', { ascending: false })
+      
+      // Filtrer pour ne garder qu'UN clip par beat (order)
+      // Priorité: is_selected=true, sinon le plus récent
+      const clipsByBeat = new Map<number, any>()
+      allClips?.forEach((clip: any) => {
+        const existing = clipsByBeat.get(clip.order)
+        if (!existing) {
+          clipsByBeat.set(clip.order, clip)
+        } else if (clip.is_selected && !existing.is_selected) {
+          // Prendre le clip sélectionné plutôt que le non-sélectionné
+          clipsByBeat.set(clip.order, clip)
+        }
+        // Sinon garder le premier (qui est le plus récent grâce à l'ordre)
+      })
+      const clips = Array.from(clipsByBeat.values()).sort((a, b) => a.order - b.order)
 
       if (clipsError) {
         console.error('[/new/[id]] Erreur chargement clips:', clipsError)
