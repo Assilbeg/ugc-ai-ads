@@ -112,7 +112,7 @@ async function executeAssemblyWithRetry(
   steps: Record<string, unknown>,
   maxRetries = 3,
   baseDelay = 2000
-): Promise<{ ok: string; assembly_id: string; results?: any; error?: string; message?: string }> {
+) {
   let lastError: Error | null = null
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
