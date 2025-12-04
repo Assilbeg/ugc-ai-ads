@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
     // Doc: https://transloadit.com/docs/robots/video-concat/
     // IMPORTANT: Les vidéos IA (Veo) ont des timestamps bizarres qui causent des
     // pertes de frames au début lors d'un concat stream-copy. On force le ré-encodage.
+    // FORMAT: 9:16 portrait (1080x1920) pour TikTok/Reels/Shorts
     steps['concatenated'] = {
       robot: '/video/concat',
       use: {
@@ -104,14 +105,21 @@ export async function POST(request: NextRequest) {
       },
       result: true,
       ffmpeg_stack: 'v6.0.0',
-      // Forcer le ré-encodage pour normaliser les timestamps
-      preset: 'ipad-high',
+      // Format 9:16 portrait pour UGC (TikTok, Reels, Shorts)
+      width: 1080,
+      height: 1920,
+      resize_strategy: 'crop',  // Crop pour garder le ratio exact
       // Options FFmpeg pour éviter la perte de frames au début
       ffmpeg: {
         'fflags': '+genpts+discardcorrupt',
         'vsync': 'cfr',
         'force_key_frames': 'expr:eq(t,0)',
         'r': 30,
+        'c:v': 'libx264',
+        'preset': 'fast',
+        'crf': '23',
+        'c:a': 'aac',
+        'b:a': '128k',
       }
     }
 
