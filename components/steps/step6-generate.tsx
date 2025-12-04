@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { NewCampaignState, CampaignClip, ClipStatus, ClipAdjustments, ClipVersionAction, ClipVersion, AutoAdjustments, UserAdjustments, getEffectiveAdjustments } from '@/types'
 import { useVideoGeneration, RegenerateWhat, VideoQuality, GenerationProgress } from '@/hooks/use-video-generation'
 import { useCredits } from '@/hooks/use-credits'
@@ -16,7 +16,7 @@ import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
-import { Loader2, Play, X, Video, Mic, Music, Maximize2, Clock, Scissors, Gauge, Eye, Check, RefreshCw, Film, Sparkles, Zap, AlertCircle } from 'lucide-react'
+import { Loader2, Play, X, Video, Mic, Music, Maximize2, Clock, Scissors, Gauge, Eye, Check, RefreshCw, Film, Sparkles, Zap, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { UpgradeModal } from '@/components/modals/upgrade-modal'
 import { FirstPurchaseModal } from '@/components/modals/first-purchase-modal'
 
@@ -252,6 +252,26 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   const [creditsNeeded, setCreditsNeeded] = useState<{ required: number; current: number } | null>(null)
   const [isFirstPurchase, setIsFirstPurchase] = useState(false)
   const [checkingCredits, setCheckingCredits] = useState(false)
+  
+  // ══════════════════════════════════════════════════════════════
+  // VERSIONING: Navigation entre versions de clips
+  // ══════════════════════════════════════════════════════════════
+  const [displayedVersionIndex, setDisplayedVersionIndex] = useState<Record<number, number>>({})
+  
+  // Grouper les clips par beat (pour afficher toutes les versions)
+  const clipsByBeat = useMemo(() => {
+    const map = new Map<number, CampaignClip[]>()
+    generatedClips.forEach(c => {
+      if (!c?.video?.raw_url && !c?.video?.final_url) return // Ignorer clips sans vidéo
+      const list = map.get(c.order) || []
+      list.push(c)
+      // Trier par date de création décroissante (plus récent en premier)
+      map.set(c.order, list.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      ))
+    })
+    return map
+  }, [generatedClips])
 
   // Initialiser les ajustements quand les clips changent
   // LOGIQUE V2: user_adjustments > auto_adjustments (si timestamp plus récent)
@@ -500,6 +520,83 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     }
   }, [supabase, archiveClipVersion])
 
+  // ══════════════════════════════════════════════════════════════
+  // VERSIONING: Désélectionner tous les clips d'un beat sauf un
+  // ══════════════════════════════════════════════════════════════
+  const deselectOtherVersions = useCallback(async (clipId: string, beat: number) => {
+    if (!campaignId) return
+    
+    try {
+      // Mettre tous les clips du même beat à is_selected = false
+      await (supabase
+        .from('campaign_clips') as any)
+        .update({ is_selected: false })
+        .eq('campaign_id', campaignId)
+        .eq('order', beat)
+      
+      // Mettre le clip choisi à is_selected = true
+      await (supabase
+        .from('campaign_clips') as any)
+        .update({ is_selected: true })
+        .eq('id', clipId)
+        
+      console.log(`[Versioning] ✓ Selected clip ${clipId} for beat ${beat}`)
+    } catch (err) {
+      console.error('[Versioning] Error selecting version:', err)
+    }
+  }, [campaignId, supabase])
+
+  // ══════════════════════════════════════════════════════════════
+  // VERSIONING: Naviguer entre les versions d'un beat
+  // ══════════════════════════════════════════════════════════════
+  const navigateVersion = useCallback((beat: number, direction: 'prev' | 'next') => {
+    const versions = clipsByBeat.get(beat) || []
+    if (versions.length <= 1) return
+    
+    const currentIndex = displayedVersionIndex[beat] || 0
+    let newIndex: number
+    
+    if (direction === 'prev') {
+      newIndex = currentIndex > 0 ? currentIndex - 1 : versions.length - 1
+    } else {
+      newIndex = currentIndex < versions.length - 1 ? currentIndex + 1 : 0
+    }
+    
+    setDisplayedVersionIndex(prev => ({ ...prev, [beat]: newIndex }))
+  }, [clipsByBeat, displayedVersionIndex])
+
+  // ══════════════════════════════════════════════════════════════
+  // VERSIONING: Sélectionner une version spécifique pour l'assemblage
+  // ══════════════════════════════════════════════════════════════
+  const selectVersion = useCallback(async (clipId: string, beat: number) => {
+    if (!campaignId) return
+    
+    try {
+      // 1. Mettre tous les clips du même beat à is_selected = false
+      await (supabase
+        .from('campaign_clips') as any)
+        .update({ is_selected: false })
+        .eq('campaign_id', campaignId)
+        .eq('order', beat)
+      
+      // 2. Mettre le clip choisi à is_selected = true
+      await (supabase
+        .from('campaign_clips') as any)
+        .update({ is_selected: true })
+        .eq('id', clipId)
+      
+      // 3. Mettre à jour le state local
+      setGeneratedClips(prev => prev.map(c => ({
+        ...c,
+        is_selected: c.id === clipId ? true : (c.order === beat ? false : c.is_selected)
+      })))
+      
+      console.log(`[Versioning] ✓ Selected version ${clipId} for beat ${beat}`)
+    } catch (err) {
+      console.error('[Versioning] Error selecting version:', err)
+    }
+  }, [campaignId, supabase])
+
   // Mettre à jour un ajustement (par clip.order, pas par index)
   // V2: Sauvegarde dans user_adjustments avec timestamp pour tracking
   const updateAdjustment = useCallback((clipOrder: number, update: Partial<ClipAdjustments>) => {
@@ -576,6 +673,41 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       saveAdjustmentToDb(clip.id, resetAdjustment)
     }
   }, [clips, generatedClips, saveAdjustmentToDb, supabase])
+
+  // ══════════════════════════════════════════════════════════════
+  // VERSIONING: Sélectionner UN clip par beat pour l'assemblage
+  // Priorité : is_selected = true, sinon le plus récent
+  // ══════════════════════════════════════════════════════════════
+  const getSelectedClipsForAssembly = useCallback((clipsToFilter: CampaignClip[]) => {
+    const byBeat = new Map<number, CampaignClip[]>()
+    
+    // Grouper les clips avec vidéo par beat
+    clipsToFilter.filter(c => c?.video?.raw_url || c?.video?.final_url).forEach(c => {
+      const list = byBeat.get(c.order) || []
+      list.push(c)
+      byBeat.set(c.order, list)
+    })
+    
+    // Pour chaque beat, prendre le clip sélectionné ou le plus récent
+    return Array.from(byBeat.entries())
+      .sort(([a], [b]) => a - b) // Trier par ordre de beat
+      .map(([beat, versions]) => {
+        // Priorité : is_selected, sinon le plus récent
+        const selected = versions.find(v => v.is_selected)
+        if (selected) {
+          console.log(`[Assembly] Beat ${beat}: using selected clip ${selected.id}`)
+          return selected
+        }
+        
+        // Fallback : le plus récent
+        const mostRecent = versions.sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )[0]
+        console.log(`[Assembly] Beat ${beat}: fallback to most recent clip ${mostRecent?.id}`)
+        return mostRecent
+      })
+      .filter(Boolean)
+  }, [])
 
   // Analyser un clip existant (transcription Whisper + analyse Claude)
   // Utile pour les clips générés avant l'ajout de cette feature
@@ -655,10 +787,17 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   // Assembler la vidéo finale (applique les ajustements automatiquement)
   // Pré-traite les clips avec trim/speed via Transloadit (/api/generate/process-clip)
   const assembleVideo = useCallback(async () => {
+    // ══════════════════════════════════════════════════════════════
+    // VERSIONING: Utiliser la fonction de sélection pour prendre UN clip par beat
+    // Priorité : is_selected = true, sinon le plus récent
+    // ══════════════════════════════════════════════════════════════
+    const selectedClips = getSelectedClipsForAssembly(generatedClips)
+    
     console.log('[Assemble] Starting assembly...', {
       campaignId,
       generatedClipsCount: generatedClips.length,
-      clipsWithVideo: generatedClips.filter(c => c?.video?.raw_url).length
+      selectedClipsCount: selectedClips.length,
+      selectedClipIds: selectedClips.map(c => ({ id: c.id, order: c.order, is_selected: c.is_selected }))
     })
     
     if (!campaignId) {
@@ -671,8 +810,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     try {
       // Préparer les données avec les ajustements trim/speed
       // IMPORTANT: Utiliser clip.order comme clé (pas l'index) pour correspondre à l'UI
-      const clipsData = generatedClips
-        .filter((clip) => clip?.video?.raw_url)
+      const clipsData = selectedClips
         .map((clip) => {
           const adj = adjustments[clip.order]
           const originalDuration = clip.video.duration || 6
@@ -905,7 +1043,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         .update({ status: 'failed' })
         .eq('id', campaignId)
     }
-  }, [campaignId, generatedClips, adjustments, supabase])
+  }, [campaignId, generatedClips, adjustments, supabase, getSelectedClipsForAssembly])
 
   // ══════════════════════════════════════════════════════════════
   // SAUVEGARDE AUTOMATIQUE EN BASE
@@ -968,6 +1106,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           adjustments: clip.adjustments || null,        // LEGACY
           auto_adjustments: clip.auto_adjustments || null,  // V2: auto (Whisper/Claude)
           user_adjustments: clip.user_adjustments || null,  // V2: user (personnalisé)
+          is_selected: clip.is_selected ?? true,  // Versioning: true par défaut pour nouveaux clips
           status: clip.status || 'pending',
         }
 
@@ -988,13 +1127,17 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           }
           updatedClipsWithIds.push(clip)
         } else {
-          // PRIORITÉ 2: Chercher si le clip existe par campaign_id + order
-          const { data: existingClip } = await (supabase
+          // PRIORITÉ 2: Chercher si le clip existe par campaign_id + order (seulement le sélectionné)
+          // Utiliser .limit(1) au lieu de .single() pour gérer plusieurs versions
+          const { data: existingList } = await (supabase
             .from('campaign_clips') as any)
             .select('id')
             .eq('campaign_id', dbCampaignId)
             .eq('order', clip.order)
-            .single()
+            .eq('is_selected', true)  // Chercher seulement le clip sélectionné
+            .limit(1)
+
+          const existingClip = existingList?.[0]
 
           if (existingClip) {
             // UPDATE avec l'ID trouvé
@@ -1220,7 +1363,17 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     if (!confirmRegen || !actor || !preset) return
 
     const { clipIndex, what } = confirmRegen
-    const clipToRegenerate = generatedClips[clipIndex] || clips[clipIndex]
+    const planClip = clips[clipIndex]
+    
+    // VERSIONING: Trouver le clip à régénérer en utilisant le beat (order)
+    // car les indices de generatedClips ne correspondent plus au plan
+    const versions = clipsByBeat.get(planClip.order) || []
+    const versionIndex = displayedVersionIndex[planClip.order] || 0
+    const selectedClip = versions.find(v => v.is_selected) || versions[0]
+    const clipToRegenerate = versions[versionIndex] || selectedClip || planClip
+    
+    const oldClipId = clipToRegenerate.id
+    const beatOrder = clipToRegenerate.order
     
     setConfirmRegen(null)
     
@@ -1249,28 +1402,106 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     )
 
     if (result) {
-      // Ajouter le numéro de version au résultat
-      result.current_version = newVersion
+      // ══════════════════════════════════════════════════════════════
+      // VERSIONING: Créer un NOUVEAU clip et désélectionner l'ancien
+      // ══════════════════════════════════════════════════════════════
       
-      console.log('[Regenerate] New clip result:', {
+      // Forcer la création d'un nouveau clip en supprimant l'ID
+      // L'ancien clip sera gardé mais désélectionné
+      const newClip: CampaignClip = {
+        ...result,
+        id: undefined as any, // Force INSERT d'un nouveau clip
+        is_selected: true,
+        current_version: newVersion,
+        created_at: new Date().toISOString(),
+      }
+      
+      console.log('[Regenerate] Creating new clip version:', {
         clipIndex,
         what,
         version: newVersion,
+        oldClipId,
+        beatOrder,
         raw_url: result.video?.raw_url?.slice(0, 80),
         final_url: result.video?.final_url?.slice(0, 80),
       })
       
-      const updatedClips = [...generatedClips]
-      updatedClips[clipIndex] = result
+      // 1. Désélectionner l'ancien clip en BDD
+      if (oldClipId && campaignId) {
+        await (supabase
+          .from('campaign_clips') as any)
+          .update({ is_selected: false })
+          .eq('id', oldClipId)
+        console.log(`[Versioning] ✓ Deselected old clip ${oldClipId}`)
+      }
       
-      setGeneratedClips(updatedClips)
-      onClipsUpdate(updatedClips)
+      // 2. Insérer le nouveau clip en BDD
+      if (campaignId) {
+        const clipData = {
+          campaign_id: campaignId,
+          order: newClip.order,
+          beat: newClip.beat,
+          first_frame: newClip.first_frame,
+          script: newClip.script,
+          video: newClip.video,
+          audio: newClip.audio || {},
+          transcription: newClip.transcription || null,
+          adjustments: newClip.adjustments || null,
+          auto_adjustments: newClip.auto_adjustments || null,
+          user_adjustments: null, // Reset user adjustments pour nouveau clip
+          is_selected: true,
+          current_version: newVersion,
+          status: newClip.status || 'completed',
+        }
+        
+        const { data: insertedClip, error: insertError } = await (supabase
+          .from('campaign_clips') as any)
+          .insert(clipData)
+          .select('id')
+          .single()
+        
+        if (insertError) {
+          console.error('[Versioning] Error inserting new clip:', insertError)
+        } else if (insertedClip) {
+          newClip.id = insertedClip.id
+          console.log(`[Versioning] ✓ Inserted new clip ${insertedClip.id} for beat ${beatOrder}`)
+        }
+      }
+      
+      // 3. Mettre à jour le state local :
+      // - Garder l'ancien clip avec is_selected = false
+      // - Ajouter le nouveau clip avec is_selected = true
+      // - L'UI affichera le nouveau clip car il est is_selected = true
+      const updatedClips = generatedClips.map((c, idx) => {
+        if (idx === clipIndex) {
+          // Garder l'ancien clip mais le marquer comme non sélectionné
+          return { ...c, is_selected: false }
+        }
+        return c
+      })
+      
+      // Ajouter le nouveau clip à la fin (il sera groupé par beat dans clipsByBeat)
+      updatedClips.push(newClip)
+      
+      // Trier les clips : ceux avec is_selected = true en premier pour chaque beat
+      // Cela garantit que l'UI affiche le bon clip
+      const sortedClips = updatedClips.sort((a, b) => {
+        if (a.order !== b.order) return a.order - b.order
+        // Pour le même beat, le sélectionné en premier
+        if (a.is_selected && !b.is_selected) return -1
+        if (!a.is_selected && b.is_selected) return 1
+        // Sinon par date de création (plus récent en premier)
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      })
+      
+      setGeneratedClips(sortedClips)
+      onClipsUpdate(sortedClips)
       
       // Rafraîchir l'affichage des crédits
       triggerCreditsRefresh()
       
-      // Déclencher la sauvegarde automatique
-      setHasNewlyGeneratedClips(true)
+      // NE PAS déclencher hasNewlyGeneratedClips car on a déjà fait l'insert manuellement
+      // setHasNewlyGeneratedClips(true)
       
       // ═══════════════════════════════════════════════════════════════
       // V2: APPLIQUER auto_adjustments calculés par Whisper/Claude
@@ -1336,28 +1567,46 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   }
 
   // Nombre de clips avec vidéo générée
-  const clipsWithVideo = generatedClips.filter(c => c.video?.raw_url || c.video?.final_url).length
-  const allClipsHaveVideo = clipsWithVideo === clips.length && clips.length > 0
+  // VERSIONING: Compter les beats qui ont AU MOINS UN clip avec vidéo
+  // (pas le nombre total de versions)
+  const beatsWithVideo = new Set(
+    generatedClips
+      .filter(c => c.video?.raw_url || c.video?.final_url)
+      .map(c => c.order)
+  ).size
+  const allClipsHaveVideo = beatsWithVideo === clips.length && clips.length > 0
   
-  const allCompleted = generatedClips.length > 0 && 
+  // VERSIONING: Tous les beats sont complétés si chaque beat a au moins un clip completed
+  const beatsCompleted = new Set<number>()
+  generatedClips.forEach(c => {
+    if (c.status === 'completed' && (c.video?.raw_url || c.video?.final_url)) {
+      beatsCompleted.add(c.order)
+    }
+  })
+  const allCompleted = clips.length > 0 && beatsCompleted.size === clips.length && 
     generatedClips.every(c => c.status === 'completed')
 
   const hasFailures = generatedClips.some(c => c.status === 'failed')
   
-  // Clips restants à générer
-  const remainingClips = clips.length - clipsWithVideo
+  // Beats restants à générer (sans aucune version avec vidéo)
+  const remainingClips = clips.length - beatsWithVideo
 
   const getClipStatus = (index: number): ClipStatus => {
-    const clipProgress = progress[clips[index]?.id || `clip-${clips[index]?.order}`]
+    const clipOrder = clips[index]?.order
+    const clipProgress = progress[clips[index]?.id || `clip-${clipOrder}`]
+    // VERSIONING: Trouver le clip sélectionné ou le plus récent pour ce beat
+    const versions = clipsByBeat.get(clipOrder) || []
+    const selectedClip = versions.find(v => v.is_selected) || versions[0]
     // Si on a une vidéo générée, c'est completed
-    const hasVideo = generatedClips[index]?.video?.raw_url || generatedClips[index]?.video?.final_url || clips[index]?.video?.raw_url || clips[index]?.video?.final_url
+    const hasVideo = selectedClip?.video?.raw_url || selectedClip?.video?.final_url || clips[index]?.video?.raw_url || clips[index]?.video?.final_url
     if (hasVideo && !clipProgress) return 'completed'
-    return clipProgress?.status || generatedClips[index]?.status || 'pending'
+    return clipProgress?.status || selectedClip?.status || 'pending'
   }
 
   // Vérifier si un clip a échoué par manque de crédits
   const getClipErrorInfo = (index: number): GenerationProgress | null => {
-    const clipProgress = progress[clips[index]?.id || `clip-${clips[index]?.order}`]
+    const clipOrder = clips[index]?.order
+    const clipProgress = progress[clips[index]?.id || `clip-${clipOrder}`]
     if (clipProgress?.errorCode === 'INSUFFICIENT_CREDITS') {
       return clipProgress
     }
@@ -1544,7 +1793,16 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           {/* Clips grid */}
           <div className="space-y-5">
             {clips.map((clip, index) => {
-              const generatedClip = generatedClips[index]
+              // ══════════════════════════════════════════════════════════════
+              // VERSIONING: Trouver le clip à afficher pour ce beat
+              // Priorité : clip sélectionné (is_selected = true), sinon le plus récent
+              // ══════════════════════════════════════════════════════════════
+              const versions = clipsByBeat.get(clip.order) || []
+              const versionIndex = displayedVersionIndex[clip.order] || 0
+              const selectedClip = versions.find(v => v.is_selected)
+              // Afficher la version navigée, ou la sélectionnée, ou la première (plus récente)
+              const generatedClip = versions[versionIndex] || selectedClip || versions[0] || generatedClips.find(c => c.order === clip.order)
+              
               const currentStatus = getClipStatus(index)
               const currentStep = getCurrentStep(currentStatus)
               const clipProgress = progress[clip.id || `clip-${clip.order}`]
@@ -1668,6 +1926,54 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                   v{version}
                                 </Badge>
                               ) : null
+                            })()}
+                            
+                            {/* ══════════════════════════════════════════════════════════════ */}
+                            {/* VERSIONING: Navigation entre versions */}
+                            {/* ══════════════════════════════════════════════════════════════ */}
+                            {(() => {
+                              const versions = clipsByBeat.get(clip.order) || []
+                              const hasMultipleVersions = versions.length > 1
+                              
+                              if (!hasMultipleVersions) return null
+                              
+                              const versionIndex = displayedVersionIndex[clip.order] || 0
+                              const displayedClip = versions[versionIndex] || generatedClip
+                              
+                              return (
+                                <div className="flex items-center gap-2 ml-auto">
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); navigateVersion(clip.order, 'prev') }}
+                                    className="p-1 rounded hover:bg-muted transition-colors"
+                                    title="Version précédente"
+                                  >
+                                    <ChevronLeft className="w-4 h-4" />
+                                  </button>
+                                  <span className="text-xs text-muted-foreground font-medium min-w-[40px] text-center">
+                                    {versionIndex + 1}/{versions.length}
+                                  </span>
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); navigateVersion(clip.order, 'next') }}
+                                    className="p-1 rounded hover:bg-muted transition-colors"
+                                    title="Version suivante"
+                                  >
+                                    <ChevronRight className="w-4 h-4" />
+                                  </button>
+                                  {!displayedClip?.is_selected && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); selectVersion(displayedClip?.id || '', clip.order) }}
+                                      className="text-xs px-2 py-1 rounded bg-violet-500 text-white hover:bg-violet-600 transition-colors font-medium"
+                                    >
+                                      Utiliser
+                                    </button>
+                                  )}
+                                  {displayedClip?.is_selected && (
+                                    <span className="text-xs text-green-500 flex items-center gap-1 font-medium">
+                                      <Check className="w-3 h-3" /> Sélectionnée
+                                    </span>
+                                  )}
+                                </div>
+                              )
                             })()}
                           </div>
                           <p className="text-sm text-foreground leading-relaxed">

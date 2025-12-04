@@ -443,6 +443,9 @@ export function useVideoGeneration() {
         updatedClip.status = 'completed' // On marque completed pour pouvoir continuer
       }
 
+      // VERSIONING: Premier clip d'un beat est sélectionné par défaut
+      updatedClip.is_selected = true
+
       return updatedClip
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {

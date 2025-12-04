@@ -276,6 +276,7 @@ export interface CampaignClip {
   auto_adjustments?: AutoAdjustments; // Ajustements calculés par Whisper/Claude
   user_adjustments?: UserAdjustments; // Ajustements modifiés par l'utilisateur
   current_version?: number;           // Numéro de version actuelle
+  is_selected?: boolean;              // Marque la version à utiliser pour l'assemblage (true = sélectionnée)
   status: ClipStatus;
   created_at: string;
   updated_at: string;
