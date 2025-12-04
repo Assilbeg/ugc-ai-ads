@@ -1083,17 +1083,31 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
                       )}
                     </div>
                     {/* Regenerate button overlay */}
-                    {firstFrames[index]?.url && (
-                      <Button 
-                        variant="secondary" 
-                        size="sm" 
-                        className="absolute bottom-2 left-2 right-2 h-7 text-[10px] bg-background/80 hover:bg-background backdrop-blur-sm rounded-lg"
-                        onClick={() => generateFirstFrame(index, clip, index > 0 ? firstFrames[index - 1]?.url : undefined, true)}
-                      >
-                        <RefreshCw className="w-3 h-3 mr-1" />
-                        Regénérer
-                      </Button>
-                    )}
+                    {firstFrames[index]?.url && (() => {
+                      // Compter les frames suivantes déjà générées
+                      const followingFramesCount = Object.entries(firstFrames)
+                        .filter(([i, f]) => parseInt(i) > index && f.url)
+                        .length
+                      
+                      return (
+                        <div className="absolute bottom-2 left-2 right-2 space-y-1">
+                          {followingFramesCount > 0 && (
+                            <div className="text-[9px] text-amber-200 bg-black/60 rounded px-1.5 py-0.5 text-center backdrop-blur-sm">
+                              {followingFramesCount} image{followingFramesCount > 1 ? 's' : ''} après
+                            </div>
+                          )}
+                          <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            className="w-full h-7 text-[10px] bg-background/80 hover:bg-background backdrop-blur-sm rounded-lg"
+                            onClick={() => generateFirstFrame(index, clip, index > 0 ? firstFrames[index - 1]?.url : undefined, true)}
+                          >
+                            <RefreshCw className="w-3 h-3 mr-1" />
+                            Regénérer
+                          </Button>
+                        </div>
+                      )
+                    })()}
                   </div>
 
                   {/* Right: Content */}

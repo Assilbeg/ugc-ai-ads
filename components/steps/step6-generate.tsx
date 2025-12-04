@@ -932,21 +932,23 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         raw_url: result.video?.raw_url?.slice(0, 80),
         final_url: result.video?.final_url?.slice(0, 80),
       })
+      
       const updatedClips = [...generatedClips]
       updatedClips[clipIndex] = result
-      setGeneratedClips(updatedClips)
-      onClipsUpdate(updatedClips) // Sauvegarder dans le state parent
       
-      // Rafraîchir l'affichage des crédits dans le header
+      setGeneratedClips(updatedClips)
+      onClipsUpdate(updatedClips)
+      
+      // Rafraîchir l'affichage des crédits
       triggerCreditsRefresh()
       
-      // Déclencher la sauvegarde automatique en base
+      // Déclencher la sauvegarde automatique
       setHasNewlyGeneratedClips(true)
       
       // Reset les ajustements pour ce clip (la vidéo a changé)
       setAdjustments(prev => ({
         ...prev,
-        [clipIndex]: {
+        [result.order]: {
           trimStart: 0,
           trimEnd: result.video.duration,
           speed: 1.0,
