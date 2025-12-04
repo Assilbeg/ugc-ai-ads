@@ -244,15 +244,18 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   const [checkingCredits, setCheckingCredits] = useState(false)
 
   // Initialiser les ajustements quand les clips changent
-  // IMPORTANT: Utiliser generatedClips car clips peut ne pas avoir la durée correcte
+  // IMPORTANT: Utiliser clip.order comme clé (pas l'index) pour éviter les décalages
   // Si transcription disponible, auto-configurer le trim sur début/fin de la parole
   useEffect(() => {
     const newAdjustments: Record<number, ClipAdjustments> = {}
     const clipsToUse = generatedClips.length > 0 ? generatedClips : clips
-    clipsToUse.forEach((clip, index) => {
+    clipsToUse.forEach((clip) => {
+      const clipOrder = clip.order
+      if (!clipOrder) return
+      
       // Utiliser la durée de la vidéo générée si disponible
       const videoDuration = clip?.video?.duration
-      if (!adjustments[index] && videoDuration) {
+      if (!adjustments[clipOrder] && videoDuration) {
         // Vérifier si on a une transcription avec timestamps
         const transcription = clip?.transcription
         const speechStart = transcription?.speech_start
@@ -271,7 +274,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           // Vitesse suggérée basée sur le débit de parole (1.0, 1.1 ou 1.2)
           const suggestedSpeed = transcription.suggested_speed || 1.0
           
-          console.log(`[Adjustments] Auto-config clip ${index} based on transcription:`, {
+          console.log(`[Adjustments] Auto-config clip order=${clipOrder} based on transcription:`, {
             speech_start: speechStart,
             speech_end: speechEnd,
             trimStart,
@@ -281,14 +284,14 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
             videoDuration
           })
           
-          newAdjustments[index] = {
+          newAdjustments[clipOrder] = {
             trimStart,
             trimEnd,
             speed: suggestedSpeed,
           }
         } else {
           // Pas de transcription, valeurs par défaut
-          newAdjustments[index] = {
+          newAdjustments[clipOrder] = {
             trimStart: 0,
             trimEnd: videoDuration,
             speed: 1.0,
@@ -301,24 +304,25 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     }
   }, [clips.length, generatedClips])
 
-  // Mettre à jour un ajustement
-  const updateAdjustment = useCallback((index: number, update: Partial<ClipAdjustments>) => {
+  // Mettre à jour un ajustement (par clip.order, pas par index)
+  const updateAdjustment = useCallback((clipOrder: number, update: Partial<ClipAdjustments>) => {
     setAdjustments(prev => ({
       ...prev,
-      [index]: { ...prev[index], ...update, isApplied: false }
+      [clipOrder]: { ...prev[clipOrder], ...update, isApplied: false }
     }))
   }, [])
 
-  // Reset les ajustements à leurs valeurs par défaut
-  const resetAdjustments = useCallback((index: number) => {
-    const clip = clips[index] || generatedClips[index]
+  // Reset les ajustements à leurs valeurs par défaut (par clip.order, pas par index)
+  const resetAdjustments = useCallback((clipOrder: number) => {
+    // Trouver le clip par son order
+    const clip = [...clips, ...generatedClips].find(c => c?.order === clipOrder)
     if (!clip) return
     
     setAdjustments(prev => ({
       ...prev,
-      [index]: {
+      [clipOrder]: {
         trimStart: 0,
-        trimEnd: clip.video.duration,
+        trimEnd: clip.video?.duration || 6,
         speed: 1.0,
       }
     }))
@@ -326,14 +330,16 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
 
   // Analyser un clip existant (transcription Whisper + analyse Claude)
   // Utile pour les clips générés avant l'ajout de cette feature
-  const analyzeClip = useCallback(async (index: number) => {
-    const clip = generatedClips[index] || clips[index]
+  // IMPORTANT: Utilise clipOrder (pas index) pour être cohérent avec les ajustements
+  const analyzeClip = useCallback(async (clipOrder: number) => {
+    // Trouver le clip par son order
+    const clip = [...generatedClips, ...clips].find(c => c?.order === clipOrder)
     if (!clip?.video?.raw_url && !clip?.video?.final_url) {
-      console.error('[Analyze] No video URL for clip', index)
+      console.error('[Analyze] No video URL for clip order', clipOrder)
       return
     }
 
-    setAnalyzingClips(prev => new Set([...prev, index]))
+    setAnalyzingClips(prev => new Set([...prev, clipOrder]))
 
     try {
       const videoUrl = clip.video.final_url || clip.video.raw_url
@@ -353,11 +359,11 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       }
 
       const result = await response.json()
-      console.log('[Analyze] ✓ Clip', index, 'analyzed:', result)
+      console.log('[Analyze] ✓ Clip order', clipOrder, 'analyzed:', result)
 
-      // Mettre à jour le clip avec la transcription
-      setGeneratedClips(prev => prev.map((c, i) => {
-        if (i === index) {
+      // Mettre à jour le clip avec la transcription (par order, pas par index)
+      setGeneratedClips(prev => prev.map((c) => {
+        if (c?.order === clipOrder) {
           return {
             ...c,
             transcription: {
@@ -373,7 +379,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         return c
       }))
 
-      // Appliquer les ajustements suggérés
+      // Appliquer les ajustements suggérés (par order, pas par index)
       if (result.speech_start !== undefined && result.speech_end !== undefined) {
         // Garder la précision max de Whisper pour un trim précis
         const trimStart = Math.max(0, result.speech_start)
@@ -382,7 +388,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
 
         setAdjustments(prev => ({
           ...prev,
-          [index]: { trimStart, trimEnd, speed }
+          [clipOrder]: { trimStart, trimEnd, speed }
         }))
       }
 
@@ -391,7 +397,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     } finally {
       setAnalyzingClips(prev => {
         const next = new Set(prev)
-        next.delete(index)
+        next.delete(clipOrder)
         return next
       })
     }
@@ -418,8 +424,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       const clipsData = generatedClips
         .map((clip, originalIndex) => ({ clip, originalIndex }))
         .filter(({ clip }) => clip?.video?.raw_url)
-        .map(({ clip, originalIndex }) => {
-          const adj = adjustments[originalIndex]
+        .map(({ clip }) => {
+          // IMPORTANT: Utiliser clip.order comme clé (pas l'index) pour correspondre à l'UI
+          const adj = adjustments[clip.order]
           const originalDuration = clip.video.duration || 6
           const trimStart = adj?.trimStart ?? 0
           const trimEnd = adj?.trimEnd ?? originalDuration
@@ -1164,7 +1171,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                           playsInline
                           ref={(video) => {
                             if (video) {
-                              const adj = adjustments[index]
+                              const adj = adjustments[clip.order]
                               if (adj) {
                                 // Appliquer la vitesse en temps réel
                                 video.playbackRate = adj.speed || 1
@@ -1187,7 +1194,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                         />
                         {/* Bouton plein écran au hover */}
                         <button
-                          onClick={() => { setPreviewingClip(index); setFullscreenVideo(videoUrl) }}
+                          onClick={() => { setPreviewingClip(clip.order); setFullscreenVideo(videoUrl) }}
                           className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/30 transition-colors"
                         >
                           <Play className="w-10 h-10 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -1376,11 +1383,11 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                             {/* Bouton Analyser (si pas de transcription) */}
                             {!generatedClip?.transcription?.speech_start && (
                               <button
-                                onClick={() => analyzeClip(index)}
-                                disabled={analyzingClips.has(index)}
+                                onClick={() => analyzeClip(clip.order)}
+                                disabled={analyzingClips.has(clip.order)}
                                 className="w-full mb-3 px-3 py-2 text-xs rounded-lg border border-dashed border-primary/50 bg-primary/5 hover:bg-primary/10 transition-colors flex items-center justify-center gap-2 text-primary disabled:opacity-50"
                               >
-                                {analyzingClips.has(index) ? (
+                                {analyzingClips.has(clip.order) ? (
                                   <>
                                     <Loader2 className="w-3 h-3 animate-spin" />
                                     Analyse en cours...
@@ -1399,19 +1406,19 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                               <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                                 <span>Trim</span>
                                 <span>
-                                  {adjustments[index]?.trimStart?.toFixed(2) || '0.00'}s → {adjustments[index]?.trimEnd?.toFixed(2) || clip.video.duration.toFixed(2)}s
+                                  {adjustments[clip.order]?.trimStart?.toFixed(2) || '0.00'}s → {adjustments[clip.order]?.trimEnd?.toFixed(2) || clip.video.duration.toFixed(2)}s
                                 </span>
                               </div>
                               <Slider
                                 value={[
-                                  adjustments[index]?.trimStart || 0,
-                                  adjustments[index]?.trimEnd || clip.video.duration
+                                  adjustments[clip.order]?.trimStart || 0,
+                                  adjustments[clip.order]?.trimEnd || clip.video.duration
                                 ]}
                                 min={0}
                                 max={clip.video.duration}
                                 step={0.01}
                                 onValueChange={([start, end]) => {
-                                  updateAdjustment(index, { trimStart: start, trimEnd: end })
+                                  updateAdjustment(clip.order, { trimStart: start, trimEnd: end })
                                 }}
                                 className="w-full"
                               />
@@ -1440,11 +1447,11 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                               <div className="flex items-center gap-1">
                                 {SPEED_OPTIONS.map((opt) => {
                                   const isSuggested = generatedClip?.transcription?.suggested_speed === opt.value
-                                  const isSelected = (adjustments[index]?.speed || 1.0) === opt.value
+                                  const isSelected = (adjustments[clip.order]?.speed || 1.0) === opt.value
                                   return (
                                     <button
                                       key={opt.value}
-                                      onClick={() => updateAdjustment(index, { speed: opt.value })}
+                                      onClick={() => updateAdjustment(clip.order, { speed: opt.value })}
                                       className={`px-2 py-1 text-xs rounded-md transition-colors relative ${
                                         isSelected
                                           ? 'bg-foreground text-background font-medium'
@@ -1464,26 +1471,26 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                             </div>
                             
                             {/* Durée ajustée */}
-                            {adjustments[index] && (
+                            {adjustments[clip.order] && (
                               <div className="text-xs text-muted-foreground mb-3">
                                 Durée finale : {calculateAdjustedDuration(
                                   clip.video.duration,
-                                  adjustments[index].trimStart,
-                                  adjustments[index].trimEnd,
-                                  adjustments[index].speed
+                                  adjustments[clip.order].trimStart,
+                                  adjustments[clip.order].trimEnd,
+                                  adjustments[clip.order].speed
                                 ).toFixed(2)}s
                               </div>
                             )}
                             
                             {/* Reset Button - seulement si modifié */}
-                            {(adjustments[index]?.trimStart !== 0 ||
-                              adjustments[index]?.trimEnd !== clip.video.duration ||
-                              adjustments[index]?.speed !== 1.0) && (
+                            {(adjustments[clip.order]?.trimStart !== 0 ||
+                              adjustments[clip.order]?.trimEnd !== clip.video.duration ||
+                              adjustments[clip.order]?.speed !== 1.0) && (
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 className="h-7 text-xs rounded-lg text-muted-foreground"
-                                onClick={() => resetAdjustments(index)}
+                                onClick={() => resetAdjustments(clip.order)}
                               >
                                 <RefreshCw className="w-3 h-3 mr-1" />
                                 Reset
