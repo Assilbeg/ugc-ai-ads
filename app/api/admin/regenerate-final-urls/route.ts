@@ -36,19 +36,23 @@ export async function GET(request: NextRequest) {
     }
     
     // Trouver les clips avec raw_url mais sans final_url
-    const { data: clips, error } = await (supabase
-      .from('campaign_clips') as any)
+    // Utiliser SQL brut car les filtres JSONB Supabase ne fonctionnent pas bien
+    const { data: clips, error } = await supabase
+      .from('campaign_clips')
       .select('id, campaign_id, beat, order, video, audio, status')
-      .not('video->raw_url', 'is', null)
-      .is('video->final_url', null)
-      .eq('status', 'completed')
+      .eq('status', 'completed') as { data: any[] | null; error: any }
+    
+    // Filtrer manuellement les clips avec raw_url mais sans final_url
+    const filteredClips = (clips || []).filter((clip: any) => 
+      clip.video?.raw_url && !clip.video?.final_url
+    )
     
     if (error) {
       console.error('[Admin] Error fetching clips:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
     
-    const clipsToRegenerate: ClipToRegenerate[] = ((clips || []) as any[]).map((clip: any) => ({
+    const clipsToRegenerate: ClipToRegenerate[] = (filteredClips as any[]).map((clip: any) => ({
       id: clip.id,
       campaign_id: clip.campaign_id,
       beat: clip.beat,
@@ -91,25 +95,28 @@ export async function POST(request: NextRequest) {
     const singleClipId = body.clipId
     
     // Trouver les clips avec raw_url mais sans final_url
-    let query = (supabase
-      .from('campaign_clips') as any)
+    let query = supabase
+      .from('campaign_clips')
       .select('id, campaign_id, beat, order, video, audio, status')
-      .not('video->raw_url', 'is', null)
-      .is('video->final_url', null)
       .eq('status', 'completed')
     
     if (singleClipId) {
       query = query.eq('id', singleClipId)
     }
     
-    const { data: clips, error } = await query as { data: any[] | null; error: any }
+    const { data: allClips, error } = await query as { data: any[] | null; error: any }
     
     if (error) {
       console.error('[Admin] Error fetching clips:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
     
-    if (!clips || clips.length === 0) {
+    // Filtrer manuellement les clips avec raw_url mais sans final_url
+    const clips = (allClips || []).filter((clip: any) => 
+      clip.video?.raw_url && !clip.video?.final_url
+    )
+    
+    if (clips.length === 0) {
       return NextResponse.json({ 
         success: true, 
         message: 'Aucun clip à régénérer',
