@@ -421,11 +421,10 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     
     try {
       // Préparer les données avec les ajustements trim/speed
+      // IMPORTANT: Utiliser clip.order comme clé (pas l'index) pour correspondre à l'UI
       const clipsData = generatedClips
-        .map((clip, originalIndex) => ({ clip, originalIndex }))
-        .filter(({ clip }) => clip?.video?.raw_url)
-        .map(({ clip }) => {
-          // IMPORTANT: Utiliser clip.order comme clé (pas l'index) pour correspondre à l'UI
+        .filter((clip) => clip?.video?.raw_url)
+        .map((clip) => {
           const adj = adjustments[clip.order]
           const originalDuration = clip.video.duration || 6
           const trimStart = adj?.trimStart ?? 0
@@ -439,7 +438,6 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           
           return {
             clip,
-            originalIndex,
             rawUrl: clip.video.final_url || clip.video.raw_url,
             duration,
             clipOrder: clip.order,
