@@ -273,9 +273,35 @@ export interface CampaignClip {
   audio: ClipAudio;
   transcription?: ClipTranscription;  // Transcription Whisper avec timestamps
   adjustments?: ClipAdjustments;      // Ajustements sauvegardés (trim + speed)
+  current_version?: number;           // Numéro de version actuelle
   status: ClipStatus;
   created_at: string;
   updated_at: string;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// HISTORIQUE DES VERSIONS DE CLIPS
+// ─────────────────────────────────────────────────────────────────
+export type ClipVersionAction = 
+  | 'initial'           // Première génération
+  | 'regenerate_video'  // Régénération vidéo
+  | 'regenerate_voice'  // Régénération voix
+  | 'regenerate_ambient' // Régénération ambiance
+  | 'regenerate_frame'  // Régénération first frame
+  | 'regenerate_all';   // Régénération complète
+
+export interface ClipVersion {
+  id: string;
+  clip_id: string;
+  version_number: number;
+  first_frame: ClipFirstFrame;
+  script: ClipScript;
+  video: ClipVideo;
+  audio: ClipAudio;
+  transcription?: ClipTranscription;
+  adjustments?: ClipAdjustments;
+  created_at: string;
+  created_by_action: ClipVersionAction;
 }
 
 // ─────────────────────────────────────────────────────────────────

@@ -93,7 +93,9 @@ export default function ExistingCampaignPage() {
         count: clips?.length || 0,
         hasError: !!clipsError,
         hasFirstFrames: clips?.filter((c: any) => c.first_frame?.image_url).length || 0,
-        hasVideos: clips?.filter((c: any) => c.video?.raw_url).length || 0,
+        hasRawVideos: clips?.filter((c: any) => c.video?.raw_url).length || 0,
+        hasFinalVideos: clips?.filter((c: any) => c.video?.final_url).length || 0,
+        campaignStatus: campaign.status,
       })
 
         // Déterminer l'étape en fonction des données présentes
@@ -114,8 +116,21 @@ export default function ExistingCampaignPage() {
           // Pas de clips générés → step 5
           step = 5
         } else {
-          // On a des clips
-          const hasGeneratedVideos = clips.some((c: any) => c.video?.raw_url)
+          // On a des clips - vérifier s'ils ont des vidéos générées
+          // Checker raw_url OU final_url (après mixage)
+          const hasGeneratedVideos = clips.some((c: any) => c.video?.raw_url || c.video?.final_url)
+          
+          console.log('[/new/[id]] Step detection:', {
+            hasGeneratedVideos,
+            campaignStatus: campaign.status,
+            clipsCount: clips.length,
+            clipsWithVideo: clips.filter((c: any) => c.video?.raw_url || c.video?.final_url).length,
+          })
+          
+          // Aller à step 6 si :
+          // - Des vidéos ont été générées
+          // - OU la campagne est en cours de génération/assemblage
+          // - OU la campagne est terminée
           if (hasGeneratedVideos || campaign.status === 'completed' || campaign.status === 'generating') {
             step = 6
           } else {

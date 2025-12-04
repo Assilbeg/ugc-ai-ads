@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { NewCampaignState, CampaignClip, ClipStatus, ClipAdjustments } from '@/types'
+import { NewCampaignState, CampaignClip, ClipStatus, ClipAdjustments, ClipVersionAction, ClipVersion } from '@/types'
 import { useVideoGeneration, RegenerateWhat, VideoQuality, GenerationProgress } from '@/hooks/use-video-generation'
 import { useCredits } from '@/hooks/use-credits'
 import { triggerCreditsRefresh } from '@/components/credits-display'
@@ -176,8 +176,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   const preset = state.preset_id ? getPresetById(state.preset_id) : undefined
   const clips = state.generated_clips || []
   
-  // Vérifier si des vidéos ont déjà été générées (clips avec raw_url)
-  const hasExistingVideos = clips.some(c => c.video?.raw_url)
+  // Vérifier si des vidéos ont déjà été générées (clips avec raw_url OU final_url)
+  const hasExistingVideos = clips.some(c => c.video?.raw_url || c.video?.final_url)
   
   // Initialiser avec les clips existants s'ils ont des vidéos
   const [generatedClips, setGeneratedClips] = useState<CampaignClip[]>(() => {
@@ -339,6 +339,141 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       console.error('[Adjustments] Error saving to DB:', err)
     }
   }, [supabase])
+
+  // ══════════════════════════════════════════════════════════════
+  // VERSIONING: Archiver une version de clip avant régénération
+  // ══════════════════════════════════════════════════════════════
+  const archiveClipVersion = useCallback(async (
+    clip: CampaignClip, 
+    action: ClipVersionAction
+  ): Promise<number> => {
+    // Si le clip n'a pas d'ID valide, on ne peut pas archiver
+    const hasValidId = clip.id && !clip.id.startsWith('temp-') && !clip.id.startsWith('clip-')
+    if (!hasValidId) {
+      console.log('[Version] Clip has no valid ID, skipping archive')
+      return 1 // Première version
+    }
+
+    // Ne pas archiver si pas de vidéo générée (rien à sauvegarder)
+    if (!clip.video?.raw_url && !clip.video?.final_url) {
+      console.log('[Version] Clip has no video, skipping archive')
+      return clip.current_version || 1
+    }
+
+    try {
+      // Récupérer le numéro de version actuel
+      const currentVersion = clip.current_version || 1
+      const newVersion = currentVersion + 1
+
+      // Créer l'archive de la version actuelle
+      const versionData = {
+        clip_id: clip.id,
+        version_number: currentVersion,
+        first_frame: clip.first_frame,
+        script: clip.script,
+        video: clip.video,
+        audio: clip.audio || {},
+        transcription: clip.transcription || null,
+        adjustments: clip.adjustments || null,
+        created_by_action: action,
+      }
+
+      const { error: insertError } = await (supabase
+        .from('clip_versions') as any)
+        .insert(versionData)
+
+      if (insertError) {
+        // Si la version existe déjà (contrainte unique), c'est OK
+        if (!insertError.message?.includes('unique_clip_version')) {
+          console.error('[Version] Error archiving version:', insertError)
+        }
+      } else {
+        console.log(`[Version] ✓ Archived version ${currentVersion} for clip ${clip.order}`)
+      }
+
+      // Mettre à jour le numéro de version dans le clip
+      await (supabase
+        .from('campaign_clips') as any)
+        .update({ current_version: newVersion })
+        .eq('id', clip.id)
+
+      return newVersion
+    } catch (err) {
+      console.error('[Version] Error:', err)
+      return clip.current_version || 1
+    }
+  }, [supabase])
+
+  // Récupérer l'historique des versions d'un clip
+  const getClipVersions = useCallback(async (clipId: string): Promise<ClipVersion[]> => {
+    if (!clipId) return []
+
+    try {
+      const { data, error } = await (supabase
+        .from('clip_versions') as any)
+        .select('*')
+        .eq('clip_id', clipId)
+        .order('version_number', { ascending: false })
+
+      if (error) {
+        console.error('[Version] Error fetching versions:', error)
+        return []
+      }
+
+      return data || []
+    } catch (err) {
+      console.error('[Version] Error:', err)
+      return []
+    }
+  }, [supabase])
+
+  // Restaurer une version précédente
+  const restoreClipVersion = useCallback(async (
+    clipId: string, 
+    version: ClipVersion
+  ): Promise<CampaignClip | null> => {
+    if (!clipId || !version) return null
+
+    try {
+      // D'abord, archiver la version actuelle
+      const { data: currentClip } = await (supabase
+        .from('campaign_clips') as any)
+        .select('*')
+        .eq('id', clipId)
+        .single()
+
+      if (currentClip) {
+        await archiveClipVersion(currentClip as CampaignClip, 'regenerate_all')
+      }
+
+      // Restaurer les données de la version
+      const { data: restoredClip, error } = await (supabase
+        .from('campaign_clips') as any)
+        .update({
+          first_frame: version.first_frame,
+          script: version.script,
+          video: version.video,
+          audio: version.audio,
+          transcription: version.transcription,
+          adjustments: version.adjustments,
+          current_version: (currentClip?.current_version || version.version_number) + 1,
+        })
+        .eq('id', clipId)
+        .select()
+        .single()
+
+      if (error) {
+        console.error('[Version] Error restoring version:', error)
+        return null
+      }
+
+      console.log(`[Version] ✓ Restored version ${version.version_number} for clip`)
+      return restoredClip as CampaignClip
+    } catch (err) {
+      console.error('[Version] Error:', err)
+      return null
+    }
+  }, [supabase, archiveClipVersion])
 
   // Mettre à jour un ajustement (par clip.order, pas par index)
   // Sauvegarde aussi en BDD pour persistance
@@ -639,6 +774,12 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         throw new Error(result.error || 'Erreur assemblage')
       }
       
+      // ✅ Mettre le status à "completed" AVANT la redirection
+      await (supabase.from('campaigns') as any)
+        .update({ status: 'completed' })
+        .eq('id', campaignId)
+      console.log('[Assemble] ✓ Campaign status set to completed')
+      
       // Assemblage terminé ! Rediriger vers la page campagne
       console.log('[Assemble] ✅ Success! Redirecting to campaign page...')
       window.location.href = `/campaign/${campaignId}`
@@ -693,47 +834,95 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     }
   }, [supabase, state.actor_id, state.preset_id, state.product, state.brief])
 
-  // Sauvegarder les clips en base
+  // Sauvegarder les clips en base (UPSERT - met à jour si existe, insert sinon)
+  // Utilise l'id du clip s'il existe, sinon cherche par campaign_id + order
   const saveClipsToDb = useCallback(async (dbCampaignId: string, clipsToSave: CampaignClip[]) => {
     if (!dbCampaignId || clipsToSave.length === 0) return
 
     setAutoSaveStatus('saving')
+    const updatedClipsWithIds: CampaignClip[] = []
 
     try {
-      // Supprimer les anciens clips et insérer les nouveaux (upsert simplifié)
-      const { error: deleteError } = await (supabase
-        .from('campaign_clips') as any)
-        .delete()
-        .eq('campaign_id', dbCampaignId)
+      for (const clip of clipsToSave) {
+        const clipData = {
+          campaign_id: dbCampaignId,
+          order: clip.order,
+          beat: clip.beat,
+          first_frame: clip.first_frame,
+          script: clip.script,
+          video: clip.video,
+          audio: clip.audio || {},
+          transcription: clip.transcription || null,
+          adjustments: clip.adjustments || null,
+          status: clip.status || 'pending',
+        }
 
-      if (deleteError) {
-        console.warn('Error deleting old clips:', deleteError)
+        // PRIORITÉ 1: Si le clip a un ID valide (UUID, pas temporaire), on UPDATE directement
+        const hasValidId = clip.id && !clip.id.startsWith('temp-') && !clip.id.startsWith('clip-')
+        
+        if (hasValidId) {
+          // UPDATE par ID
+          const { error: updateError } = await (supabase
+            .from('campaign_clips') as any)
+            .update(clipData)
+            .eq('id', clip.id)
+
+          if (updateError) {
+            console.error(`Error updating clip ${clip.id}:`, updateError)
+          } else {
+            console.log(`✓ Clip ${clip.order} updated (id: ${clip.id})`)
+          }
+          updatedClipsWithIds.push(clip)
+        } else {
+          // PRIORITÉ 2: Chercher si le clip existe par campaign_id + order
+          const { data: existingClip } = await (supabase
+            .from('campaign_clips') as any)
+            .select('id')
+            .eq('campaign_id', dbCampaignId)
+            .eq('order', clip.order)
+            .single()
+
+          if (existingClip) {
+            // UPDATE avec l'ID trouvé
+            const { error: updateError } = await (supabase
+              .from('campaign_clips') as any)
+              .update(clipData)
+              .eq('id', existingClip.id)
+
+            if (updateError) {
+              console.error(`Error updating clip ${clip.order}:`, updateError)
+            } else {
+              console.log(`✓ Clip ${clip.order} updated (found id: ${existingClip.id})`)
+            }
+            // Stocker l'ID pour le mettre à jour dans le state
+            updatedClipsWithIds.push({ ...clip, id: existingClip.id })
+          } else {
+            // INSERT et récupérer l'ID généré
+            const { data: insertedClip, error: insertError } = await (supabase
+              .from('campaign_clips') as any)
+              .insert(clipData)
+              .select('id')
+              .single()
+
+            if (insertError) {
+              console.error(`Error inserting clip ${clip.order}:`, insertError)
+              updatedClipsWithIds.push(clip)
+            } else {
+              console.log(`✓ Clip ${clip.order} inserted (new id: ${insertedClip.id})`)
+              // Stocker le nouvel ID
+              updatedClipsWithIds.push({ ...clip, id: insertedClip.id })
+            }
+          }
+        }
       }
 
-      const clipsToInsert = clipsToSave.map(clip => ({
-        campaign_id: dbCampaignId,
-        order: clip.order,
-        beat: clip.beat,
-        first_frame: clip.first_frame,
-        script: clip.script,
-        video: clip.video,
-        audio: clip.audio || {},
-        transcription: clip.transcription || null,
-        adjustments: clip.adjustments || null,
-        status: clip.status || 'pending',
-      }))
-
-      const { error: insertError } = await (supabase
-        .from('campaign_clips') as any)
-        .insert(clipsToInsert)
-
-      if (insertError) {
-        console.error('Error saving clips:', insertError)
-        setAutoSaveStatus('error')
-        return
+      // Mettre à jour les clips avec leurs IDs de la BDD
+      if (updatedClipsWithIds.some(c => c.id !== clipsToSave.find(orig => orig.order === c.order)?.id)) {
+        console.log('[SaveClips] Updating clips with DB IDs')
+        setGeneratedClips(updatedClipsWithIds)
       }
 
-      console.log('✓ Clips auto-saved:', clipsToSave.length)
+      console.log('✓ All clips saved:', clipsToSave.length)
       setAutoSaveStatus('saved')
     } catch (err) {
       console.error('Error saving clips:', err)
@@ -759,13 +948,12 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   // Auto-save UNIQUEMENT quand des clips sont NOUVELLEMENT générés (pas au chargement)
   useEffect(() => {
     if (campaignId && generatedClips.length > 0 && !campaignId.startsWith('temp-') && hasNewlyGeneratedClips) {
-      // Sauvegarder les clips avec vidéo générée
-      const clipsWithVideo = generatedClips.filter(c => c.video?.raw_url)
-      if (clipsWithVideo.length > 0) {
-        console.log('[AutoSave] Saving newly generated clips:', clipsWithVideo.length)
-        saveClipsToDb(campaignId, generatedClips)
-        setHasNewlyGeneratedClips(false) // Reset après sauvegarde
-      }
+      // TOUJOURS sauvegarder les clips générés, même si certains ont échoué
+      // Cela garantit que les vidéos sont persistées en BDD
+      const clipsWithVideo = generatedClips.filter(c => c.video?.raw_url || c.video?.final_url)
+      console.log('[AutoSave] Saving newly generated clips:', generatedClips.length, 'with video:', clipsWithVideo.length)
+      saveClipsToDb(campaignId, generatedClips)
+      setHasNewlyGeneratedClips(false) // Reset après sauvegarde
     }
   }, [campaignId, generatedClips, saveClipsToDb, hasNewlyGeneratedClips])
 
@@ -866,6 +1054,13 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
 
     // Marquer qu'on a de nouveaux clips générés (pour déclencher la sauvegarde)
     setHasNewlyGeneratedClips(true)
+    
+    // Initialiser les versions à 1 pour les nouveaux clips générés
+    for (const clip of results) {
+      if (clip.video?.raw_url && !clip.current_version) {
+        clip.current_version = 1
+      }
+    }
 
     // Fusionner avec les clips existants - on utilise l'order comme clé unique
     // IMPORTANT: On ne compare pas les id car ils peuvent être undefined
@@ -915,6 +1110,20 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     
     setConfirmRegen(null)
     
+    // ══════════════════════════════════════════════════════════════
+    // ARCHIVER LA VERSION ACTUELLE AVANT RÉGÉNÉRATION
+    // ══════════════════════════════════════════════════════════════
+    const actionMap: Record<RegenerateWhat, ClipVersionAction> = {
+      video: 'regenerate_video',
+      voice: 'regenerate_voice',
+      ambient: 'regenerate_ambient',
+      frame: 'regenerate_frame',
+      all: 'regenerate_all',
+    }
+    
+    const newVersion = await archiveClipVersion(clipToRegenerate, actionMap[what])
+    console.log(`[Regenerate] Archived version, new version will be: ${newVersion}`)
+    
     const result = await regenerateSingleClip(
       clipToRegenerate,
       actor,
@@ -926,9 +1135,13 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     )
 
     if (result) {
+      // Ajouter le numéro de version au résultat
+      result.current_version = newVersion
+      
       console.log('[Regenerate] New clip result:', {
         clipIndex,
         what,
+        version: newVersion,
         raw_url: result.video?.raw_url?.slice(0, 80),
         final_url: result.video?.final_url?.slice(0, 80),
       })
@@ -1305,6 +1518,15 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                               <Clock className="w-3.5 h-3.5" />
                               <span>{clip.video.duration}s</span>
                             </div>
+                            {/* Indicateur de version */}
+                            {(() => {
+                              const version = generatedClip?.current_version || clip.current_version || 1
+                              return version > 1 ? (
+                                <Badge variant="outline" className="text-xs px-1.5 py-0 text-muted-foreground">
+                                  v{version}
+                                </Badge>
+                              ) : null
+                            })()}
                           </div>
                           <p className="text-sm text-foreground leading-relaxed">
                             "{clip.script.text}"

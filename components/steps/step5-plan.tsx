@@ -698,43 +698,83 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
   }, [clips, onClipsGenerated])
 
   // ══════════════════════════════════════════════════════════════
-  // SAUVEGARDER LES CLIPS EN BDD DÈS QU'ILS SONT GÉNÉRÉS
+  // SAUVEGARDER LES CLIPS EN BDD (UPSERT - ne jamais écraser les vidéos existantes)
   // ══════════════════════════════════════════════════════════════
   const saveClipsToDb = useCallback(async (clipsToSave: CampaignClip[]) => {
     if (!state.campaign_id || clipsToSave.length === 0) return
 
     try {
-      // Supprimer les anciens clips et insérer les nouveaux
-      const { error: deleteError } = await (supabase
-        .from('campaign_clips') as any)
-        .delete()
-        .eq('campaign_id', state.campaign_id)
+      for (const clip of clipsToSave) {
+        // Données à sauvegarder (script, first_frame, etc. mais PAS video si elle n'est pas définie)
+        const clipData: Record<string, unknown> = {
+          campaign_id: state.campaign_id,
+          order: clip.order,
+          beat: clip.beat,
+          first_frame: clip.first_frame,
+          script: clip.script,
+          audio: clip.audio || {},
+          status: clip.status || 'pending',
+        }
+        
+        // IMPORTANT: Ne sauvegarder video QUE si elle a du contenu
+        // Cela évite d'écraser les vidéos générées en step 6
+        if (clip.video?.raw_url || clip.video?.final_url) {
+          clipData.video = clip.video
+        }
 
-      if (deleteError) {
-        console.warn('[Step5] Error deleting old clips:', deleteError)
+        // Chercher si le clip existe déjà (par ID ou par campaign_id + order)
+        const hasValidId = clip.id && !clip.id.startsWith('temp-') && !clip.id.startsWith('clip-')
+        
+        let existingClipId: string | null = null
+        
+        if (hasValidId) {
+          existingClipId = clip.id
+        } else {
+          const { data: found } = await (supabase
+            .from('campaign_clips') as any)
+            .select('id, video')
+            .eq('campaign_id', state.campaign_id)
+            .eq('order', clip.order)
+            .single()
+          
+          if (found) {
+            existingClipId = found.id
+            // PRÉSERVER les vidéos existantes si on n'en a pas de nouvelles
+            if (found.video?.raw_url && !clip.video?.raw_url) {
+              clipData.video = found.video
+              console.log(`[Step5] ✓ Preserving existing video for clip ${clip.order}`)
+            }
+          }
+        }
+
+        if (existingClipId) {
+          // UPDATE
+          const { error: updateError } = await (supabase
+            .from('campaign_clips') as any)
+            .update(clipData)
+            .eq('id', existingClipId)
+
+          if (updateError) {
+            console.error(`[Step5] Error updating clip ${clip.order}:`, updateError)
+          } else {
+            console.log(`[Step5] ✓ Clip ${clip.order} updated`)
+          }
+        } else {
+          // INSERT (nouveau clip sans vidéo)
+          clipData.video = clip.video || {}
+          const { error: insertError } = await (supabase
+            .from('campaign_clips') as any)
+            .insert(clipData)
+
+          if (insertError) {
+            console.error(`[Step5] Error inserting clip ${clip.order}:`, insertError)
+          } else {
+            console.log(`[Step5] ✓ Clip ${clip.order} inserted`)
+          }
+        }
       }
 
-      const clipsToInsert = clipsToSave.map(clip => ({
-        campaign_id: state.campaign_id,
-        order: clip.order,
-        beat: clip.beat,
-        first_frame: clip.first_frame,
-        script: clip.script,
-        video: clip.video,
-        audio: clip.audio || {},
-        status: clip.status || 'pending',
-      }))
-
-      const { error: insertError } = await (supabase
-        .from('campaign_clips') as any)
-        .insert(clipsToInsert)
-
-      if (insertError) {
-        console.error('[Step5] Error saving clips to DB:', insertError)
-        return
-      }
-
-      console.log('[Step5] ✓ Clips saved to DB:', clipsToSave.length)
+      console.log('[Step5] ✓ All clips saved to DB:', clipsToSave.length)
     } catch (err) {
       console.error('[Step5] Error saving clips to DB:', err)
     }
