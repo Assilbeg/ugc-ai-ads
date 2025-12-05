@@ -7,6 +7,7 @@ export const INTENTION_PRESETS: IntentionPreset[] = [
     slug: 'confession-intime',
     description: 'Partage personnel et vulnérable, comme si tu parlais à un ami proche',
     thumbnail_url: '/presets/confession-intime.jpg',
+  filming_type: 'handheld',
     first_frame: {
       location: 'bedroom',
       posture: 'sitting_bed',
@@ -43,6 +44,7 @@ export const INTENTION_PRESETS: IntentionPreset[] = [
     slug: 'morning-discovery',
     description: 'Tu viens de découvrir un truc génial et tu partages ton enthousiasme',
     thumbnail_url: '/presets/morning-discovery.jpg',
+  filming_type: 'handheld',
     first_frame: {
       location: 'kitchen',
       posture: 'standing_casual',
@@ -79,6 +81,7 @@ export const INTENTION_PRESETS: IntentionPreset[] = [
     slug: 'street-hype',
     description: 'Tu marches en ville et tu partages un tip en mode FOMO',
     thumbnail_url: '/presets/street-hype.jpg',
+  filming_type: 'filmed_by_other',
     first_frame: {
       location: 'street_urban',
       posture: 'walking',
@@ -115,6 +118,7 @@ export const INTENTION_PRESETS: IntentionPreset[] = [
     slug: 'chill-testimonial',
     description: 'Témoignage détendu sur ton canapé, authentique et sincère',
     thumbnail_url: '/presets/chill-testimonial.jpg',
+  filming_type: 'handheld',
     first_frame: {
       location: 'living_room',
       posture: 'sitting_couch',
@@ -151,6 +155,7 @@ export const INTENTION_PRESETS: IntentionPreset[] = [
     slug: 'car-confession',
     description: 'Dans ta voiture, moment de vérité entre deux trajets',
     thumbnail_url: '/presets/car-confession.jpg',
+  filming_type: 'handheld',
     first_frame: {
       location: 'car',
       posture: 'sitting_car',
@@ -187,6 +192,7 @@ export const INTENTION_PRESETS: IntentionPreset[] = [
     slug: 'unboxing-product',
     description: 'Focus produit avec démonstration, mains visibles',
     thumbnail_url: '/presets/unboxing-product.jpg',
+  filming_type: 'setup_phone',
     first_frame: {
       location: 'neutral_background',
       posture: 'sitting_desk',
@@ -223,6 +229,7 @@ export const INTENTION_PRESETS: IntentionPreset[] = [
     slug: 'story-journey',
     description: 'Narration multi-lieux : tu racontes ton parcours avec le produit à travers différents moments de ta journée',
     thumbnail_url: '/presets/story-journey.jpg',
+  filming_type: 'handheld',
     first_frame: {
       location: 'bedroom', // Lieu par défaut / premier clip
       posture: 'sitting_bed',

@@ -87,6 +87,25 @@ Historique des régénérations.
 | regenerate_frame | Régénération du first frame |
 | regenerate_all | Régénération complète |
 
+### `intention_presets`
+Templates d'intentions (presets) utilisés pour les campagnes.
+
+| Colonne | Type | Description |
+|---------|------|-------------|
+| id | VARCHAR | PK (slug/id du preset) |
+| name | VARCHAR | Nom du preset |
+| slug | VARCHAR | Slug unique |
+| description | TEXT | Description marketing |
+| thumbnail_url | TEXT | Illustration |
+| filming_type | VARCHAR | `handheld` (défaut), `filmed_by_other`, `setup_phone` |
+| first_frame | JSONB | location, posture, lighting, base_expression, camera_angle, extra_prompt, scene_mode, location_by_beat?, camera_style, camera_style_by_beat? |
+| script | JSONB | tone, structure, hook_templates, cta_templates |
+| ambient_audio | JSONB | prompt, intensity |
+| suggested_total_duration | INTEGER | Durée suggérée (s) |
+| suggested_clip_count | INTEGER | Nombre de clips suggéré |
+
+> `filming_type` pilote le prompt vidéo (selfie vs filmé vs téléphone posé) en combinaison avec `camera_style`.
+
 ### `campaign_assemblies`
 Historique des assemblages vidéo.
 
@@ -477,6 +496,62 @@ FROM actors
 WHERE user_id = 'USER_UUID'
   AND is_custom = true;
 ```
+
+---
+
+## 📂 Fichiers de référence
+
+| Fichier | Description |
+|---------|-------------|
+| `/supabase/*.sql` | Migrations SQL complètes |
+| `/types/index.ts` | **Types TypeScript** - Source de vérité pour les structures de données |
+| `/lib/credits.ts` | Logique de crédits (check, deduct, add) |
+| `/lib/generation-logger.ts` | Logging des générations |
+
+### Types TypeScript importants (types/index.ts)
+
+```typescript
+// Clip principal
+interface CampaignClip {
+  id: string;
+  campaign_id: string;
+  order: number;              // 1-5
+  beat: ScriptBeat;           // hook, problem, solution, proof, cta
+  first_frame: ClipFirstFrame;
+  script: ClipScript;
+  video: ClipVideo;
+  audio: ClipAudio;
+  transcription?: ClipTranscription;
+  auto_adjustments?: AutoAdjustments;  // Calculés par Whisper/Claude
+  user_adjustments?: UserAdjustments;  // Modifiés par l'utilisateur
+  is_selected?: boolean;               // Pour assemblage
+  status: ClipStatus;
+}
+
+// Ajustements (la fonction getEffectiveAdjustments() est dans ce fichier)
+interface AutoAdjustments {
+  trim_start: number;
+  trim_end: number;
+  speed: number;
+  updated_at: string;  // CRITIQUE pour la priorité
+}
+
+interface UserAdjustments {
+  trim_start: number;
+  trim_end: number;
+  speed: number;
+  updated_at: string;  // CRITIQUE pour la priorité
+}
+
+// Types de beat
+type ScriptBeat = "hook" | "problem" | "agitation" | "solution" | "proof" | "cta";
+
+// Status possibles
+type ClipStatus = "pending" | "generating_frame" | "generating_video" | 
+                  "generating_voice" | "generating_ambient" | "completed" | "failed";
+```
+
+> **Note** : Toujours utiliser `getEffectiveAdjustments()` de `types/index.ts` pour obtenir les ajustements effectifs (user > auto si plus récent).
 
 ---
 

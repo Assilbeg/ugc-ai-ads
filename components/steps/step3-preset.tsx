@@ -33,6 +33,12 @@ const TONE_LABELS: Record<string, string> = {
   reflective: 'Réflexif',
 }
 
+const FILMING_LABELS: Record<string, string> = {
+  handheld: 'Selfie',
+  filmed_by_other: 'Filmé',
+  setup_phone: 'Téléphone posé',
+}
+
 export function Step3Preset({ selectedPresetId, selectedActor, onSelect, onNext, onBack }: Step3PresetProps) {
   const handleContinue = () => {
     if (selectedPresetId) {
@@ -107,6 +113,11 @@ export function Step3Preset({ selectedPresetId, selectedActor, onSelect, onNext,
                     <Badge variant="secondary" className="text-[10px] rounded-full px-2 py-0 bg-white/20 text-white border-0">
                       {TONE_LABELS[preset.script.tone] || preset.script.tone}
                     </Badge>
+                    {preset.filming_type && (
+                      <Badge variant="secondary" className="text-[10px] rounded-full px-2 py-0 bg-white/10 text-white border-0">
+                        {FILMING_LABELS[preset.filming_type] || preset.filming_type}
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </div>

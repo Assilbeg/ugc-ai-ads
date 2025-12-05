@@ -78,6 +78,11 @@ Fichier : `lib/api/claude.ts`
 - Prompts en français pour scripts français
 - Structure dictée par le preset (hook, problem, solution, proof, cta)
 - Durées suggérées par clip dans le preset
+- Filming type (`filming_type` sur le preset) combiné avec `camera_style` pour les mots-clés UGC :
+  - handheld : selfie bras tendu (avant-bras possiblement visible)
+  - filmed_by_other : quelqu’un filme, cadrage plus large, acteur libre de marcher
+  - setup_phone : téléphone posé/trépied, cadrage stable, mains libres
+  - camera_style ajuste le niveau de mouvement (handheld_shaky / handheld_subtle / stable)
 
 ### Régénération de clip individuel
 
@@ -348,6 +353,7 @@ Les admins (vérifiés par email dans `lib/admin.ts`) :
 | Trim/Speed | `app/api/generate/process-clip/route.ts` |
 | Assemblage | `app/api/assemble/route.ts` |
 | Crédits | `lib/credits.ts`, `app/api/credits/route.ts` |
+| Presets/Intentions | `lib/presets.ts`, `app/(admin)/admin/presets/page.tsx` (filming_type), `components/steps/step3-preset.tsx` (badge filming_type) |
 
 ---
 

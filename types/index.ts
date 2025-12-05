@@ -66,6 +66,12 @@ export type CameraStyleType =
   | "handheld_subtle"   // Légères micro-vibrations naturelles (confession, authentique)
   | "stable";           // Stable, peu de mouvement (product focus, professionnel)
 
+// Qui tient/positionne le téléphone (impact prompt)
+export type FilmingType =
+  | "handheld"        // Selfie : l'acteur tient le téléphone, bras tendu
+  | "filmed_by_other" // Quelqu'un filme : l'acteur peut marcher librement
+  | "setup_phone";    // Téléphone posé/trépied : mains libres, plan stable
+
 export type ToneType =
   | "vulnerable"
   | "energetic"
@@ -161,6 +167,7 @@ export interface IntentionPreset {
   slug: string;
   description: string;
   thumbnail_url: string;
+  filming_type: FilmingType; // Type principal de filmage (selfie vs filmé vs posé)
   first_frame: FirstFrameConfig;
   script: ScriptConfig;
   ambient_audio: AmbientConfig;

@@ -232,3 +232,10 @@ CREATE POLICY "Users can delete clips of their campaigns" ON campaign_clips
 -- Products bucket: public read, authenticated upload  
 -- Frames/Videos/Audio: public read, authenticated upload
 
+-- ─────────────────────────────────────────────────────────────────
+-- MIGRATION: filming_type sur intention_presets
+-- ─────────────────────────────────────────────────────────────────
+ALTER TABLE intention_presets
+ADD COLUMN IF NOT EXISTS filming_type VARCHAR(20) DEFAULT 'handheld'
+  CHECK (filming_type IN ('handheld', 'filmed_by_other', 'setup_phone'));
+

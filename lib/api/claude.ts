@@ -139,6 +139,11 @@ Exception importante :
 1.10 PLAN / CUTS
 - One-shot par défaut ; cuts simples seulement si demandés
 
+1.11 FILMING TYPE (QUI TIENT/PLACE LE TÉLÉPHONE)
+- handheld : l'acteur tient le smartphone bras tendu, angle selfie, l'avant-bras peut être visible
+- filmed_by_other : quelqu'un d'autre filme, cadrage plus large, pas d'avant-bras de l'acteur, il peut marcher librement
+- setup_phone : téléphone posé/trépied, cadrage stable centré, l'acteur a les mains libres (vlog/facecam posée)
+
 ══════════════════════════════════════════════════════════════════
 2. CHOIX MOTEUR + DURÉES + DÉBIT ORAL
 ══════════════════════════════════════════════════════════════════
@@ -246,10 +251,15 @@ Tu dois rédiger le champ "video.prompt" en suivant STRICTEMENT ce template dans
 
 1. Scene Overview (1–2 phrases visuelles simples)
 
-2. UGC Authenticity keywords (ADAPTER AU CAMERA_STYLE) :
-   - handheld_shaky: "vertical 9:16 smartphone selfie, iPhone front camera, noticeable handheld shake, walking movement, dynamic camera, authentic amateur feel, slight grain, realistic skin texture"
-   - handheld_subtle: "vertical 9:16 smartphone selfie, iPhone front camera, subtle micro-jitters, natural handheld feel, authentic amateur vibes, slight grain, casual setting, realistic skin texture"
-   - stable: "vertical 9:16 smartphone selfie, iPhone front camera, steady handheld, minimal movement, stable framing, natural lighting, professional UGC feel, realistic skin texture"
+2. UGC Authenticity keywords (ADAPTER AU FILMING_TYPE + CAMERA_STYLE) :
+   FILMING TYPE :
+   - handheld: "actor holding smartphone at arm's length, selfie framing, forearm partially visible, natural selfie pose"
+   - filmed_by_other: "someone else is filming, wider framing, no actor arm in frame, actor can walk/move freely"
+   - setup_phone: "phone on tripod or propped up, stable centered framing, actor has both hands free, vlog setup"
+   CAMERA STYLE :
+   - handheld_shaky: "vertical 9:16 smartphone look, noticeable handheld shake, walking movement, dynamic camera, slight grain, realistic skin texture"
+   - handheld_subtle: "vertical 9:16 smartphone look, subtle micro-jitters, natural handheld feel, authentic amateur vibes, slight grain, realistic skin texture"
+   - stable: "vertical 9:16 smartphone look, steady handheld/tripod, minimal movement, stable framing, natural lighting, professional UGC feel, realistic skin texture"
 
 3. Descriptive Scene :
    - Lieu précis (bedroom, kitchen, street, car interior, etc.)
@@ -411,7 +421,7 @@ Structure attendue :
       "video": {
         "engine": "veo3.1",
         "duration": 6,
-        "prompt": "Prompt complet suivant le template ci-dessus, avec UGC keywords ADAPTÉS au camera_style. IMPORTANT: Dans la section Script audio, toujours inclure 'speaks in standard metropolitan French accent, Parisian pronunciation, clear and neutral:' AVANT le texte. Terminer par les NEGATIVES.",
+        "prompt": "Prompt complet suivant le template ci-dessus, avec UGC keywords ADAPTÉS au filming_type ET au camera_style. IMPORTANT: Dans la section Script audio, toujours inclure 'speaks in standard metropolitan French accent, Parisian pronunciation, clear and neutral:' AVANT le texte. Terminer par les NEGATIVES.",
         "camera_style": "handheld_subtle"
       },
       "status": "pending"
@@ -439,6 +449,7 @@ PRESET D'INTENTION : ${preset.name}
 - Ton : ${preset.script.tone}
 - Structure narrative : ${preset.script.structure.join(' → ')}
 - Mode de scène : ${preset.first_frame.scene_mode || 'single_location'}
+- Type de filmage : ${preset.filming_type || 'handheld'} (handheld=selfie bras tendu, filmed_by_other=quelqu'un filme, setup_phone=téléphone posé)
 - Lieu par défaut : ${preset.first_frame.location}
 ${preset.first_frame.scene_mode === 'multi_location' && preset.first_frame.location_by_beat 
   ? `- Lieux par beat : ${Object.entries(preset.first_frame.location_by_beat).map(([beat, loc]) => `${beat}=${loc}`).join(', ')}` 

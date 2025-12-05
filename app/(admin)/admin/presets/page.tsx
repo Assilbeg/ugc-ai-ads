@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { IntentionPreset, ScriptBeat, ToneType, LocationType, PostureType, LightingType, ExpressionType } from '@/types'
+import { IntentionPreset, ScriptBeat, ToneType, LocationType, PostureType, LightingType, ExpressionType, FilmingType } from '@/types'
 import { INTENTION_PRESETS } from '@/lib/presets'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -19,6 +19,7 @@ const LIGHTINGS: LightingType[] = ['soft_warm', 'bright_natural', 'golden_hour',
 const EXPRESSIONS: ExpressionType[] = ['neutral_relaxed', 'thoughtful', 'excited', 'curious', 'frustrated', 'relieved', 'confident', 'surprised']
 const TONES: ToneType[] = ['vulnerable', 'energetic', 'conversational', 'authoritative', 'playful', 'urgent']
 const BEATS: ScriptBeat[] = ['hook', 'problem', 'agitation', 'solution', 'proof', 'cta']
+const FILMING_TYPES: FilmingType[] = ['handheld', 'filmed_by_other', 'setup_phone']
 
 export default function AdminPresetsPage() {
   const [presets, setPresets] = useState<IntentionPreset[]>([])
@@ -36,6 +37,7 @@ export default function AdminPresetsPage() {
     slug: '',
     description: '',
     thumbnail_url: '',
+    filming_type: 'handheld',
     first_frame: {
       location: 'bedroom',
       posture: 'sitting_bed',
@@ -115,6 +117,7 @@ export default function AdminPresetsPage() {
       slug: '',
       description: '',
       thumbnail_url: '',
+      filming_type: 'handheld',
       first_frame: {
         location: 'bedroom',
         posture: 'sitting_bed',
@@ -167,6 +170,7 @@ export default function AdminPresetsPage() {
       slug: form.slug,
       description: form.description,
       thumbnail_url: form.thumbnail_url,
+      filming_type: form.filming_type,
       first_frame: form.first_frame,
       script: form.script,
       ambient_audio: form.ambient_audio,
@@ -313,6 +317,26 @@ export default function AdminPresetsPage() {
                       className="bg-zinc-800 border-zinc-700 text-white"
                       placeholder="confession-intime"
                     />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-zinc-300">Type de filmage</Label>
+                    <Select
+                      value={form.filming_type}
+                      onValueChange={(v) => setForm(prev => ({ ...prev, filming_type: v as FilmingType }))}
+                    >
+                      <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FILMING_TYPES.map(t => (
+                          <SelectItem key={t} value={t}>
+                            {t === 'handheld' && 'Selfie (handheld) - acteur tient le téléphone'}
+                            {t === 'filmed_by_other' && 'Filmé par quelqu\'un - l\'acteur peut marcher'}
+                            {t === 'setup_phone' && 'Téléphone posé/trépied - mains libres'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <div className="space-y-1.5">
@@ -540,9 +564,14 @@ Clique sur le lien, tu me remercieras"
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between">
                   <CardTitle className="text-base font-medium">{preset.name}</CardTitle>
-                  <Badge variant="secondary">
-                    {preset.script.tone}
-                  </Badge>
+                  <div className="flex gap-2">
+                    <Badge variant="secondary">
+                      {preset.script.tone}
+                    </Badge>
+                    <Badge variant="outline">
+                      {preset.filming_type}
+                    </Badge>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
