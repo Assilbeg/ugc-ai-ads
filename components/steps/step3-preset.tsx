@@ -33,10 +33,10 @@ const TONE_LABELS: Record<string, string> = {
   reflective: 'Réflexif',
 }
 
-const FILMING_LABELS: Record<string, string> = {
-  handheld: 'Selfie',
-  filmed_by_other: 'Filmé',
-  setup_phone: 'Téléphone posé',
+const FILMING_LABELS: Record<string, { label: string; icon: string; color: string }> = {
+  handheld: { label: 'Selfie', icon: '🤳', color: 'bg-blue-500/30' },
+  filmed_by_other: { label: 'Filmé par autre', icon: '🎬', color: 'bg-purple-500/30' },
+  setup_phone: { label: 'Posé / Trépied', icon: '📱', color: 'bg-green-500/30' },
 }
 
 export function Step3Preset({ selectedPresetId, selectedActor, onSelect, onNext, onBack }: Step3PresetProps) {
@@ -109,15 +109,19 @@ export function Step3Preset({ selectedPresetId, selectedActor, onSelect, onNext,
                   <p className="text-xs text-white/70 mt-1 line-clamp-2">
                     {preset.description}
                   </p>
-                  <div className="flex items-center gap-2 mt-2">
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    {preset.filming_type && FILMING_LABELS[preset.filming_type] && (
+                      <Badge 
+                        variant="secondary" 
+                        className={`text-[10px] rounded-full px-2 py-0.5 text-white border-0 ${FILMING_LABELS[preset.filming_type].color}`}
+                      >
+                        <span className="mr-1">{FILMING_LABELS[preset.filming_type].icon}</span>
+                        {FILMING_LABELS[preset.filming_type].label}
+                      </Badge>
+                    )}
                     <Badge variant="secondary" className="text-[10px] rounded-full px-2 py-0 bg-white/20 text-white border-0">
                       {TONE_LABELS[preset.script.tone] || preset.script.tone}
                     </Badge>
-                    {preset.filming_type && (
-                      <Badge variant="secondary" className="text-[10px] rounded-full px-2 py-0 bg-white/10 text-white border-0">
-                        {FILMING_LABELS[preset.filming_type] || preset.filming_type}
-                      </Badge>
-                    )}
                   </div>
                 </div>
               </div>

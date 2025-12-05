@@ -22,6 +22,7 @@
 10. [Transcription Intelligente (Whisper + Claude)](#10-transcription-intelligente-whisper--claude)
 11. [Structure des Beats](#11-structure-des-beats)
 12. [Race Conditions et Patterns](#12-race-conditions-et-patterns)
+13. [Génération d'Images d'Acteurs (Higgsfield Soul)](#13-génération-dimages-dacteurs-higgsfield-soul)
 
 ---
 
@@ -740,6 +741,56 @@ if (isClipRegenerating(clipId)) {
 
 ---
 
+## 13. Patterns "Fix puis Revert" - Leçons apprises
+
+> Ces patterns documentent des tentatives d'optimisation qui ont échoué.
+> **À consulter AVANT de réimplémenter des idées similaires.**
+
+### Ne traiter que les clips "avec ajustements réels"
+
+| Commit | Action | Problème |
+|--------|--------|----------|
+| `825a268` | Fix : ne pré-traiter que les clips avec ajustements réels (évite timeout) | Certains clips non traités avaient des timestamps cassés |
+| `f22023c` | **Revert** | Incohérences dans l'assemblage |
+
+**Leçon** : TOUS les clips doivent être normalisés via Transloadit, même sans trim/speed explicite. La normalisation des timestamps (`setpts=PTS-STARTPTS`) est nécessaire pour tous.
+
+---
+
+### Flag igndts pour "ignorer les timestamps"
+
+| Commit | Action | Problème |
+|--------|--------|----------|
+| (non trouvé) | Ajout `fflags: '+igndts'` | Coupe le début des vidéos |
+| `94daeca` | **Revert** : restaurer params originaux sans igndts | |
+
+**Leçon** : `igndts` (ignore DTS) peut causer des problèmes de timing. Utiliser `+genpts+discardcorrupt` à la place.
+
+---
+
+### Resize dans concat
+
+| Commit | Action | Problème |
+|--------|--------|----------|
+| `5318463` | Resize 9:16 dans process-clip | |
+| `616ee96` | Revert : retour process-clip simple | |
+| `08f7d82` | Resize 9:16 APRÈS concat (séparé) | ✅ Solution finale |
+
+**Leçon** : Le resize doit être une étape SÉPARÉE après le concat, pas dans la même étape.
+
+---
+
+### fal.ai compose pour concat
+
+| Commit | Action | Problème |
+|--------|--------|----------|
+| (avant) | Utilisation de fal.ai ffmpeg-api/compose pour concat | Timestamps cassés, pas de trim |
+| `04c0851` | **Fix** : Transloadit concat au lieu de fal.ai | ✅ Solution finale |
+
+**Leçon** : fal.ai compose ne gère pas bien les timestamps des vidéos IA. Transloadit avec ré-encodage forcé est plus fiable.
+
+---
+
 ## 🔄 Historique des comportements critiques
 
 | Date | Commit | Comportement ajouté |
@@ -760,6 +811,88 @@ if (isClipRegenerating(clipId)) {
 | Nov 2024 | `7390684` | Préservation vidéos existantes en step5 |
 | Nov 2024 | `5b7c01b` | Retirer instructions négatives accent |
 | Nov 2024 | `2df633e` | Functional updater pattern |
+
+---
+
+## 13. Génération d'Images d'Acteurs (Higgsfield Soul)
+
+### Contexte
+
+Les images "soul" sont les photos de référence des acteurs utilisées pour :
+- Afficher dans le sélecteur d'acteurs (step 1)
+- Générer les first frames avec consistance de personnage (via NanoBanana Pro)
+
+### API Higgsfield Soul
+
+```
+Endpoint: https://platform.higgsfield.ai/higgsfield-ai/soul/standard
+Auth: Key {API_KEY_ID}:{API_KEY_SECRET}
+Doc: https://docs.higgsfield.ai/guides/images
+```
+
+### Style de prompt CRITIQUE
+
+> **Le style des images doit être "selfie UGC authentique"**, pas un portrait studio.
+
+**Caractéristiques du bon style :**
+- Pose selfie naturelle (bras tendu visible)
+- Décor réel (chambre, salon, cuisine) avec éléments de vie
+- Lumière naturelle (golden hour, lumière fenêtre)
+- Vêtements casual du quotidien
+- Expression naturelle, regard vers la caméra
+- Maquillage léger ou naturel
+
+**Exemple de bon prompt :**
+```
+Young woman taking a selfie in her bedroom, blonde hair with hair clip, 
+natural golden hour lighting from window, wearing casual black tank top, 
+sitting on bed with white sheets, cozy bedroom background with mirror and plants, 
+arm extended holding phone, looking at camera with confident subtle smile, 
+authentic UGC TikTok style, photorealistic, natural skin
+```
+
+**Ce qu'il NE faut PAS faire :**
+```
+❌ "Professional photograph... clean neutral background, studio lighting"
+❌ "8k quality, highly detailed" (trop "stock photo")
+❌ Pas de contexte/décor
+```
+
+### Paramètres Higgsfield
+
+| Paramètre | Valeur | Note |
+|-----------|--------|------|
+| **Preset** | `0.5 selfie` | TOUJOURS utiliser ce preset |
+| **Aspect ratio** | `3:4` ou `9:16` | Portrait vertical |
+| **Resolution** | `720p` | Suffisant pour la qualité |
+
+### Templates par filming_type (First Frames & Intention Media)
+
+Les images d'intention et first frames utilisent des templates différents selon le `filming_type` du preset :
+
+| filming_type | Description | Prompt clé |
+|--------------|-------------|------------|
+| `handheld` | Selfie bras tendu | "arm extended holding phone visible in frame" |
+| `filmed_by_other` | Filmé par quelqu'un | "as if filmed by someone else, half-body or full-body" |
+| `setup_phone` | Téléphone sur trépied | "both hands free (as if phone is on tripod)" |
+
+**Fichiers concernés :**
+- `app/api/generate/intention-media/route.ts` - Génération des images d'intention
+- `app/(admin)/admin/actors/page.tsx` - Preview des prompts dans l'admin
+
+### Référence visuelle
+
+L'image de Luna est la référence du style attendu :
+```
+https://xresijptcptdilwecklf.supabase.co/storage/v1/object/public/actors/1764348622762-LUNA.jpg
+```
+
+Caractéristiques :
+- Selfie dans une chambre (lit, miroir, plantes)
+- Lumière golden hour naturelle
+- Débardeur noir casual
+- Cheveux longs bruns avec pince
+- Expression confiante et naturelle
 
 ---
 

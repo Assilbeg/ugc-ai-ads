@@ -3,8 +3,17 @@ import { createClient } from '@/lib/supabase/server'
 import { generateFirstFrame } from '@/lib/api/falai'
 import { IntentionPreset, ActorIntentionMedia } from '@/types'
 
-// Template pour générer l'image de l'acteur dans le contexte d'une intention
-const INTENTION_TEMPLATE = `Generate a photo of this same person as a first frame for a TikTok UGC video. {CONTEXT}. Same person as reference, natural selfie pose looking at camera, authentic UGC style. KEEP THE EXACT SAME FACE AND IDENTITY. NO TIKTOK UI, NO TEXT, NO WATERMARKS, NO OVERLAYS ON THE IMAGE.`
+// Templates par filming_type pour générer l'image de l'acteur
+const FILMING_TYPE_TEMPLATES: Record<string, string> = {
+  // Selfie tenu à la main - bras tendu visible
+  handheld: `Generate a photo of this same person as a first frame for a TikTok UGC video. {CONTEXT}. Same person as reference, natural selfie pose with arm extended holding phone visible in frame, looking at camera, authentic UGC selfie style. KEEP THE EXACT SAME FACE AND IDENTITY. NO TIKTOK UI, NO TEXT, NO WATERMARKS, NO OVERLAYS ON THE IMAGE.`,
+  
+  // Filmé par quelqu'un d'autre - pas de bras tendu, cadrage plus large
+  filmed_by_other: `Generate a photo of this same person as a first frame for a TikTok UGC video. {CONTEXT}. Same person as reference, natural pose as if filmed by someone else, looking at camera or slightly off-camera, half-body or full-body framing, authentic UGC style. KEEP THE EXACT SAME FACE AND IDENTITY. NO TIKTOK UI, NO TEXT, NO WATERMARKS, NO OVERLAYS ON THE IMAGE.`,
+  
+  // Téléphone posé/trépied - cadrage fixe, mains libres pour montrer produit
+  setup_phone: `Generate a photo of this same person as a first frame for a TikTok UGC video. {CONTEXT}. Same person as reference, natural pose with both hands free (as if phone is on tripod), looking at camera, half-body framing showing hands/desk area, authentic UGC style. KEEP THE EXACT SAME FACE AND IDENTITY. NO TIKTOK UI, NO TEXT, NO WATERMARKS, NO OVERLAYS ON THE IMAGE.`,
+}
 
 // Construire le contexte visuel à partir du preset
 function buildContextFromPreset(preset: IntentionPreset): string {
@@ -50,6 +59,11 @@ function buildContextFromPreset(preset: IntentionPreset): string {
   return `${location}, ${lighting}, ${expression}, ${first_frame.extra_prompt}`
 }
 
+// Obtenir le template selon le filming_type
+function getTemplateForFilmingType(filmingType?: string): string {
+  return FILMING_TYPE_TEMPLATES[filmingType || 'handheld'] || FILMING_TYPE_TEMPLATES.handheld
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -78,7 +92,9 @@ export async function POST(request: NextRequest) {
         console.log(`[Intention Media] Using custom prompt for ${preset.id}`)
       } else {
         const context = buildContextFromPreset(preset)
-        fullPrompt = INTENTION_TEMPLATE.replace('{CONTEXT}', context)
+        const template = getTemplateForFilmingType(preset.filming_type)
+        fullPrompt = template.replace('{CONTEXT}', context)
+        console.log(`[Intention Media] Using filming_type: ${preset.filming_type || 'handheld'} for ${preset.id}`)
       }
 
       console.log(`[Intention Media] Generating ${preset.id}...`)

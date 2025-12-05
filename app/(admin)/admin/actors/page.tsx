@@ -143,8 +143,17 @@ const INTENTION_EMOJIS: Record<string, string> = {
   'story-journey': '🎬',
 }
 
-// Template pour générer l'image de l'acteur dans le contexte d'une intention
-const INTENTION_TEMPLATE = `Generate a photo of this same person as a first frame for a TikTok UGC video. {CONTEXT}. Same person as reference, natural selfie pose looking at camera, authentic UGC style. KEEP THE EXACT SAME FACE AND IDENTITY. NO TIKTOK UI, NO TEXT, NO WATERMARKS, NO OVERLAYS ON THE IMAGE.`
+// Templates par filming_type pour générer l'image de l'acteur
+const FILMING_TYPE_TEMPLATES: Record<string, string> = {
+  // Selfie tenu à la main - bras tendu visible
+  handheld: `Generate a photo of this same person as a first frame for a TikTok UGC video. {CONTEXT}. Same person as reference, natural selfie pose with arm extended holding phone visible in frame, looking at camera, authentic UGC selfie style. KEEP THE EXACT SAME FACE AND IDENTITY. NO TIKTOK UI, NO TEXT, NO WATERMARKS, NO OVERLAYS ON THE IMAGE.`,
+  
+  // Filmé par quelqu'un d'autre - pas de bras tendu, cadrage plus large
+  filmed_by_other: `Generate a photo of this same person as a first frame for a TikTok UGC video. {CONTEXT}. Same person as reference, natural pose as if filmed by someone else, looking at camera or slightly off-camera, half-body or full-body framing, authentic UGC style. KEEP THE EXACT SAME FACE AND IDENTITY. NO TIKTOK UI, NO TEXT, NO WATERMARKS, NO OVERLAYS ON THE IMAGE.`,
+  
+  // Téléphone posé/trépied - cadrage fixe, mains libres pour montrer produit
+  setup_phone: `Generate a photo of this same person as a first frame for a TikTok UGC video. {CONTEXT}. Same person as reference, natural pose with both hands free (as if phone is on tripod), looking at camera, half-body framing showing hands/desk area, authentic UGC style. KEEP THE EXACT SAME FACE AND IDENTITY. NO TIKTOK UI, NO TEXT, NO WATERMARKS, NO OVERLAYS ON THE IMAGE.`,
+}
 
 // Descriptions pour construire le contexte
 const LOCATION_DESCRIPTIONS: Record<string, string> = {
@@ -180,14 +189,15 @@ const EXPRESSION_DESCRIPTIONS: Record<string, string> = {
   surprised: 'looking surprised',
 }
 
-// Construire le prompt complet pour une intention
+// Construire le prompt complet pour une intention (prend en compte filming_type)
 function buildIntentionPrompt(preset: IntentionPreset): string {
-  const { first_frame } = preset
+  const { first_frame, filming_type } = preset
   const location = LOCATION_DESCRIPTIONS[first_frame.location] || first_frame.location
   const lighting = LIGHTING_DESCRIPTIONS[first_frame.lighting] || first_frame.lighting
   const expression = EXPRESSION_DESCRIPTIONS[first_frame.base_expression] || first_frame.base_expression
   const context = `${location}, ${lighting}, ${expression}, ${first_frame.extra_prompt}`
-  return INTENTION_TEMPLATE.replace('{CONTEXT}', context)
+  const template = FILMING_TYPE_TEMPLATES[filming_type || 'handheld'] || FILMING_TYPE_TEMPLATES.handheld
+  return template.replace('{CONTEXT}', context)
 }
 
 export default function AdminActorsPage() {

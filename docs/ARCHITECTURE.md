@@ -219,5 +219,60 @@ Campaign (1)
 
 ---
 
+## 🚧 Architecture Future : Webhooks Async
+
+> **Status** : Planifié, pas encore implémenté  
+> **Fichier de référence** : `PLAN ARCHITECTURE A FAIRE/webhooks-async-generation.md`
+
+### Problème actuel
+
+L'architecture actuelle utilise du **polling synchrone** :
+
+```
+[Browser] ──HTTP POST──► [Vercel API] ──poll loop──► [Fal.ai]
+              │                │                        │
+              │                │ (boucle 5-30 min)      │
+              │◄───────────────┤                        │
+              │ (connexion ouverte tout ce temps)       │
+```
+
+**Limitations** :
+- Timeout Vercel Pro = 300s max (5 min)
+- Connexion HTTP fragile (WiFi, navigateur fermé)
+- Workers Vercel bloqués pendant la génération
+
+### Solution planifiée : Webhooks
+
+```
+[Browser] ──POST──► [API Route] ──submit──► [Fal.ai]
+    │                   │                      │
+    │◄──{jobId}─────────┤  (retour 1-2s)      │
+    │                   │                      │
+    │──poll /api/jobs───►                      │  (génère 2-10 min)
+    │◄──{status}────────┤                      │
+    │                   │◄─────webhook─────────┤
+    │◄──{completed}─────┤                      │
+```
+
+### Fichiers à créer (quand on implémentera)
+
+| Fichier | Description |
+|---------|-------------|
+| `supabase/generation_jobs.sql` | Nouvelle table pour tracker les jobs async |
+| `app/api/webhooks/fal/route.ts` | Handler webhook Fal.ai |
+| `app/api/jobs/[id]/route.ts` | GET status d'un job |
+
+### Checklist avant implémentation
+
+Avant d'implémenter cette architecture, le développeur/LLM **DOIT** :
+
+1. ✅ Lire `lib/api/falai.ts` - comprendre `falRequest`, `pollUntilCompleteWithUrls`
+2. ✅ Lire `hooks/use-video-generation.ts` - comprendre le flow actuel
+3. ✅ Lire `lib/generation-logger.ts` - ne pas dupliquer le système de logging
+4. ✅ Lire `lib/credits.ts` - comprendre quand déduire les crédits
+5. ✅ Vérifier doc Fal.ai webhooks : https://fal.ai/docs/webhooks
+
+---
+
 *Dernière mise à jour : 5 décembre 2024*
 
