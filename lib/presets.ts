@@ -274,6 +274,43 @@ export const INTENTION_PRESETS: IntentionPreset[] = [
     suggested_total_duration: 45,
     suggested_clip_count: 5,
   },
+  {
+    id: 'workplace-expert',
+    name: 'Workplace Expert',
+    slug: 'workplace-expert',
+    description: 'Tu partages un conseil pro depuis ton bureau, ton expertise au service de ton audience',
+    thumbnail_url: '/presets/workplace-expert.jpg',
+    filming_type: 'setup_phone',
+    first_frame: {
+      location: 'office_desk',
+      posture: 'sitting_desk',
+      lighting: 'bright_natural',
+      base_expression: 'confident',
+      camera_angle: 'selfie_front',
+      extra_prompt: 'modern office or home office setup, computer monitor visible in background, professional but approachable look, business casual attire, clean desk, natural window light',
+      scene_mode: 'single_location',
+      camera_style: 'stable',
+    },
+    script: {
+      tone: 'authoritative',
+      structure: ['hook', 'problem', 'solution', 'proof', 'cta'],
+      hook_templates: [
+        'En tant que pro je vois cette erreur tout le temps...',
+        'Ok petit tips que j\'aurais aimé connaître avant...',
+        'Arrêtez de faire ça, sérieusement...',
+      ],
+      cta_templates: [
+        'Le lien est en bio pour aller plus loin',
+        'Clique sur le lien, je t\'explique tout en détail',
+      ],
+    },
+    ambient_audio: {
+      prompt: 'quiet office ambient, subtle keyboard typing in distance, soft air conditioning hum, professional atmosphere',
+      intensity: 'subtle',
+    },
+    suggested_total_duration: 35,
+    suggested_clip_count: 5,
+  },
 ]
 
 export function getPresetBySlug(slug: string): IntentionPreset | undefined {

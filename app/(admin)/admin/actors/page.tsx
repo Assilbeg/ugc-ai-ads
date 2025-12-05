@@ -141,6 +141,7 @@ const INTENTION_EMOJIS: Record<string, string> = {
   'car-confession': '🚗',
   'unboxing-product': '📦',
   'story-journey': '🎬',
+  'workplace-expert': '💼',
 }
 
 // Templates par filming_type pour générer l'image de l'acteur
