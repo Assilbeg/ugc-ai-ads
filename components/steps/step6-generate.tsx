@@ -128,14 +128,27 @@ function AssemblyModal({ isOpen, clipCount }: { isOpen: boolean; clipCount: numb
 // Le replace() simple peut échouer si le texte exact n'est pas trouvé
 // ══════════════════════════════════════════════════════════════
 function replaceScriptInPrompt(originalPrompt: string, oldScript: string, newScript: string): string {
-  if (!originalPrompt || !oldScript) return originalPrompt
-  if (oldScript === newScript) return originalPrompt
+  console.log('[replaceScriptInPrompt] ═══════════════════════════════════════')
+  console.log('[replaceScriptInPrompt] oldScript:', oldScript?.slice(0, 50))
+  console.log('[replaceScriptInPrompt] newScript:', newScript?.slice(0, 50))
+  console.log('[replaceScriptInPrompt] originalPrompt has accent pattern?:', originalPrompt?.includes('speaks in'))
+  
+  if (!originalPrompt || !oldScript) {
+    console.warn('[replaceScriptInPrompt] Missing originalPrompt or oldScript, returning original')
+    return originalPrompt
+  }
+  if (oldScript === newScript) {
+    console.log('[replaceScriptInPrompt] oldScript === newScript, returning original')
+    return originalPrompt
+  }
   
   // Méthode 1: Replace direct
   let updatedPrompt = originalPrompt.replace(oldScript, newScript)
   
   // Vérifier si le replace a fonctionné
   if (updatedPrompt !== originalPrompt) {
+    console.log('[replaceScriptInPrompt] ✓ Direct replace worked!')
+    console.log('[replaceScriptInPrompt] Result contains newScript?:', updatedPrompt.includes(newScript))
     return updatedPrompt
   }
   
@@ -146,35 +159,48 @@ function replaceScriptInPrompt(originalPrompt: string, oldScript: string, newScr
   const accentPattern = /(speaks in[^:]+:)\s*/g
   const matches = [...originalPrompt.matchAll(accentPattern)]
   
+  console.log('[replaceScriptInPrompt] Accent pattern matches found:', matches.length)
+  
   if (matches.length > 0) {
     // Trouver la dernière occurrence du pattern d'accent
     const lastMatch = matches[matches.length - 1]
     const accentEndIndex = lastMatch.index! + lastMatch[0].length
     
-    // Le script commence après "clear and neutral: " et peut finir avant la prochaine section
+    // Le script commence après "speaks in ... :" et peut finir avant la prochaine section
     const afterAccent = originalPrompt.substring(accentEndIndex)
     const beforeAccent = originalPrompt.substring(0, accentEndIndex)
+    
+    console.log('[replaceScriptInPrompt] afterAccent (first 100):', afterAccent.slice(0, 100))
     
     // Trouver où finit le script (après le texte parlé)
     // Chercher la fin: généralement avant "NEGATIVES:" ou une section majeure
     const endMarkers = ['NEGATIVES:', '\n\n', 'Sound:', 'Background:', '\n7.', '\n8.']
     let scriptEndIndex = afterAccent.length
+    let foundMarker = 'end of string'
     for (const marker of endMarkers) {
       const markerIndex = afterAccent.indexOf(marker)
       if (markerIndex !== -1 && markerIndex < scriptEndIndex) {
         scriptEndIndex = markerIndex
+        foundMarker = marker
       }
     }
     
+    console.log('[replaceScriptInPrompt] Script ends at marker:', foundMarker, 'index:', scriptEndIndex)
+    
     const afterScript = afterAccent.substring(scriptEndIndex)
     updatedPrompt = beforeAccent + newScript + afterScript
+    
     console.log('[replaceScriptInPrompt] ✓ Replaced using accent pattern method')
+    console.log('[replaceScriptInPrompt] Result contains newScript?:', updatedPrompt.includes(newScript))
+    console.log('[replaceScriptInPrompt] ═══════════════════════════════════════')
     return updatedPrompt
   }
   
   // Méthode 3: Fallback - ajouter le nouveau script avec un marqueur clair
   console.warn('[replaceScriptInPrompt] Could not find accent pattern, appending script override')
-  return originalPrompt + `\n\n[SCRIPT OVERRIDE - Actor says exactly]: "${newScript}"`
+  const result = originalPrompt + `\n\n[SCRIPT OVERRIDE - Actor says exactly]: "${newScript}"`
+  console.log('[replaceScriptInPrompt] ═══════════════════════════════════════')
+  return result
 }
 
 // Vitesses disponibles (UGC TikTok = dynamique, JAMAIS de ralentissement)
@@ -1601,23 +1627,28 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     
     // VERSIONING: Utiliser le clip passé directement (avec les dernières modifications)
     // OU trouver le clip via clipsByBeat (fallback pour les autres boutons de régénération)
+    console.log('[handleConfirmRegenerate] ═══════════════════════════════════════════════════')
+    console.log('[handleConfirmRegenerate] confirmRegen:', { clipIndex, what, hasPassedClip: !!passedClip })
+    
     let clipToRegenerate: CampaignClip
     if (passedClip) {
       // Cas "Sauvegarder & Régénérer" : on utilise le clip avec le script mis à jour
       clipToRegenerate = passedClip
-      console.log('[Regenerate] ═══════════════════════════════════════════════════')
-      console.log('[Regenerate] Using passed clip with updated data:')
-      console.log('[Regenerate] - Script text:', passedClip.script?.text?.slice(0, 80))
-      console.log('[Regenerate] - Video prompt (first 200):', passedClip.video?.prompt?.slice(0, 200))
-      console.log('[Regenerate] - Prompt contains script?:', passedClip.video?.prompt?.includes(passedClip.script?.text || ''))
-      console.log('[Regenerate] ═══════════════════════════════════════════════════')
+      console.log('[handleConfirmRegenerate] ✓ Using PASSED clip (from Sauvegarder & Régénérer)')
+      console.log('[handleConfirmRegenerate] - Script text:', passedClip.script?.text?.slice(0, 80))
+      console.log('[handleConfirmRegenerate] - Video prompt (first 300):', passedClip.video?.prompt?.slice(0, 300))
+      console.log('[handleConfirmRegenerate] - Prompt contains script?:', passedClip.video?.prompt?.includes(passedClip.script?.text || ''))
     } else {
       // Cas régénération standard : trouver via clipsByBeat
+      console.log('[handleConfirmRegenerate] ⚠️ No passed clip, using clipsByBeat fallback')
       const versions = clipsByBeat.get(planClip.order) || []
       const versionIndex = displayedVersionIndex[planClip.order] || 0
       const selectedClip = versions.find(v => v.is_selected) || versions[0]
       clipToRegenerate = versions[versionIndex] || selectedClip || planClip
+      console.log('[handleConfirmRegenerate] - Fallback clip script:', clipToRegenerate.script?.text?.slice(0, 80))
+      console.log('[handleConfirmRegenerate] - Fallback clip prompt (first 300):', clipToRegenerate.video?.prompt?.slice(0, 300))
     }
+    console.log('[handleConfirmRegenerate] ═══════════════════════════════════════════════════')
     
     const oldClipId = clipToRegenerate.id
     const beatOrder = clipToRegenerate.order
