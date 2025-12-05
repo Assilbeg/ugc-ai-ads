@@ -289,6 +289,26 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     })
     return map
   }, [generatedClips])
+  
+  // Liste des beats UNIQUES pour l'affichage (un par order)
+  // On prend le clip le plus représentatif par beat (selected ou plus récent)
+  // Cela évite d'afficher plusieurs tuiles pour le même beat
+  const uniqueBeats = useMemo(() => {
+    // Utiliser les clips du plan original comme base
+    const seenOrders = new Set<number>()
+    const result: CampaignClip[] = []
+    
+    // D'abord, prendre les clips du plan (state.generated_clips)
+    clips.forEach(c => {
+      if (!seenOrders.has(c.order)) {
+        seenOrders.add(c.order)
+        result.push(c)
+      }
+    })
+    
+    // Trier par order
+    return result.sort((a, b) => a.order - b.order)
+  }, [clips])
 
   // Initialiser les ajustements quand les clips changent
   // LOGIQUE V2: user_adjustments > auto_adjustments (si timestamp plus récent)
@@ -1870,9 +1890,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
             </Card>
           )}
 
-          {/* Clips grid */}
+          {/* Clips grid - UNE tuile par beat (order unique) */}
           <div className="space-y-5">
-            {clips.map((clip, index) => {
+            {uniqueBeats.map((clip, index) => {
               // ══════════════════════════════════════════════════════════════
               // VERSIONING: Trouver le clip à afficher pour ce beat
               // Priorité : clip sélectionné (is_selected = true), sinon le plus récent
