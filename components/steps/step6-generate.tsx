@@ -134,6 +134,14 @@ const SPEED_OPTIONS = [
 // Garantit une vitesse minimum de 1.0 (pas de ralentissement)
 const ensureMinSpeed = (speed: number): number => Math.max(1.0, speed)
 
+// Helper pour obtenir la clé d'un clip (pour les ajustements)
+// Utilise clip.id si disponible, sinon un ID temporaire basé sur l'order
+// IMPORTANT: Cette clé doit être cohérente entre l'initialisation et l'UI
+const getClipKey = (clip: { id?: string; order: number } | null | undefined): string => {
+  if (!clip) return ''
+  return clip.id || `temp-order-${clip.order}`
+}
+
 interface Step6GenerateProps {
   state: NewCampaignState
   onClipsUpdate: (clips: CampaignClip[]) => void
@@ -237,9 +245,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   const [fullscreenVideo, setFullscreenVideo] = useState<string | null>(null)
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   
-  // Ajustements vidéo (trim + vitesse) par clip
-  const [adjustments, setAdjustments] = useState<Record<number, ClipAdjustments>>({})
-  const [previewingClip, setPreviewingClip] = useState<number | null>(null)
+  // Ajustements vidéo (trim + vitesse) par clip - clé = clip.id (unique par version)
+  const [adjustments, setAdjustments] = useState<Record<string, ClipAdjustments>>({})
+  const [previewingClip, setPreviewingClip] = useState<string | null>(null) // clip.id pour la preview
   const [assembling, setAssembling] = useState(false)
   
   // Modal de confirmation pour régénération
@@ -253,8 +261,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   // Qualité vidéo sélectionnée
   const [videoQuality, setVideoQuality] = useState<VideoQuality>('fast')
   
-  // Analyse de clips (transcription + auto-trim)
-  const [analyzingClips, setAnalyzingClips] = useState<Set<number>>(new Set())
+  // Analyse de clips (transcription + auto-trim) - clé = clip.id
+  const [analyzingClips, setAnalyzingClips] = useState<Set<string>>(new Set())
   
   // Modal d'achat de crédits
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
@@ -284,19 +292,20 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
 
   // Initialiser les ajustements quand les clips changent
   // LOGIQUE V2: user_adjustments > auto_adjustments (si timestamp plus récent)
-  // IMPORTANT: Utiliser clip.order comme clé (pas l'index) pour éviter les décalages
+  // IMPORTANT: Utiliser clip.id comme clé (unique par version de clip)
   // NOTE: Ne PAS inclure 'adjustments' dans les dépendances pour éviter boucle infinie
   useEffect(() => {
     const clipsToUse = generatedClips.length > 0 ? generatedClips : clips
     
     // Utiliser setAdjustments avec prev pour éviter la dépendance sur adjustments
     setAdjustments(prev => {
-      const newAdjustments: Record<number, ClipAdjustments> = { ...prev }
+      const newAdjustments: Record<string, ClipAdjustments> = { ...prev }
       let hasChanges = false
       
       clipsToUse.forEach((clip) => {
-        const clipOrder = clip.order
-        if (!clipOrder) return
+        // IMPORTANT: Utiliser le helper getClipKey pour cohérence avec l'UI
+        const clipId = getClipKey(clip)
+        if (!clipId) return
         
         // Utiliser la durée de la vidéo générée si disponible
         const videoDuration = clip?.video?.duration
@@ -313,20 +322,53 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         )
         
         // Vérifier si les ajustements ont changé
-        const current = prev[clipOrder]
+        const current = prev[clipId]
         const hasChanged = !current || 
           current.trimStart !== effective.trimStart ||
           current.trimEnd !== effective.trimEnd ||
           current.speed !== effective.speed
         
         if (hasChanged) {
-          console.log(`[Adjustments] ✓ Loading ${effective.source} adjustments for clip order=${clipOrder}`)
-          newAdjustments[clipOrder] = {
+          console.log(`[Adjustments] ✓ Loading ${effective.source} adjustments for clip id=${clipId} (order=${clip.order})`)
+          newAdjustments[clipId] = {
             trimStart: effective.trimStart,
             trimEnd: effective.trimEnd,
             speed: ensureMinSpeed(effective.speed),
           }
           hasChanges = true
+        }
+        
+        // ═══════════════════════════════════════════════════════════════
+        // MIGRATION: Quand le clip obtient son vrai ID (après sauvegarde BDD),
+        // copier les ajustements du temp-order vers le vrai ID
+        // ET sauvegarder en BDD si des modifications ont été faites
+        // ═══════════════════════════════════════════════════════════════
+        if (clip.id) {
+          const tempKey = `temp-order-${clip.order}`
+          // Si on a des ajustements sous la clé temp mais pas sous le vrai ID
+          if (prev[tempKey] && !newAdjustments[clip.id] && !prev[clip.id]) {
+            console.log(`[Adjustments] ✓ Migrating from ${tempKey} to ${clip.id}`)
+            newAdjustments[clip.id] = prev[tempKey]
+            hasChanges = true
+            
+            // Sauvegarder en BDD les ajustements migrés (async, fire-and-forget)
+            // Cela garantit que les modifications faites sur temp-order sont persistées
+            const migratedAdj = prev[tempKey]
+            if (migratedAdj) {
+              const userAdj = {
+                trim_start: migratedAdj.trimStart,
+                trim_end: migratedAdj.trimEnd,
+                speed: migratedAdj.speed,
+                updated_at: new Date().toISOString(),
+              }
+              // Note: On ne peut pas appeler saveUserAdjustmentsToDb ici (pas dans les deps)
+              // Donc on fait l'appel Supabase directement
+              ;(supabase.from('campaign_clips') as any)
+                .update({ user_adjustments: userAdj, adjustments: migratedAdj })
+                .eq('id', clip.id)
+                .then(() => console.log(`[Adjustments] ✓ Migrated adjustments saved to DB for ${clip.id}`))
+            }
+          }
         }
         
         // ═══════════════════════════════════════════════════════════════
@@ -340,15 +382,15 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
             processedUrl: clip.adjustments.processedUrl,
           }
           
-          const currentLegacy = prev[clipOrder]
+          const currentLegacy = prev[clipId]
           const hasChangedLegacy = !currentLegacy || 
             currentLegacy.trimStart !== clipAdjustments.trimStart ||
             currentLegacy.trimEnd !== clipAdjustments.trimEnd ||
             currentLegacy.speed !== clipAdjustments.speed
           
           if (hasChangedLegacy) {
-            console.log(`[Adjustments] ✓ Loading LEGACY adjustments for clip order=${clipOrder}`)
-            newAdjustments[clipOrder] = clipAdjustments
+            console.log(`[Adjustments] ✓ Loading LEGACY adjustments for clip id=${clipId}`)
+            newAdjustments[clipId] = clipAdjustments
             hasChanges = true
           }
         }
@@ -611,15 +653,19 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     }
   }, [campaignId, supabase])
 
-  // Mettre à jour un ajustement (par clip.order, pas par index)
+  // Mettre à jour un ajustement par clip.id (unique par version)
   // V2: Sauvegarde dans user_adjustments avec timestamp pour tracking
-  const updateAdjustment = useCallback((clipOrder: number, update: Partial<ClipAdjustments>) => {
+  const updateAdjustment = useCallback((clipId: string, update: Partial<ClipAdjustments>) => {
+    if (!clipId) return
+    
+    // Vérifier si c'est un vrai ID ou une clé temporaire
+    const isRealId = !clipId.startsWith('temp-order-')
+    
     setAdjustments(prev => {
-      const newAdjustment = { ...prev[clipOrder], ...update, isApplied: false }
+      const newAdjustment = { ...prev[clipId], ...update, isApplied: false }
       
-      // Trouver le clip pour sauvegarder en BDD
-      const clip = [...generatedClips, ...clips].find(c => c?.order === clipOrder)
-      if (clip?.id) {
+      // Sauvegarder en BDD SEULEMENT si c'est un vrai ID
+      if (isRealId) {
         // V2: Créer user_adjustments avec timestamp
         const userAdjustments: UserAdjustments = {
           trim_start: newAdjustment.trimStart,
@@ -629,21 +675,25 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         }
         
         // Sauvegarder user_adjustments en BDD (async)
-        saveUserAdjustmentsToDb(clip.id, userAdjustments)
+        saveUserAdjustmentsToDb(clipId, userAdjustments)
         
         // LEGACY: Aussi sauvegarder dans adjustments pour compatibilité
-        saveAdjustmentToDb(clip.id, newAdjustment)
+        saveAdjustmentToDb(clipId, newAdjustment)
+      } else {
+        console.log(`[Adjustments] Skipping DB save for temp key: ${clipId}`)
       }
       
-      return { ...prev, [clipOrder]: newAdjustment }
+      return { ...prev, [clipId]: newAdjustment }
     })
-  }, [saveAdjustmentToDb, saveUserAdjustmentsToDb, generatedClips, clips])
+  }, [saveAdjustmentToDb, saveUserAdjustmentsToDb])
 
   // Reset les ajustements aux valeurs IA (auto_adjustments) ou par défaut
   // V2: Supprime user_adjustments pour revenir aux valeurs auto
-  const resetAdjustments = useCallback((clipOrder: number) => {
-    // Trouver le clip par son order
-    const clip = [...clips, ...generatedClips].find(c => c?.order === clipOrder)
+  const resetAdjustments = useCallback((clipId: string) => {
+    if (!clipId) return
+    
+    // Trouver le clip par son ID
+    const clip = [...clips, ...generatedClips].find(c => c?.id === clipId)
     if (!clip) return
     
     // V2: Utiliser auto_adjustments si disponible, sinon valeurs par défaut
@@ -654,38 +704,36 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         trimEnd: clip.auto_adjustments.trim_end,
         speed: ensureMinSpeed(clip.auto_adjustments.speed),
       }
-      console.log(`[Adjustments] Reset to AUTO values for clip order=${clipOrder}:`, resetAdjustment)
+      console.log(`[Adjustments] Reset to AUTO values for clip id=${clipId}:`, resetAdjustment)
     } else {
       resetAdjustment = {
         trimStart: 0,
         trimEnd: clip.video?.duration || 6,
         speed: 1.0,
       }
-      console.log(`[Adjustments] Reset to DEFAULT values for clip order=${clipOrder}:`, resetAdjustment)
+      console.log(`[Adjustments] Reset to DEFAULT values for clip id=${clipId}:`, resetAdjustment)
     }
     
     setAdjustments(prev => ({
       ...prev,
-      [clipOrder]: resetAdjustment
+      [clipId]: resetAdjustment
     }))
     
     // V2: Supprimer user_adjustments en BDD (revenir aux valeurs auto)
-    if (clip.id) {
-      // Supprimer user_adjustments (null)
-      ;(supabase.from('campaign_clips') as any)
-        .update({ user_adjustments: null })
-        .eq('id', clip.id)
-        .then(({ error }: { error: Error | null }) => {
-          if (error) {
-            console.error('[Adjustments] Failed to reset user_adjustments:', error)
-          } else {
-            console.log('[Adjustments] ✓ Reset user_adjustments to null for clip:', clip.id)
-          }
-        })
-      
-      // LEGACY: Aussi mettre à jour adjustments
-      saveAdjustmentToDb(clip.id, resetAdjustment)
-    }
+    // Supprimer user_adjustments (null)
+    ;(supabase.from('campaign_clips') as any)
+      .update({ user_adjustments: null })
+      .eq('id', clipId)
+      .then(({ error }: { error: Error | null }) => {
+        if (error) {
+          console.error('[Adjustments] Failed to reset user_adjustments:', error)
+        } else {
+          console.log('[Adjustments] ✓ Reset user_adjustments to null for clip:', clipId)
+        }
+      })
+    
+    // LEGACY: Aussi mettre à jour adjustments
+    saveAdjustmentToDb(clipId, resetAdjustment)
   }, [clips, generatedClips, saveAdjustmentToDb, supabase])
 
   // ══════════════════════════════════════════════════════════════
@@ -725,16 +773,18 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
 
   // Analyser un clip existant (transcription Whisper + analyse Claude)
   // Utile pour les clips générés avant l'ajout de cette feature
-  // IMPORTANT: Utilise clipOrder (pas index) pour être cohérent avec les ajustements
-  const analyzeClip = useCallback(async (clipOrder: number) => {
-    // Trouver le clip par son order
-    const clip = [...generatedClips, ...clips].find(c => c?.order === clipOrder)
+  // IMPORTANT: Utilise clipId (unique par version) pour être cohérent avec les ajustements
+  const analyzeClip = useCallback(async (clipId: string) => {
+    if (!clipId) return
+    
+    // Trouver le clip par son ID
+    const clip = [...generatedClips, ...clips].find(c => c?.id === clipId)
     if (!clip?.video?.raw_url && !clip?.video?.final_url) {
-      console.error('[Analyze] No video URL for clip order', clipOrder)
+      console.error('[Analyze] No video URL for clip id', clipId)
       return
     }
 
-    setAnalyzingClips(prev => new Set([...prev, clipOrder]))
+    setAnalyzingClips(prev => new Set([...prev, clipId]))
 
     try {
       const videoUrl = clip.video.final_url || clip.video.raw_url
@@ -754,11 +804,11 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       }
 
       const result = await response.json()
-      console.log('[Analyze] ✓ Clip order', clipOrder, 'analyzed:', result)
+      console.log('[Analyze] ✓ Clip id', clipId, 'analyzed:', result)
 
-      // Mettre à jour le clip avec la transcription (par order, pas par index)
+      // Mettre à jour le clip avec la transcription (par id)
       setGeneratedClips(prev => prev.map((c) => {
-        if (c?.order === clipOrder) {
+        if (c?.id === clipId) {
           return {
             ...c,
             transcription: {
@@ -768,13 +818,20 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
               speech_end: result.speech_end,
               words_per_second: result.words_per_second,
               suggested_speed: result.suggested_speed,
+            },
+            // Aussi mettre à jour auto_adjustments
+            auto_adjustments: {
+              trim_start: Math.max(0, result.speech_start),
+              trim_end: Math.min(result.speech_end, clip.video.duration),
+              speed: ensureMinSpeed(result.suggested_speed || 1.0),
+              updated_at: new Date().toISOString(),
             }
           }
         }
         return c
       }))
 
-      // Appliquer les ajustements suggérés (par order, pas par index)
+      // Appliquer les ajustements suggérés (par clip.id)
       if (result.speech_start !== undefined && result.speech_end !== undefined) {
         // Garder la précision max de Whisper pour un trim précis
         const trimStart = Math.max(0, result.speech_start)
@@ -783,7 +840,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
 
         setAdjustments(prev => ({
           ...prev,
-          [clipOrder]: { trimStart, trimEnd, speed }
+          [clipId]: { trimStart, trimEnd, speed }
         }))
       }
 
@@ -792,7 +849,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     } finally {
       setAnalyzingClips(prev => {
         const next = new Set(prev)
-        next.delete(clipOrder)
+        next.delete(clipId)
         return next
       })
     }
@@ -823,14 +880,18 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     
     try {
       // Préparer les données avec les ajustements trim/speed
-      // IMPORTANT: Utiliser clip.order comme clé (pas l'index) pour correspondre à l'UI
+      // IMPORTANT: Utiliser clip.id comme clé (unique par version de clip)
       const clipsData = selectedClips
         .map((clip) => {
-          const adj = adjustments[clip.order]
+          // Récupérer les ajustements par clip.id (priorité) ou depuis auto_adjustments
+          const adj = clip.id ? adjustments[clip.id] : undefined
+          const autoAdj = clip.auto_adjustments
           const originalDuration = clip.video.duration || 6
-          const trimStart = adj?.trimStart ?? 0
-          const trimEnd = adj?.trimEnd ?? originalDuration
-          const speed = adj?.speed ?? 1.0
+          
+          // Priorité: adjustments du state > auto_adjustments > valeurs par défaut
+          const trimStart = adj?.trimStart ?? autoAdj?.trim_start ?? 0
+          const trimEnd = adj?.trimEnd ?? autoAdj?.trim_end ?? originalDuration
+          const speed = adj?.speed ?? autoAdj?.speed ?? 1.0
           const trimmedDuration = trimEnd - trimStart
           const duration = trimmedDuration / speed
           // TOUJOURS traiter avec Transloadit pour normaliser les timestamps
@@ -842,6 +903,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
             clip,
             rawUrl: clip.video.final_url || clip.video.raw_url,
             duration,
+            clipId: clip.id,
             clipOrder: clip.order,
             trimStart,
             trimEnd,
@@ -1852,14 +1914,16 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                           loop
                           playsInline
                           ref={(video) => {
-                            if (video) {
-                              const adj = adjustments[clip.order]
+                            const clipKey = getClipKey(generatedClip)
+                            if (video && clipKey) {
+                              const adj = adjustments[clipKey]
                               if (adj) {
                                 // Appliquer la vitesse en temps réel
                                 video.playbackRate = adj.speed || 1
                                 // Gérer le trim (boucle entre trimStart et trimEnd)
+                                const videoDuration = generatedClip.video?.duration || clip.video.duration
                                 const handleTimeUpdate = () => {
-                                  const trimEnd = adj.trimEnd ?? clip.video.duration
+                                  const trimEnd = adj.trimEnd ?? videoDuration
                                   const trimStart = adj.trimStart ?? 0
                                   if (video.currentTime >= trimEnd || video.currentTime < trimStart) {
                                     video.currentTime = trimStart
@@ -1876,7 +1940,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                         />
                         {/* Bouton plein écran au hover */}
                         <button
-                          onClick={() => { setPreviewingClip(clip.order); setFullscreenVideo(videoUrl) }}
+                          onClick={() => { setPreviewingClip(getClipKey(generatedClip) || null); setFullscreenVideo(videoUrl) }}
                           className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/30 transition-colors"
                         >
                           <Play className="w-10 h-10 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -2119,122 +2183,162 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                               <Badge variant="outline" className="text-xs ml-auto">gratuit</Badge>
                             </div>
                             
-                            {/* Bouton Analyser (si pas de transcription) */}
-                            {!generatedClip?.transcription?.speech_start && (
-                              <button
-                                onClick={() => analyzeClip(clip.order)}
-                                disabled={analyzingClips.has(clip.order)}
-                                className="w-full mb-3 px-3 py-2 text-xs rounded-lg border border-dashed border-primary/50 bg-primary/5 hover:bg-primary/10 transition-colors flex items-center justify-center gap-2 text-primary disabled:opacity-50"
-                              >
-                                {analyzingClips.has(clip.order) ? (
-                                  <>
-                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                    Analyse en cours...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Sparkles className="w-3 h-3" />
-                                    Auto-détecter trim & vitesse
-                                  </>
-                                )}
-                              </button>
-                            )}
+                            {/* Bouton Analyser (si pas de transcription pour CE clip) */}
+                            {(() => {
+                              const clipKey = getClipKey(generatedClip)
+                              // Afficher le bouton seulement si :
+                              // 1. Pas de transcription avec speech_start
+                              // 2. On a une clé valide (id ou temp)
+                              // 3. Le clip a un vrai ID (pour pouvoir sauvegarder en BDD)
+                              if (generatedClip?.transcription?.speech_start || !generatedClip?.id) return null
+                              return (
+                                <button
+                                  onClick={() => analyzeClip(generatedClip.id)}
+                                  disabled={analyzingClips.has(clipKey)}
+                                  className="w-full mb-3 px-3 py-2 text-xs rounded-lg border border-dashed border-primary/50 bg-primary/5 hover:bg-primary/10 transition-colors flex items-center justify-center gap-2 text-primary disabled:opacity-50"
+                                >
+                                  {analyzingClips.has(clipKey) ? (
+                                    <>
+                                      <Loader2 className="w-3 h-3 animate-spin" />
+                                      Analyse en cours...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Sparkles className="w-3 h-3" />
+                                      Auto-détecter trim & vitesse
+                                    </>
+                                  )}
+                                </button>
+                              )
+                            })()}
                             
-                            {/* Trim Slider */}
-                            <div className="mb-3">
-                              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                                <span>Trim</span>
-                                <span>
-                                  {adjustments[clip.order]?.trimStart?.toFixed(2) || '0.00'}s → {adjustments[clip.order]?.trimEnd?.toFixed(2) || clip.video.duration.toFixed(2)}s
-                                </span>
-                              </div>
-                              <Slider
-                                value={[
-                                  adjustments[clip.order]?.trimStart || 0,
-                                  adjustments[clip.order]?.trimEnd || clip.video.duration
-                                ]}
-                                min={0}
-                                max={clip.video.duration}
-                                step={0.01}
-                                onValueChange={([start, end]) => {
-                                  updateAdjustment(clip.order, { trimStart: start, trimEnd: end })
-                                }}
-                                className="w-full"
-                              />
-                            </div>
+                            {/* Trim Slider - utilise la durée de la vidéo GÉNÉRÉE */}
+                            {(() => {
+                              const clipKey = getClipKey(generatedClip)
+                              const videoDuration = generatedClip?.video?.duration || clip.video.duration
+                              const adj = clipKey ? adjustments[clipKey] : undefined
+                              return (
+                                <div className="mb-3">
+                                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                                    <span>Trim</span>
+                                    <span>
+                                      {adj?.trimStart?.toFixed(2) || '0.00'}s → {adj?.trimEnd?.toFixed(2) || videoDuration.toFixed(2)}s
+                                    </span>
+                                  </div>
+                                  <Slider
+                                    value={[
+                                      adj?.trimStart || 0,
+                                      adj?.trimEnd || videoDuration
+                                    ]}
+                                    min={0}
+                                    max={videoDuration}
+                                    step={0.01}
+                                    onValueChange={([start, end]) => {
+                                      // Utiliser le vrai ID pour sauvegarder en BDD (si disponible)
+                                      const saveKey = generatedClip?.id || clipKey
+                                      if (saveKey) updateAdjustment(saveKey, { trimStart: start, trimEnd: end })
+                                    }}
+                                    className="w-full"
+                                  />
+                                </div>
+                              )
+                            })()}
                             
                             {/* Speed Buttons */}
-                            <div className="mb-3">
-                              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                                <Gauge className="w-3 h-3" />
-                                <span>Vitesse</span>
-                                {/* Indicateur de débit de parole */}
-                                {generatedClip?.transcription?.words_per_second && (
-                                  <span className={`ml-auto px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                    generatedClip.transcription.words_per_second < 2.5 
-                                      ? 'bg-orange-500/20 text-orange-600' 
-                                      : generatedClip.transcription.words_per_second > 4.0 
-                                        ? 'bg-blue-500/20 text-blue-600'
-                                        : 'bg-green-500/20 text-green-600'
-                                  }`}>
-                                    {generatedClip.transcription.words_per_second.toFixed(1)} mots/s
-                                    {generatedClip.transcription.words_per_second < 2.5 && ' (lent)'}
-                                    {generatedClip.transcription.words_per_second > 4.0 && ' (rapide)'}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-1">
-                                {SPEED_OPTIONS.map((opt) => {
-                                  const isSuggested = generatedClip?.transcription?.suggested_speed === opt.value
-                                  const isSelected = (adjustments[clip.order]?.speed || 1.0) === opt.value
-                                  return (
-                                    <button
-                                      key={opt.value}
-                                      onClick={() => updateAdjustment(clip.order, { speed: opt.value })}
-                                      className={`px-2 py-1 text-xs rounded-md transition-colors relative ${
-                                        isSelected
-                                          ? 'bg-foreground text-background font-medium'
-                                          : isSuggested
-                                            ? 'bg-primary/20 ring-1 ring-primary/50 hover:bg-primary/30'
-                                            : 'bg-muted hover:bg-muted/80'
-                                      }`}
-                                    >
-                                      {opt.label}
-                                      {isSuggested && !isSelected && (
-                                        <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />
-                                      )}
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                            </div>
+                            {(() => {
+                              const clipKey = getClipKey(generatedClip)
+                              const adj = clipKey ? adjustments[clipKey] : undefined
+                              return (
+                                <div className="mb-3">
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                                    <Gauge className="w-3 h-3" />
+                                    <span>Vitesse</span>
+                                    {/* Indicateur de débit de parole */}
+                                    {generatedClip?.transcription?.words_per_second && (
+                                      <span className={`ml-auto px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                        generatedClip.transcription.words_per_second < 2.5 
+                                          ? 'bg-orange-500/20 text-orange-600' 
+                                          : generatedClip.transcription.words_per_second > 4.0 
+                                            ? 'bg-blue-500/20 text-blue-600'
+                                            : 'bg-green-500/20 text-green-600'
+                                      }`}>
+                                        {generatedClip.transcription.words_per_second.toFixed(1)} mots/s
+                                        {generatedClip.transcription.words_per_second < 2.5 && ' (lent)'}
+                                        {generatedClip.transcription.words_per_second > 4.0 && ' (rapide)'}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    {SPEED_OPTIONS.map((opt) => {
+                                      const isSuggested = generatedClip?.transcription?.suggested_speed === opt.value
+                                      const isSelected = (adj?.speed || 1.0) === opt.value
+                                      const saveKey = generatedClip?.id || clipKey
+                                      return (
+                                        <button
+                                          key={opt.value}
+                                          onClick={() => saveKey && updateAdjustment(saveKey, { speed: opt.value })}
+                                          className={`px-2 py-1 text-xs rounded-md transition-colors relative ${
+                                            isSelected
+                                              ? 'bg-foreground text-background font-medium'
+                                              : isSuggested
+                                                ? 'bg-primary/20 ring-1 ring-primary/50 hover:bg-primary/30'
+                                                : 'bg-muted hover:bg-muted/80'
+                                          }`}
+                                        >
+                                          {opt.label}
+                                          {isSuggested && !isSelected && (
+                                            <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />
+                                          )}
+                                        </button>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                              )
+                            })()}
                             
                             {/* Durée ajustée */}
-                            {adjustments[clip.order] && (
-                              <div className="text-xs text-muted-foreground mb-3">
-                                Durée finale : {calculateAdjustedDuration(
-                                  clip.video.duration,
-                                  adjustments[clip.order].trimStart,
-                                  adjustments[clip.order].trimEnd,
-                                  adjustments[clip.order].speed
-                                ).toFixed(2)}s
-                              </div>
-                            )}
+                            {(() => {
+                              const clipKey = getClipKey(generatedClip)
+                              const videoDuration = generatedClip?.video?.duration || clip.video.duration
+                              const adj = clipKey ? adjustments[clipKey] : undefined
+                              if (!adj) return null
+                              return (
+                                <div className="text-xs text-muted-foreground mb-3">
+                                  Durée finale : {calculateAdjustedDuration(
+                                    videoDuration,
+                                    adj.trimStart,
+                                    adj.trimEnd,
+                                    adj.speed
+                                  ).toFixed(2)}s
+                                </div>
+                              )
+                            })()}
                             
                             {/* Reset Button - seulement si modifié */}
-                            {(adjustments[clip.order]?.trimStart !== 0 ||
-                              adjustments[clip.order]?.trimEnd !== clip.video.duration ||
-                              adjustments[clip.order]?.speed !== 1.0) && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 text-xs rounded-lg text-muted-foreground"
-                                onClick={() => resetAdjustments(clip.order)}
-                              >
-                                <RefreshCw className="w-3 h-3 mr-1" />
-                                Reset
+                            {(() => {
+                              const clipKey = getClipKey(generatedClip)
+                              const videoDuration = generatedClip?.video?.duration || clip.video.duration
+                              const adj = clipKey ? adjustments[clipKey] : undefined
+                              const isModified = adj && (
+                                adj.trimStart !== 0 ||
+                                adj.trimEnd !== videoDuration ||
+                                adj.speed !== 1.0
+                              )
+                              // Reset nécessite un vrai ID pour sauvegarder en BDD
+                              if (!isModified || !generatedClip?.id) return null
+                              return (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-xs rounded-lg text-muted-foreground"
+                                  onClick={() => resetAdjustments(generatedClip.id)}
+                                >
+                                  <RefreshCw className="w-3 h-3 mr-1" />
+                                  Reset
                               </Button>
-                            )}
+                              )
+                            })()}
                           </div>
                           
                           {/* Section RÉGÉNÉRER (coûteux) */}
