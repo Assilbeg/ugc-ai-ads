@@ -63,6 +63,7 @@
 | **Une tuile par beat dans l'UI** | Itérer sur `uniqueBeats`, pas sur `clips` | `91ae571` |
 | **Archiver APRÈS succès** | Créer la clip_version APRÈS la régénération réussie, pas avant | `26f5f86` |
 | **Nouveau row à chaque régénération** | `id: undefined` force un INSERT, pas un UPDATE | `25957ca` |
+| **Preview sur nouveau clip après regen** | Reset `displayedVersionIndex[beat]` à 0 + trier `clipsByBeat` par `is_selected` d'abord | Dec 2024 |
 
 ### Code de référence
 
@@ -833,6 +834,7 @@ if (isClipRegenerating(clipId)) {
 
 | Date | Commit | Comportement ajouté |
 |------|--------|---------------------|
+| Dec 2024 | - | Preview affiche automatiquement le nouveau clip après régénération (reset displayedVersionIndex + tri is_selected) |
 | Dec 2024 | - | Fix allCompleted : ne vérifier que les clips avec vidéo (pas les squelettes pending) |
 | Dec 2024 | - | Policy RLS actors : admin peut modifier acteurs preset |
 | Dec 2024 | `81785dc` | Fix comptage clips par beats |
