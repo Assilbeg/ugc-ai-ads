@@ -1605,7 +1605,12 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     if (passedClip) {
       // Cas "Sauvegarder & Régénérer" : on utilise le clip avec le script mis à jour
       clipToRegenerate = passedClip
-      console.log('[Regenerate] Using passed clip with updated script:', passedClip.script?.text?.slice(0, 50))
+      console.log('[Regenerate] ═══════════════════════════════════════════════════')
+      console.log('[Regenerate] Using passed clip with updated data:')
+      console.log('[Regenerate] - Script text:', passedClip.script?.text?.slice(0, 80))
+      console.log('[Regenerate] - Video prompt (first 200):', passedClip.video?.prompt?.slice(0, 200))
+      console.log('[Regenerate] - Prompt contains script?:', passedClip.video?.prompt?.includes(passedClip.script?.text || ''))
+      console.log('[Regenerate] ═══════════════════════════════════════════════════')
     } else {
       // Cas régénération standard : trouver via clipsByBeat
       const versions = clipsByBeat.get(planClip.order) || []

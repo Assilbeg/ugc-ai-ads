@@ -514,11 +514,19 @@ export function useVideoGeneration() {
         const frameUrl = updatedClip.first_frame.image_url
         if (!frameUrl) throw new Error('First frame requis pour générer la vidéo')
 
+        // DEBUG: Log le prompt qui va être envoyé à Veo
+        const videoPromptToSend = clip.video.prompt
+        console.log('[Regenerate Video] ═══════════════════════════════════════')
+        console.log('[Regenerate Video] Script text:', clip.script?.text?.slice(0, 100))
+        console.log('[Regenerate Video] Video prompt (first 300 chars):', videoPromptToSend?.slice(0, 300))
+        console.log('[Regenerate Video] Video prompt contains script?', videoPromptToSend?.includes(clip.script?.text || ''))
+        console.log('[Regenerate Video] ═══════════════════════════════════════')
+
         const videoResponse = await fetch('/api/generate/video', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            prompt: clip.video.prompt,
+            prompt: videoPromptToSend,
             firstFrameUrl: frameUrl,
             engine: 'veo3.1',
             duration: clip.video.duration,
