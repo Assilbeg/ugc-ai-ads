@@ -240,7 +240,7 @@ export async function POST(request: NextRequest) {
     // Optionnel: comparer avec la DB
     let dbComparison = null
     if (compareDb) {
-      const supabase = await createServiceClient()
+      const supabase = createServiceClient()
       
       // Récupérer toutes les URLs FAL de la DB
       const { data: clips } = await supabase

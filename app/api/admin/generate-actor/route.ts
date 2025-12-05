@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     // On utilise le service client pour bypass RLS car les acteurs preset ont user_id = null
     let savedActor = null
     if (saveToDb) {
-      const serviceSupabase = await createServiceClient()
+      const serviceSupabase = createServiceClient()
       const { data, error } = await (serviceSupabase
         .from('actors') as any)
         .insert({

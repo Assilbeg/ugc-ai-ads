@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
 
     // Mettre à jour l'acteur dans Supabase
     // On utilise le service client pour bypass RLS car les acteurs preset ont user_id = null
-    const supabase = await createServiceClient()
+    const supabase = createServiceClient()
     
     // D'abord récupérer les intention_media existantes
     const { data: existingActor } = await (supabase

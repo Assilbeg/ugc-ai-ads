@@ -919,7 +919,7 @@ const supabase = await createClient()  // Utilise ANON_KEY → soumis aux RLS
 
 // ✅ SOLUTION - Bypass RLS avec service role
 import { createServiceClient } from '@/lib/supabase/server'
-const supabase = await createServiceClient()  // Utilise SERVICE_ROLE_KEY → bypass RLS
+const supabase = createServiceClient()  // Utilise SERVICE_ROLE_KEY → bypass RLS (non-async)
 ```
 
 ### Quand utiliser `createServiceClient()` ?
