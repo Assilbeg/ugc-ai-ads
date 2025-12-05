@@ -17,7 +17,6 @@ Projets utilisateur.
 | brief | JSONB | Brief utilisateur |
 | status | VARCHAR | draft, generating, completed, failed |
 | final_video_url | TEXT | URL vidéo assemblée |
-| thumbnail_url | TEXT | URL miniature (générée lors de l'assemblage) |
 | created_at | TIMESTAMPTZ | Date de création |
 | updated_at | TIMESTAMPTZ | Date de modification |
 

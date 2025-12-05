@@ -11,7 +11,6 @@ interface CampaignCardProps {
     id: string
     status: string
     final_video_url?: string
-    thumbnail_url?: string
     created_at: string
     brief?: { what_selling?: string; target_duration?: number }
     campaign_clips?: { count: number }[]
@@ -101,21 +100,13 @@ export function CampaignCard({ campaign, presetName, statusConfig, onDelete }: C
           {/* Video area - Format 9:16 */}
           <div className="relative aspect-[9/16] bg-gradient-to-br from-zinc-100 to-zinc-200 dark:from-zinc-800 dark:to-zinc-900 overflow-hidden cursor-pointer">
             {campaign.final_video_url ? (
-              campaign.thumbnail_url ? (
-                <img 
-                  src={campaign.thumbnail_url} 
-                  alt="Thumbnail"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <video 
-                  src={campaign.final_video_url} 
-                  className="w-full h-full object-cover"
-                  muted
-                  playsInline
-                  preload="metadata"
-                />
-              )
+              <video 
+                src={campaign.final_video_url} 
+                className="w-full h-full object-cover"
+                muted
+                playsInline
+                preload="metadata"
+              />
             ) : actor?.soul_image_url ? (
               <img 
                 src={actor.soul_image_url} 
