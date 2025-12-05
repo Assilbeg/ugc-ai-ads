@@ -411,11 +411,12 @@ export async function POST(request: NextRequest) {
         console.log('[Assemble] ✓ Assembly sauvegardé, version:', assembly?.version || 'N/A')
       }
 
-      // Mettre à jour la campagne
+      // Mettre à jour la campagne (avec thumbnail)
       await (supabase
         .from('campaigns') as any)
         .update({ 
           final_video_url: videoUrl,
+          thumbnail_url: thumbnailUrl || null,
           status: 'completed'
         })
         .eq('id', campaignId)
