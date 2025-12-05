@@ -648,6 +648,65 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     if (!campaignId) return
     
     try {
+      // ═══════════════════════════════════════════════════════════════
+      // CAS 1: Version archivée (ID préfixé "version-")
+      // Ces versions viennent de clip_versions et doivent être restaurées
+      // ═══════════════════════════════════════════════════════════════
+      if (clipId.startsWith('version-')) {
+        const versionId = clipId.replace('version-', '')
+        console.log(`[Versioning] Restoring archived version ${versionId}`)
+        
+        // Trouver la version archivée dans le state
+        const archivedClip = generatedClips.find(c => c.id === clipId)
+        if (!archivedClip) {
+          console.error('[Versioning] Archived version not found in state')
+          return
+        }
+        
+        // Trouver le clip parent (celui qui a current_version le plus élevé pour ce beat)
+        const parentClip = generatedClips
+          .filter(c => c.order === beat && !c.id?.startsWith('version-'))
+          .sort((a, b) => (b.current_version || 0) - (a.current_version || 0))[0]
+        
+        if (!parentClip) {
+          console.error('[Versioning] Parent clip not found for beat', beat)
+          return
+        }
+        
+        // Récupérer les données de la version archivée
+        const { data: versionData, error: versionError } = await (supabase
+          .from('clip_versions') as any)
+          .select('*')
+          .eq('id', versionId)
+          .single()
+        
+        if (versionError || !versionData) {
+          console.error('[Versioning] Error fetching version data:', versionError)
+          return
+        }
+        
+        // Restaurer la version dans le clip parent
+        const restored = await restoreClipVersion(parentClip.id, versionData)
+        if (restored) {
+          // Mettre à jour le state local avec le clip restauré
+          setGeneratedClips(prev => prev.map(c => {
+            if (c.id === parentClip.id) {
+              return { ...restored, is_selected: true }
+            }
+            if (c.order === beat) {
+              return { ...c, is_selected: false }
+            }
+            return c
+          }))
+          console.log(`[Versioning] ✓ Restored archived version ${versionData.version_number} for beat ${beat}`)
+        }
+        return
+      }
+      
+      // ═══════════════════════════════════════════════════════════════
+      // CAS 2: Clip normal dans campaign_clips
+      // ═══════════════════════════════════════════════════════════════
+      
       // 1. Mettre tous les clips du même beat à is_selected = false
       await (supabase
         .from('campaign_clips') as any)
@@ -671,7 +730,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     } catch (err) {
       console.error('[Versioning] Error selecting version:', err)
     }
-  }, [campaignId, supabase])
+  }, [campaignId, supabase, generatedClips, restoreClipVersion])
 
   // Mettre à jour un ajustement par clip.id (unique par version)
   // V2: Sauvegarde dans user_adjustments avec timestamp pour tracking
