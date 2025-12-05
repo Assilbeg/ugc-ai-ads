@@ -330,6 +330,27 @@ Toutes les tables ont RLS activé :
 - Les presets (actors avec is_custom=false) sont publics en lecture
 - `generation_costs` et `subscription_plans` sont publics en lecture
 
+### Policy spéciale : Acteurs
+
+Les acteurs preset ont `user_id = null`, ce qui posait problème pour les modifications admin.
+
+**Solution** : La policy UPDATE sur `actors` autorise les admins à modifier les acteurs preset :
+
+```sql
+-- Policy UPDATE sur actors
+CREATE POLICY "Users can update their own actors or admins can update preset actors" ON actors
+FOR UPDATE
+USING (
+  user_id = auth.uid() 
+  OR (
+    is_custom = false 
+    AND (SELECT email FROM auth.users WHERE id = auth.uid()) = 'alexis.albo.lapro@gmail.com'
+  )
+);
+```
+
+> Voir `CRITICAL_BEHAVIORS.md` section 14 pour plus de détails.
+
 ---
 
 ## Fonctions SQL

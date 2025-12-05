@@ -833,6 +833,7 @@ if (isClipRegenerating(clipId)) {
 
 | Date | Commit | Comportement ajouté |
 |------|--------|---------------------|
+| Dec 2024 | - | Policy RLS actors : admin peut modifier acteurs preset |
 | Dec 2024 | `81785dc` | Fix comptage clips par beats |
 | Dec 2024 | `53749b0` | Charger clip_versions pour navigation |
 | Dec 2024 | `91ae571` | Une seule tuile par beat (itère sur uniqueBeats) |
@@ -940,14 +941,37 @@ Caractéristiques :
 
 Les acteurs "preset" (Luna, Emma, Marco...) ont `user_id = null` car ils n'appartiennent à aucun utilisateur spécifique - ils sont partagés.
 
-La politique RLS sur `actors` pour UPDATE est :
+L'ancienne politique RLS sur `actors` pour UPDATE était :
 ```sql
 user_id = auth.uid()
 ```
 
-Problème : `null = auth.uid()` est **toujours false** en SQL → les updates sont silencieusement ignorés !
+Problème : `null = auth.uid()` est **toujours false** en SQL → les updates étaient silencieusement ignorés !
 
-### Solution : Service Role pour les opérations admin
+### Solution 1 : Policy RLS avec exception admin (recommandé pour l'admin UI)
+
+> **Fix dec 2024** : La policy RLS a été modifiée pour permettre aux admins de modifier les acteurs preset directement depuis l'interface admin, sans avoir besoin du service role.
+
+```sql
+-- Nouvelle policy (remplace l'ancienne)
+CREATE POLICY "Users can update their own actors or admins can update preset actors" ON actors
+FOR UPDATE
+USING (
+  user_id = auth.uid() 
+  OR (
+    is_custom = false 
+    AND (SELECT email FROM auth.users WHERE id = auth.uid()) = 'alexis.albo.lapro@gmail.com'
+  )
+);
+```
+
+Cette policy autorise :
+1. **Utilisateurs normaux** : peuvent modifier leurs propres acteurs (`user_id = auth.uid()`)
+2. **Admin** : peut modifier les acteurs preset (`is_custom = false`) identifié par son email
+
+### Solution 2 : Service Role pour les opérations API
+
+Pour les opérations côté serveur (APIs), utiliser le service role qui bypass les RLS :
 
 ```typescript
 // ❌ PROBLÈME - Les updates sur acteurs preset échouent silencieusement
@@ -959,19 +983,19 @@ import { createServiceClient } from '@/lib/supabase/server'
 const supabase = createServiceClient()  // Utilise SERVICE_ROLE_KEY → bypass RLS (non-async)
 ```
 
-### Quand utiliser `createServiceClient()` ?
+### Quand utiliser quoi ?
 
-| Cas | Client à utiliser |
-|-----|-------------------|
-| Opérations utilisateur standard | `createClient()` |
-| API admin sur acteurs preset | `createServiceClient()` |
-| Génération intention_media | `createServiceClient()` |
+| Cas | Solution |
+|-----|----------|
+| Admin UI (page /admin/actors) | Policy RLS avec exception admin ✅ |
+| API génération intention_media | `createServiceClient()` |
 | Déduction de crédits | `createServiceClient()` |
-| Opérations sur données partagées | `createServiceClient()` |
+| Opérations utilisateur standard | `createClient()` |
 
 ### Fichiers concernés
 
-- `app/api/generate/intention-media/route.ts` - Génération images intention (fix dec 2024)
+- `app/api/generate/intention-media/route.ts` - Génération images intention (service role)
+- `app/(admin)/admin/actors/page.tsx` - Gestion acteurs (bénéficie de la policy RLS admin)
 
 ---
 
