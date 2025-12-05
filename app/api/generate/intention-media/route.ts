@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { generateFirstFrame } from '@/lib/api/falai'
 import { IntentionPreset, ActorIntentionMedia } from '@/types'
 
@@ -124,7 +124,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Mettre à jour l'acteur dans Supabase
-    const supabase = await createClient()
+    // On utilise le service client pour bypass RLS car les acteurs preset ont user_id = null
+    const supabase = await createServiceClient()
     
     // D'abord récupérer les intention_media existantes
     const { data: existingActor } = await (supabase

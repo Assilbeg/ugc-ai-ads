@@ -23,6 +23,7 @@
 11. [Structure des Beats](#11-structure-des-beats)
 12. [Race Conditions et Patterns](#12-race-conditions-et-patterns)
 13. [Génération d'Images d'Acteurs (Higgsfield Soul)](#13-génération-dimages-dacteurs-higgsfield-soul)
+14. [RLS et APIs Admin (Service Role)](#14-rls-et-apis-admin-service-role)
 
 ---
 
@@ -893,6 +894,47 @@ Caractéristiques :
 - Débardeur noir casual
 - Cheveux longs bruns avec pince
 - Expression confiante et naturelle
+
+---
+
+## 14. RLS et APIs Admin (Service Role)
+
+### Le problème des acteurs preset
+
+Les acteurs "preset" (Luna, Emma, Marco...) ont `user_id = null` car ils n'appartiennent à aucun utilisateur spécifique - ils sont partagés.
+
+La politique RLS sur `actors` pour UPDATE est :
+```sql
+user_id = auth.uid()
+```
+
+Problème : `null = auth.uid()` est **toujours false** en SQL → les updates sont silencieusement ignorés !
+
+### Solution : Service Role pour les opérations admin
+
+```typescript
+// ❌ PROBLÈME - Les updates sur acteurs preset échouent silencieusement
+import { createClient } from '@/lib/supabase/server'
+const supabase = await createClient()  // Utilise ANON_KEY → soumis aux RLS
+
+// ✅ SOLUTION - Bypass RLS avec service role
+import { createServiceClient } from '@/lib/supabase/server'
+const supabase = await createServiceClient()  // Utilise SERVICE_ROLE_KEY → bypass RLS
+```
+
+### Quand utiliser `createServiceClient()` ?
+
+| Cas | Client à utiliser |
+|-----|-------------------|
+| Opérations utilisateur standard | `createClient()` |
+| API admin sur acteurs preset | `createServiceClient()` |
+| Génération intention_media | `createServiceClient()` |
+| Déduction de crédits | `createServiceClient()` |
+| Opérations sur données partagées | `createServiceClient()` |
+
+### Fichiers concernés
+
+- `app/api/generate/intention-media/route.ts` - Génération images intention (fix dec 2024)
 
 ---
 
