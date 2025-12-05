@@ -1,0 +1,118 @@
+# UGC AI App - Règles pour Cursor/Claude
+
+## 🚨 AVANT DE MODIFIER UNE FEATURE
+
+1. **Consulter la documentation** dans `/docs/` :
+   - `CRITICAL_BEHAVIORS.md` - Invariants à NE JAMAIS casser
+   - `ARCHITECTURE.md` - Vue d'ensemble
+   - `DATABASE.md` - Schéma BDD
+   - `FEATURES.md` - Documentation fonctionnelle
+
+2. Si la doc n'existe pas pour cette feature → **la créer AVANT de coder**
+
+3. Après avoir établi un nouveau comportement critique → **l'ajouter à CRITICAL_BEHAVIORS.md**
+
+## ❌ NE JAMAIS FAIRE
+
+### Base de données
+- Utiliser `.single()` sur `campaign_clips` filtré par `order` (plusieurs clips possibles par beat)
+- Écraser `video.raw_url` ou `video.final_url` si elles existent déjà
+- Oublier de gérer `is_selected` pour le versioning des clips
+
+### Vidéo / Audio
+- Ralentir les vidéos (speed < 1.0) - UGC TikTok = toujours >= 1.0
+- Superposer l'audio au lieu de le remplacer dans le mix
+- Resize avant concat (cause INTERNAL_COMMAND_ERROR)
+- Utiliser fal.ai compose pour le concat (timestamps cassés)
+
+### FFmpeg
+- Oublier `setpts=PTS-STARTPTS` avant le trim
+- Utiliser `igndts` flag (coupe le début des vidéos)
+- Oublier `trim=start=0` explicite pour les vidéos Veo
+
+### Code
+- Créer des fichiers sans justification - modifier l'existant d'abord
+- Mettre des instructions négatives dans les prompts Claude ("don't use X accent")
+- Utiliser l'index au lieu de clip.id pour les ajustements
+
+## ✅ TOUJOURS FAIRE
+
+### Versioning clips
+- Utiliser `getEffectiveAdjustments()` pour obtenir trim/speed (auto vs user)
+- Préserver les vidéos existantes lors de la sauvegarde en step5
+- Garder un seul clip avec `is_selected=true` par beat
+- Archiver la version APRÈS la régénération réussie (pas avant)
+
+### FFmpeg / Transloadit
+- Normaliser les timestamps FFmpeg avant concat (`setpts=PTS-STARTPTS`)
+- Forcer ré-encodage dans concat (preset: 'ipad-high')
+- Resize 9:16 dans une étape SÉPARÉE après concat
+- Retry automatique (3x) pour les assemblages
+
+### Documentation
+- Documenter les nouveaux comportements critiques
+- Mettre à jour CRITICAL_BEHAVIORS.md après un fix de bug majeur
+- Inclure le commit de référence dans la doc
+
+## 📁 Fichiers importants
+
+### Types et config
+- `types/index.ts` - Tous les types TypeScript
+- `lib/presets.ts` - Définition des presets (intentions)
+- `lib/admin.ts` - Liste des admins
+
+### Génération principale
+- `components/steps/step6-generate.tsx` - Logique de génération
+- `components/steps/step5-plan.tsx` - Génération du plan
+- `lib/api/claude.ts` - Prompts et génération de plans
+
+### Endpoints API critiques
+- `app/api/generate/process-clip/route.ts` - Trim + Speed (Transloadit)
+- `app/api/assemble/route.ts` - Concat final (Transloadit)
+- `app/api/generate/mix-video/route.ts` - Mix audio
+
+### Hooks
+- `hooks/use-video-generation.ts` - Logique de génération
+- `hooks/use-credits.ts` - Gestion des crédits
+
+## 🔑 IDs importants
+
+- Supabase Project ID : `xresijptcptdilwecklf`
+- Cloudinary Cloud Name : `dap13uqjz`
+
+## 🗣️ Communication
+
+- Toujours répondre en français
+- Ne pas créer de nouveaux fichiers sans demander
+- Modifier l'existant plutôt que créer du nouveau
+- Citer les commits de référence quand pertinent
+
+## 📊 Structure des ajustements (V2)
+
+```typescript
+// Auto (Whisper + Claude)
+interface AutoAdjustments {
+  trim_start: number;
+  trim_end: number;
+  speed: number;
+  updated_at: string;  // CRITIQUE pour priorité
+}
+
+// User (slider UI)
+interface UserAdjustments {
+  trim_start: number;
+  trim_end: number;
+  speed: number;
+  updated_at: string;  // CRITIQUE pour priorité
+}
+
+// Règle : user > auto SI user.updated_at > auto.updated_at
+```
+
+## 🎬 Pipeline vidéo
+
+```
+First Frame → Vidéo (Veo) → Transcription → Voice Clone → Ambient → Mix → Process → Assemble
+```
+
+Chaque étape a ses propres règles - voir `docs/CRITICAL_BEHAVIORS.md`
