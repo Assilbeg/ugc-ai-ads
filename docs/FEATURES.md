@@ -13,9 +13,10 @@
 5. [Voice Cloning (ChatterboxHD)](#5-voice-cloning-chatterboxhd)
 6. [Audio Ambiant (ElevenLabs)](#6-audio-ambiant-elevenlabs)
 7. [Ajustements Trim/Speed](#7-ajustements-trimspeed)
-8. [Versioning des Clips](#8-versioning-des-clips)
-9. [Assemblage Final](#9-assemblage-final)
-10. [Système de Crédits](#10-système-de-crédits)
+8. [Édition du Prompt Vidéo (Step 6)](#8-édition-du-prompt-vidéo-step-6)
+9. [Versioning des Clips](#9-versioning-des-clips)
+10. [Assemblage Final](#10-assemblage-final)
+11. [Système de Crédits](#11-système-de-crédits)
 
 ---
 
@@ -268,7 +269,48 @@ Les ajustements sont appliqués via Transloadit au moment de :
 
 ---
 
-## 8. Versioning des Clips
+## 8. Édition du Prompt Vidéo (Step 6)
+
+### Concept
+
+À l'étape 6 (génération), l'utilisateur peut modifier le prompt vidéo de chaque clip et régénérer la vidéo avec ce nouveau prompt. Cela permet d'affiner le mouvement et l'action de l'acteur sans avoir à retourner à l'étape 5.
+
+### UI
+
+Le prompt vidéo est affiché sous le script de chaque clip complété :
+- **Affichage** : Texte italique avec label "Prompt vidéo"
+- **Bouton "Modifier"** : Ouvre une textarea pour l'édition
+- **Actions disponibles** :
+  - "Annuler" - ferme sans sauvegarder
+  - "Sauvegarder" - sauvegarde le prompt sans régénérer
+  - "Sauvegarder & Régénérer" - sauvegarde ET lance la régénération
+
+### Flux technique
+
+1. L'utilisateur modifie le prompt dans la textarea
+2. Au clic sur "Sauvegarder" ou "Sauvegarder & Régénérer" :
+   - Le state local est mis à jour (`generatedClips` et `clips`)
+   - Le prompt est sauvegardé en BDD (`campaign_clips.video.prompt`)
+3. Si "Sauvegarder & Régénérer" :
+   - La modale de confirmation de régénération s'ouvre
+   - La régénération utilise le nouveau prompt (déjà dans `clip.video.prompt`)
+
+### Différence avec Step 5
+
+| Step 5 (Plan) | Step 6 (Generate) |
+|---------------|-------------------|
+| Édition du **script** (texte parlé) | Édition du **prompt vidéo** (mouvement) |
+| Édition du **prompt visuel** (first frame) | - |
+| Régénère le **first frame** | Régénère la **vidéo** |
+
+### Fichiers concernés
+
+- `components/steps/step6-generate.tsx` - UI et logique d'édition
+- `hooks/use-video-generation.ts` - Régénération (utilise `clip.video.prompt`)
+
+---
+
+## 9. Versioning des Clips
 
 ### Concept
 
@@ -291,7 +333,7 @@ Fallback : le plus récent si aucun sélectionné.
 
 ---
 
-## 9. Assemblage Final
+## 10. Assemblage Final
 
 ### Endpoint
 
@@ -321,7 +363,7 @@ L'assemblage peut prendre 30s à 2min selon le nombre de clips.
 
 ---
 
-## 10. Système de Crédits
+## 11. Système de Crédits
 
 ### Principe
 

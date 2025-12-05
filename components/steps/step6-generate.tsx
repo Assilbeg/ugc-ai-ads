@@ -271,6 +271,12 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   const [checkingCredits, setCheckingCredits] = useState(false)
   
   // ══════════════════════════════════════════════════════════════
+  // ÉDITION DU PROMPT VIDÉO
+  // ══════════════════════════════════════════════════════════════
+  const [editingVideoPrompt, setEditingVideoPrompt] = useState<number | null>(null) // beat order en édition
+  const [editVideoPromptText, setEditVideoPromptText] = useState('')
+  
+  // ══════════════════════════════════════════════════════════════
   // VERSIONING: Navigation entre versions de clips
   // ══════════════════════════════════════════════════════════════
   const [displayedVersionIndex, setDisplayedVersionIndex] = useState<Record<number, number>>({})
@@ -1719,6 +1725,76 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     })
   }
 
+  // ══════════════════════════════════════════════════════════════
+  // ÉDITION DU PROMPT VIDÉO
+  // ══════════════════════════════════════════════════════════════
+  const startEditingVideoPrompt = (beatOrder: number, currentPrompt: string) => {
+    setEditingVideoPrompt(beatOrder)
+    setEditVideoPromptText(currentPrompt)
+  }
+
+  const cancelEditVideoPrompt = () => {
+    setEditingVideoPrompt(null)
+    setEditVideoPromptText('')
+  }
+
+  const saveVideoPrompt = async (beatOrder: number) => {
+    if (!editVideoPromptText.trim()) return
+    
+    // Trouver le clip à mettre à jour (le sélectionné ou le plus récent pour ce beat)
+    const versions = clipsByBeat.get(beatOrder) || []
+    const selectedClip = versions.find(v => v.is_selected) || versions[0]
+    const planClip = clips.find(c => c.order === beatOrder)
+    const clipToUpdate = selectedClip || planClip
+    
+    if (!clipToUpdate) {
+      console.error('[VideoPrompt] No clip found for beat', beatOrder)
+      cancelEditVideoPrompt()
+      return
+    }
+
+    // Mettre à jour le clip dans le state local
+    const updatedClips = generatedClips.map(c => {
+      if (c.order === beatOrder) {
+        return {
+          ...c,
+          video: { ...c.video, prompt: editVideoPromptText }
+        }
+      }
+      return c
+    })
+    setGeneratedClips(updatedClips)
+    
+    // Mettre à jour aussi le state parent (clips du plan)
+    onClipsUpdate(clips.map(c => {
+      if (c.order === beatOrder) {
+        return {
+          ...c,
+          video: { ...c.video, prompt: editVideoPromptText }
+        }
+      }
+      return c
+    }))
+
+    // Sauvegarder en BDD si le clip a un ID
+    if (selectedClip?.id) {
+      const { error } = await supabase
+        .from('campaign_clips')
+        .update({ 
+          video: { ...selectedClip.video, prompt: editVideoPromptText }
+        })
+        .eq('id', selectedClip.id)
+      
+      if (error) {
+        console.error('[VideoPrompt] Error saving to DB:', error)
+      } else {
+        console.log(`[VideoPrompt] ✓ Saved new prompt for clip ${selectedClip.id}`)
+      }
+    }
+
+    cancelEditVideoPrompt()
+  }
+
   const handleFinish = async () => {
     if (campaignId) {
       onComplete(campaignId)
@@ -2145,6 +2221,61 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                           <p className="text-sm text-foreground leading-relaxed">
                             "{clip.script.text}"
                           </p>
+                          
+                          {/* Prompt vidéo - affichage/édition */}
+                          {isCompleted && (
+                            <div className="mt-3 pt-3 border-t border-border/50">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Video className="w-3.5 h-3.5 text-muted-foreground" />
+                                <span className="text-xs font-medium text-muted-foreground">Prompt vidéo</span>
+                                {editingVideoPrompt !== clip.order && (
+                                  <button
+                                    onClick={() => startEditingVideoPrompt(clip.order, generatedClip?.video?.prompt || clip.video.prompt)}
+                                    className="ml-auto text-xs text-primary hover:underline"
+                                  >
+                                    Modifier
+                                  </button>
+                                )}
+                              </div>
+                              {editingVideoPrompt === clip.order ? (
+                                <div className="space-y-2">
+                                  <textarea
+                                    value={editVideoPromptText}
+                                    onChange={(e) => setEditVideoPromptText(e.target.value)}
+                                    className="w-full bg-background border border-border rounded-lg p-2 text-xs min-h-[60px] focus:border-primary focus:outline-none resize-none"
+                                    placeholder="Décrivez le mouvement et l'action de la vidéo..."
+                                  />
+                                  <div className="flex justify-end gap-2">
+                                    <button
+                                      onClick={cancelEditVideoPrompt}
+                                      className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+                                    >
+                                      Annuler
+                                    </button>
+                                    <button
+                                      onClick={() => saveVideoPrompt(clip.order)}
+                                      className="px-2 py-1 text-xs bg-muted hover:bg-muted/80 rounded"
+                                    >
+                                      Sauvegarder
+                                    </button>
+                                    <button
+                                      onClick={async () => {
+                                        await saveVideoPrompt(clip.order)
+                                        askRegenerate(index, 'video')
+                                      }}
+                                      className="px-2 py-1 text-xs bg-orange-500 text-white hover:bg-orange-600 rounded font-medium"
+                                    >
+                                      Sauvegarder & Régénérer
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="text-xs text-muted-foreground line-clamp-2 italic">
+                                  {generatedClip?.video?.prompt || clip.video.prompt}
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
 
