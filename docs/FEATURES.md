@@ -269,39 +269,41 @@ Les ajustements sont appliqués via Transloadit au moment de :
 
 ---
 
-## 8. Édition du Prompt Vidéo (Step 6)
+## 8. Édition du Script (Step 6)
 
 ### Concept
 
-À l'étape 6 (génération), l'utilisateur peut modifier le prompt vidéo de chaque clip et régénérer la vidéo avec ce nouveau prompt. Cela permet d'affiner le mouvement et l'action de l'acteur sans avoir à retourner à l'étape 5.
+À l'étape 6 (génération), l'utilisateur peut modifier le **script** (ce que dit l'acteur) de chaque clip et régénérer la vidéo avec ce nouveau texte. Cela permet d'ajuster le discours sans avoir à retourner à l'étape 5.
 
 ### UI
 
-Le prompt vidéo est affiché sous le script de chaque clip complété :
-- **Affichage** : Texte italique avec label "Prompt vidéo"
-- **Bouton "Modifier"** : Ouvre une textarea pour l'édition
+Le script est affiché pour chaque clip complété :
+- **Affichage** : Le script entre guillemets, avec bouton "Modifier" au survol
+- **Mode édition** : Textarea avec compteur de mots
 - **Actions disponibles** :
   - "Annuler" - ferme sans sauvegarder
-  - "Sauvegarder" - sauvegarde le prompt sans régénérer
-  - "Sauvegarder & Régénérer" - sauvegarde ET lance la régénération
+  - "Sauvegarder" - sauvegarde le script sans régénérer
+  - "Sauvegarder & Régénérer" - sauvegarde ET lance la régénération vidéo
 
 ### Flux technique
 
-1. L'utilisateur modifie le prompt dans la textarea
+1. L'utilisateur modifie le script dans la textarea
 2. Au clic sur "Sauvegarder" ou "Sauvegarder & Régénérer" :
    - Le state local est mis à jour (`generatedClips` et `clips`)
-   - Le prompt est sauvegardé en BDD (`campaign_clips.video.prompt`)
+   - Le script est sauvegardé en BDD (`campaign_clips.script.text` + `word_count`)
+   - Le `video.prompt` est aussi mis à jour (le texte du script y est remplacé)
 3. Si "Sauvegarder & Régénérer" :
    - La modale de confirmation de régénération s'ouvre
-   - La régénération utilise le nouveau prompt (déjà dans `clip.video.prompt`)
+   - La régénération utilise le nouveau script dans `video.prompt`
 
 ### Différence avec Step 5
 
 | Step 5 (Plan) | Step 6 (Generate) |
 |---------------|-------------------|
-| Édition du **script** (texte parlé) | Édition du **prompt vidéo** (mouvement) |
+| Édition du **script** (texte parlé) | Édition du **script** (texte parlé) |
 | Édition du **prompt visuel** (first frame) | - |
 | Régénère le **first frame** | Régénère la **vidéo** |
+| Avant génération | Après génération (ajustement) |
 
 ### Fichiers concernés
 

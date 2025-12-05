@@ -271,10 +271,10 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   const [checkingCredits, setCheckingCredits] = useState(false)
   
   // ══════════════════════════════════════════════════════════════
-  // ÉDITION DU PROMPT VIDÉO
+  // ÉDITION DU SCRIPT (ce que dit l'acteur)
   // ══════════════════════════════════════════════════════════════
-  const [editingVideoPrompt, setEditingVideoPrompt] = useState<number | null>(null) // beat order en édition
-  const [editVideoPromptText, setEditVideoPromptText] = useState('')
+  const [editingScript, setEditingScript] = useState<number | null>(null) // beat order en édition
+  const [editScriptText, setEditScriptText] = useState('')
   
   // ══════════════════════════════════════════════════════════════
   // VERSIONING: Navigation entre versions de clips
@@ -1726,20 +1726,20 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   }
 
   // ══════════════════════════════════════════════════════════════
-  // ÉDITION DU PROMPT VIDÉO
+  // ÉDITION DU SCRIPT (ce que dit l'acteur)
   // ══════════════════════════════════════════════════════════════
-  const startEditingVideoPrompt = (beatOrder: number, currentPrompt: string) => {
-    setEditingVideoPrompt(beatOrder)
-    setEditVideoPromptText(currentPrompt)
+  const startEditingScript = (beatOrder: number, currentScript: string) => {
+    setEditingScript(beatOrder)
+    setEditScriptText(currentScript)
   }
 
-  const cancelEditVideoPrompt = () => {
-    setEditingVideoPrompt(null)
-    setEditVideoPromptText('')
+  const cancelEditScript = () => {
+    setEditingScript(null)
+    setEditScriptText('')
   }
 
-  const saveVideoPrompt = async (beatOrder: number) => {
-    if (!editVideoPromptText.trim()) return
+  const saveScript = async (beatOrder: number) => {
+    if (!editScriptText.trim()) return
     
     // Trouver le clip à mettre à jour (le sélectionné ou le plus récent pour ce beat)
     const versions = clipsByBeat.get(beatOrder) || []
@@ -1748,17 +1748,26 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     const clipToUpdate = selectedClip || planClip
     
     if (!clipToUpdate) {
-      console.error('[VideoPrompt] No clip found for beat', beatOrder)
-      cancelEditVideoPrompt()
+      console.error('[Script] No clip found for beat', beatOrder)
+      cancelEditScript()
       return
     }
 
-    // Mettre à jour le clip dans le state local
+    const newWordCount = editScriptText.split(/\s+/).filter(w => w.length > 0).length
+
+    // Mettre à jour le clip dans le state local (script ET video.prompt)
     const updatedClips = generatedClips.map(c => {
       if (c.order === beatOrder) {
+        // Mettre à jour le script dans video.prompt aussi (remplacer l'ancien texte)
+        let updatedVideoPrompt = c.video?.prompt || ''
+        if (c.script?.text && updatedVideoPrompt) {
+          // Remplacer l'ancien script dans le video.prompt par le nouveau
+          updatedVideoPrompt = updatedVideoPrompt.replace(c.script.text, editScriptText)
+        }
         return {
           ...c,
-          video: { ...c.video, prompt: editVideoPromptText }
+          script: { text: editScriptText, word_count: newWordCount },
+          video: { ...c.video, prompt: updatedVideoPrompt }
         }
       }
       return c
@@ -1768,9 +1777,14 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     // Mettre à jour aussi le state parent (clips du plan)
     onClipsUpdate(clips.map(c => {
       if (c.order === beatOrder) {
+        let updatedVideoPrompt = c.video?.prompt || ''
+        if (c.script?.text && updatedVideoPrompt) {
+          updatedVideoPrompt = updatedVideoPrompt.replace(c.script.text, editScriptText)
+        }
         return {
           ...c,
-          video: { ...c.video, prompt: editVideoPromptText }
+          script: { text: editScriptText, word_count: newWordCount },
+          video: { ...c.video, prompt: updatedVideoPrompt }
         }
       }
       return c
@@ -1778,21 +1792,27 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
 
     // Sauvegarder en BDD si le clip a un ID
     if (selectedClip?.id) {
+      let updatedVideoPrompt = selectedClip.video?.prompt || ''
+      if (selectedClip.script?.text && updatedVideoPrompt) {
+        updatedVideoPrompt = updatedVideoPrompt.replace(selectedClip.script.text, editScriptText)
+      }
+      
       const { error } = await (supabase
         .from('campaign_clips') as any)
         .update({ 
-          video: { ...selectedClip.video, prompt: editVideoPromptText }
+          script: { text: editScriptText, word_count: newWordCount },
+          video: { ...selectedClip.video, prompt: updatedVideoPrompt }
         })
         .eq('id', selectedClip.id)
       
       if (error) {
-        console.error('[VideoPrompt] Error saving to DB:', error)
+        console.error('[Script] Error saving to DB:', error)
       } else {
-        console.log(`[VideoPrompt] ✓ Saved new prompt for clip ${selectedClip.id}`)
+        console.log(`[Script] ✓ Saved new script for clip ${selectedClip.id}`)
       }
     }
 
-    cancelEditVideoPrompt()
+    cancelEditScript()
   }
 
   const handleFinish = async () => {
@@ -2218,62 +2238,57 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                               )
                             })()}
                           </div>
-                          <p className="text-sm text-foreground leading-relaxed">
-                            "{clip.script.text}"
-                          </p>
-                          
-                          {/* Prompt vidéo - affichage/édition */}
-                          {isCompleted && (
-                            <div className="mt-3 pt-3 border-t border-border/50">
-                              <div className="flex items-center gap-2 mb-1">
-                                <Video className="w-3.5 h-3.5 text-muted-foreground" />
-                                <span className="text-xs font-medium text-muted-foreground">Prompt vidéo</span>
-                                {editingVideoPrompt !== clip.order && (
+                          {/* Script éditable - seulement si clip complété */}
+                          {isCompleted && editingScript === clip.order ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={editScriptText}
+                                onChange={(e) => setEditScriptText(e.target.value)}
+                                className="w-full bg-background border border-border rounded-lg p-2 text-sm min-h-[60px] focus:border-primary focus:outline-none resize-none"
+                                placeholder="Le texte que dit l'acteur..."
+                              />
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs text-muted-foreground">
+                                  {editScriptText.split(/\s+/).filter(w => w.length > 0).length} mots
+                                </span>
+                                <div className="flex gap-2">
                                   <button
-                                    onClick={() => startEditingVideoPrompt(clip.order, generatedClip?.video?.prompt || clip.video.prompt)}
-                                    className="ml-auto text-xs text-primary hover:underline"
+                                    onClick={cancelEditScript}
+                                    className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+                                  >
+                                    Annuler
+                                  </button>
+                                  <button
+                                    onClick={() => saveScript(clip.order)}
+                                    className="px-2 py-1 text-xs bg-muted hover:bg-muted/80 rounded"
+                                  >
+                                    Sauvegarder
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      await saveScript(clip.order)
+                                      askRegenerate(index, 'video')
+                                    }}
+                                    className="px-2 py-1 text-xs bg-orange-500 text-white hover:bg-orange-600 rounded font-medium"
+                                  >
+                                    Sauvegarder & Régénérer
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="group/script">
+                              <p className="text-sm text-foreground leading-relaxed">
+                                "{generatedClip?.script?.text || clip.script.text}"
+                                {isCompleted && (
+                                  <button
+                                    onClick={() => startEditingScript(clip.order, generatedClip?.script?.text || clip.script.text)}
+                                    className="ml-2 text-xs text-primary opacity-0 group-hover/script:opacity-100 transition-opacity hover:underline"
                                   >
                                     Modifier
                                   </button>
                                 )}
-                              </div>
-                              {editingVideoPrompt === clip.order ? (
-                                <div className="space-y-2">
-                                  <textarea
-                                    value={editVideoPromptText}
-                                    onChange={(e) => setEditVideoPromptText(e.target.value)}
-                                    className="w-full bg-background border border-border rounded-lg p-2 text-xs min-h-[60px] focus:border-primary focus:outline-none resize-none"
-                                    placeholder="Décrivez le mouvement et l'action de la vidéo..."
-                                  />
-                                  <div className="flex justify-end gap-2">
-                                    <button
-                                      onClick={cancelEditVideoPrompt}
-                                      className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
-                                    >
-                                      Annuler
-                                    </button>
-                                    <button
-                                      onClick={() => saveVideoPrompt(clip.order)}
-                                      className="px-2 py-1 text-xs bg-muted hover:bg-muted/80 rounded"
-                                    >
-                                      Sauvegarder
-                                    </button>
-                                    <button
-                                      onClick={async () => {
-                                        await saveVideoPrompt(clip.order)
-                                        askRegenerate(index, 'video')
-                                      }}
-                                      className="px-2 py-1 text-xs bg-orange-500 text-white hover:bg-orange-600 rounded font-medium"
-                                    >
-                                      Sauvegarder & Régénérer
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <p className="text-xs text-muted-foreground line-clamp-2 italic">
-                                  {generatedClip?.video?.prompt || clip.video.prompt}
-                                </p>
-                              )}
+                              </p>
                             </div>
                           )}
                         </div>
