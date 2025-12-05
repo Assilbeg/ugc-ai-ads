@@ -80,6 +80,22 @@
 - Supabase Project ID : `xresijptcptdilwecklf`
 - Cloudinary Cloud Name : `dap13uqjz`
 
+## 📊 Mapping Beats → Order
+
+| Order | Beat | Description |
+|-------|------|-------------|
+| 1 | hook | Accroche |
+| 2 | problem | Problème (ou agitation) |
+| 3 | solution | Solution |
+| 4 | proof | Preuve |
+| 5 | cta | Call-to-action |
+
+## 💰 Système de crédits
+
+- **1 crédit = 1 centime d'euro**
+- Balance en crédits (pas en centimes)
+- Balance peut être négative (race condition protection)
+
 ## 🗣️ Communication
 
 - Toujours répondre en français

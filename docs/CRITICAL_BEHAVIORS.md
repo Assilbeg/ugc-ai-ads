@@ -4,6 +4,8 @@
 > validés et qui doivent être préservés. **Toute modification de ces comportements doit être
 > discutée et documentée.**
 
+> 🔧 Pour le troubleshooting des erreurs courantes, voir [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md)
+
 ---
 
 ## 📋 Table des matières
@@ -17,6 +19,9 @@
 7. [Système de Crédits](#7-système-de-crédits)
 8. [Persistance des Données](#8-persistance-des-données)
 9. [Prompts Claude](#9-prompts-claude)
+10. [Transcription Intelligente (Whisper + Claude)](#10-transcription-intelligente-whisper--claude)
+11. [Structure des Beats](#11-structure-des-beats)
+12. [Race Conditions et Patterns](#12-race-conditions-et-patterns)
 
 ---
 
@@ -25,6 +30,26 @@
 ### Contexte
 > Commit `25957ca` - Permet de régénérer un clip sans perdre l'ancien.
 > Plusieurs versions peuvent exister pour le même beat.
+
+### Architecture du versioning
+
+```
+                    campaign_clips (table principale)
+                    ┌─────────────────────────────────────┐
+                    │ Clip A (beat 1, is_selected=true)   │ ← Utilisé pour assemblage
+                    │ Clip B (beat 1, is_selected=false)  │ ← Ancienne version
+                    │ Clip C (beat 2, is_selected=true)   │
+                    └─────────────────────────────────────┘
+                                     │
+                                     ▼
+                    clip_versions (snapshots pour restauration)
+                    ┌─────────────────────────────────────┐
+                    │ Version 1 de Clip A (snapshot)      │
+                    │ Version 2 de Clip A (snapshot)      │
+                    └─────────────────────────────────────┘
+```
+
+**IMPORTANT** : Les versions actives sont des **rows séparés** dans `campaign_clips`, pas des mises à jour d'un même row. La table `clip_versions` ne sert qu'à restaurer des snapshots.
 
 ### Règles CRITIQUES
 
@@ -35,6 +60,7 @@
 | **Ne JAMAIS utiliser `.single()`** | Utiliser `.limit(1)` pour les requêtes sur `campaign_clips` par `order` | `91ae571` |
 | **Une tuile par beat dans l'UI** | Itérer sur `uniqueBeats`, pas sur `clips` | `91ae571` |
 | **Archiver APRÈS succès** | Créer la clip_version APRÈS la régénération réussie, pas avant | `26f5f86` |
+| **Nouveau row à chaque régénération** | `id: undefined` force un INSERT, pas un UPDATE | `25957ca` |
 
 ### Code de référence
 
@@ -93,9 +119,11 @@ const clip = clips?.[0]
 ```
 1. First Frame (Nano Banana Pro) ─────────────────────┐
    └── Image de référence pour Veo                    │
+   └── Modèle: fal-ai/nano-banana-pro/edit            │
                                                       │
 2. Vidéo (Veo 3.1 - Fast ou Standard) ←───────────────┘
    └── Génère vidéo AVEC audio (lip-sync)
+   └── Modèle: fal-ai/veo3.1/image-to-video
                     │
 3. Transcription (Whisper) ←──────────────────────────┘
    └── Extrait speech_start, speech_end, words_per_second
@@ -104,9 +132,11 @@ const clip = clips?.[0]
 4. Voice Conversion (ChatterboxHD S2S) ←──────────────┘
    └── Clone la voix depuis l'audio Veo
    └── Garde la synchronisation labiale
+   └── Modèle: resemble-ai/chatterboxhd/speech-to-speech
                     │
 5. Ambient Audio (ElevenLabs SFX) 
    └── Son d'ambiance généré au prompt
+   └── Modèle: fal-ai/elevenlabs/sound-effects/v2
                     │
 6. Mix Audio (fal.ai ffmpeg-api/compose) ←────────────┘
    └── REMPLACE l'audio original
@@ -166,6 +196,16 @@ interface UserAdjustments {
 | **Ajustements par `clip.id`** | PAS par beat/order. Chaque version a ses propres ajustements | `c3c5549` |
 | **Toujours sauvegarder `updated_at`** | C'est ce qui détermine la priorité auto vs user | `070217a` |
 | **Précision 0.01s** | Les timestamps de trim sont au centième de seconde | `de0f29c` |
+| **Reset user_adjustments à la régénération** | Quand on régénère, `user_adjustments` est mis à `undefined` | `070217a` |
+
+### Comportement lors de la régénération
+
+Quand on régénère une vidéo :
+1. Whisper re-transcrit l'audio
+2. Claude recalcule les marqueurs de parole
+3. `auto_adjustments` est mis à jour avec un nouveau `updated_at`
+4. **`user_adjustments` est SUPPRIMÉ** (mis à `undefined`)
+5. L'utilisateur perd ses personnalisations → doit refaire ses ajustements manuels
 
 ### Vitesses autorisées
 
@@ -291,20 +331,95 @@ ElevenLabs (Sound Effects)
 REMPLACE l'audio original de la vidéo
 ```
 
+### Les 3 cas de mixage (mix-video/route.ts) - CRITIQUE
+
+> **Fichier de référence** : `app/api/generate/mix-video/route.ts`
+
+| Cas | Voix | Ambiance | Comportement | Audio Original Veo |
+|-----|------|----------|--------------|-------------------|
+| 1 | ✅ | ❌ | **REMPLACE** l'audio Veo par la voix clonée | ❌ SUPPRIMÉ |
+| 2 | ❌ | ✅ | **MIXE** l'audio Veo + ambiance | ✅ GARDÉ |
+| 3 | ✅ | ✅ | **REMPLACE** l'audio Veo par voix clonée + ambiance | ❌ SUPPRIMÉ |
+
+### Pourquoi c'est critique
+
+```
+              ┌─────────────────────────────────────────────────────────────┐
+              │ L'audio original de Veo contient une voix IA "robotique"   │
+              │ avec lip-sync. On veut la REMPLACER par une voix humaine   │
+              │ clonée, sauf si le clonage échoue.                         │
+              └─────────────────────────────────────────────────────────────┘
+
+CAS 1 : Voix ✅, Ambiance ❌
+═══════════════════════════
+    [Vidéo Veo]───video───►[Output]
+                            ▲
+    [Voix clonée]──audio────┘   ← L'audio Veo est IGNORÉ (map: ['0:v', '[aout]'])
+
+
+CAS 2 : Voix ❌, Ambiance ✅ (fallback quand voix échoue)
+═══════════════════════════════════════════════════════
+    [Vidéo Veo]───video + audio───►[amix]───►[Output]
+                                    ▲
+    [Ambiance]──────────────────────┘
+    
+    ⚠️ ATTENTION: L'audio Veo (voix robotique) est GARDÉ !
+    → Résultat = voix IA + ambiance. Qualité inférieure.
+
+
+CAS 3 : Voix ✅, Ambiance ✅ (cas nominal)
+═══════════════════════════════════════
+    [Vidéo Veo]───video───►[Output]
+                            ▲
+    [Voix clonée]──┬───────►[amix]
+    [Ambiance]─────┘
+    
+    → Audio Veo IGNORÉ. Output = voix humaine + ambiance.
+```
+
+### Code FFmpeg correspondant
+
+```typescript
+// CAS 1 : Voix seule - REMPLACE l'audio
+'filter_complex': `[1:a]volume=${voiceVol},apad=pad_dur=${duration}[aout]`,
+'map': ['0:v', '[aout]'],  // 0:v = vidéo Veo, [aout] = voix clonée
+
+// CAS 2 : Ambiance seule - GARDE l'audio Veo
+'filter_complex': `[0:a]volume=1.0[orig];[1:a]volume=${ambientVol},...[aout]`,
+'map': ['0:v', '[aout]'],  // [0:a] = audio Veo original (GARDÉ)
+
+// CAS 3 : Les deux - REMPLACE l'audio
+'filter_complex': `[1:a]volume=${voiceVol},...[voice];[2:a]volume=${ambientVol},...[ambient];[voice][ambient]amix=...`,
+'map': ['0:v', '[aout]'],  // Pas de 0:a = audio Veo IGNORÉ
+```
+
 ### Règles CRITIQUES
 
 | Règle | Pourquoi |
 |-------|----------|
-| **L'audio Veo est SUPPRIMÉ** | On le remplace entièrement par voix clonée + ambiance |
+| **L'audio Veo est SUPPRIMÉ (cas 1 et 3)** | On le remplace entièrement par voix clonée + ambiance |
+| **L'audio Veo est GARDÉ (cas 2 seulement)** | Si voix échoue, on mixe l'original avec l'ambiance |
 | **Volumes : voix 100%, ambiance 20%** | L'ambiance ne doit pas couvrir la voix |
 | **L'ambiance dure toute la vidéo** | Elle est générée à la durée de la vidéo, pas du speech |
 | **Source audio = vidéo Veo raw** | Jamais depuis TTS, toujours depuis la vidéo générée |
+| **`apad=pad_dur=${duration}`** | Assure que l'audio a la bonne durée (évite coupures) |
+
+### Quand les cas se produisent
+
+| Scénario | Cas déclenché | Résultat audio |
+|----------|---------------|----------------|
+| Génération normale, tout OK | Cas 3 | ✅ Voix humaine + ambiance |
+| ChatterboxHD timeout/erreur | Cas 2 | ⚠️ Voix IA robotique + ambiance |
+| ElevenLabs timeout/erreur | Cas 1 | ✅ Voix humaine sans ambiance |
+| Pas d'acteur avec voix | Cas 2 | ⚠️ Voix IA + ambiance |
+| User régénère juste l'ambiance | Cas 3 | ✅ Voix existante + nouvelle ambiance |
 
 ### Volumes par défaut
 
 ```typescript
-const DEFAULT_VOICE_VOLUME = 100   // Ne JAMAIS descendre sous 80
-const DEFAULT_AMBIENT_VOLUME = 20  // Entre 10-30 idéalement
+// Valeurs utilisées dans le mix audio
+const voiceVolume = 100   // Ne JAMAIS descendre sous 80
+const ambientVolume = 20  // Entre 10-30 idéalement
 ```
 
 ---
@@ -361,6 +476,12 @@ const DEFAULT_AMBIENT_VOLUME = 20  // Entre 10-30 idéalement
 
 ## 7. Système de Crédits
 
+### Comprendre les unités
+
+> ⚠️ **IMPORTANT** : Dans ce projet, **1 crédit = 1 centime d'euro**.
+> Le `balance` dans `user_credits` est en **crédits**, pas en centimes.
+> Exemple : balance = 1000 crédits = 10.00€
+
 ### Règles CRITIQUES
 
 | Règle | Pourquoi | Commit |
@@ -373,23 +494,26 @@ const DEFAULT_AMBIENT_VOLUME = 20  // Entre 10-30 idéalement
 ### Coûts par seconde pour Veo
 
 ```typescript
-// Les vidéos Veo sont facturées PAR SECONDE
+// Les vidéos Veo sont facturées PAR SECONDE de vidéo générée
 const videoCost = costPerSecond * videoDuration
 
 // Exemple pour Fast (25 crédits/seconde):
-// 6s Fast = 25 × 6 = 150 crédits
-// 8s Fast = 25 × 8 = 200 crédits
+// 6s Fast = 25 × 6 = 150 crédits = 1.50€
+// 8s Fast = 25 × 8 = 200 crédits = 2.00€
 ```
 
 ### Prix (décembre 2024)
 
-| Type | Coût interne (crédits) | Coût réel fal.ai |
+| Type | Coût facturé (crédits) | Coût réel fal.ai |
 |------|------------------------|------------------|
-| First Frame | 25 | $0.15 |
-| Veo 3.1 Fast | 25/seconde | $0.15/seconde |
-| Veo 3.1 Standard | 60/seconde | $0.40/seconde |
-| Voice Chatterbox | 20 | $0.02/minute |
-| Ambient ElevenLabs | 15 | $0.002/seconde |
+| First Frame | 25 crédits (0.25€) | ~15 centimes |
+| Veo 3.1 Fast | 25 crédits/seconde | ~15 centimes/seconde |
+| Veo 3.1 Standard | 60 crédits/seconde | ~40 centimes/seconde |
+| Voice Chatterbox | 20 crédits | ~1 centime |
+| Ambient ElevenLabs | 15 crédits | ~2 centimes |
+
+> **Note** : `cost_cents` dans la table `generation_costs` = crédits facturés au client.
+> `real_cost_cents` = coût réel fal.ai en centimes d'euro.
 
 ---
 
@@ -402,7 +526,10 @@ const videoCost = costPerSecond * videoDuration
 | **Step 5 (Plan)** | script, first_frame, beat, order | `step5-plan.tsx` |
 | **Step 6 (Generate)** | video, audio, transcription, adjustments | `step6-generate.tsx` |
 
-### Règle CRITIQUE : Préserver les vidéos existantes
+### Règle CRITIQUE : Préserver les vidéos existantes en Step 5
+
+> **Commit `7390684`** : Quand l'utilisateur retourne à Step 5 (plan) et re-sauvegarde,
+> les vidéos déjà générées en Step 6 ne doivent JAMAIS être écrasées.
 
 ```typescript
 // step5-plan.tsx - saveClipsToDb
@@ -416,6 +543,23 @@ if (clip.video?.raw_url || clip.video?.final_url) {
 if (found.video?.raw_url && !clip.video?.raw_url) {
   clipData.video = found.video
   console.log(`[Step5] ✓ Preserving existing video for clip ${clip.order}`)
+}
+```
+
+### Règle CRITIQUE : Ne pas régénérer le plan automatiquement
+
+> **Commits `1c7450b`, `2deb19b`** : Quand l'utilisateur retourne à Step 5 avec des clips
+> existants, NE PAS régénérer le plan Claude automatiquement.
+
+```typescript
+// ❌ INTERDIT
+useEffect(() => {
+  if (clips.length === 0) generatePlan()
+}, [clips])
+
+// ✅ CORRECT - Seulement si explicitement demandé
+const handleRegeneratePlan = () => {
+  if (confirm('Régénérer le plan ?')) generatePlan()
 }
 ```
 
@@ -447,6 +591,155 @@ const prompt = "Generate a script in natural French from France (metropolitan)."
 
 ---
 
+## 10. Transcription Intelligente (Whisper + Claude)
+
+### Le problème du "gibberish"
+
+Les vidéos générées par Veo ont souvent des **sons parasites** au début et à la fin :
+- Onomatopées : "hmm", "euh", "ah", "mhm"
+- Bruits de bouche/respiration
+- Mots répétés sans sens
+
+Whisper transcrit TOUT, même ces sons. Si on utilise les timestamps bruts, le trim coupe mal.
+
+### Solution : Double analyse
+
+```
+1. Whisper (fal-ai/whisper)
+   └── Transcrit l'audio COMPLET avec timestamps mot par mot
+   └── Output: { text, chunks: [{timestamp: [start, end], text}] }
+                    │
+2. Claude (analyzeSpeechBoundaries)
+   └── Compare transcription vs script ORIGINAL
+   └── Identifie où le "vrai" script commence (ignore le gibberish)
+   └── Calcule words_per_second sur le SCRIPT, pas la transcription
+   └── Output: { speech_start, speech_end, confidence, suggested_speed }
+```
+
+### Règles CRITIQUES
+
+| Règle | Pourquoi |
+|-------|----------|
+| **Gibberish = tout ce qui n'est pas dans le script** | Mots transcrits mais pas attendus |
+| **speech_start = début du 1er mot du script** | Pas le 1er mot transcrit |
+| **speech_end = fin du dernier mot du script** | Pas le dernier mot transcrit |
+| **words_per_second sur le script** | Le débit compte les mots VOULUS, pas le gibberish |
+| **Padding de 0.15s** | Ajouter un peu de marge pour ne pas couper serré |
+| **Confidence : high/medium/low** | Indique la fiabilité de l'analyse |
+
+### Exemple concret
+
+```
+Script original : "Découvre ce produit incroyable"
+
+Whisper transcrit :
+  [0.1s] "hmm"
+  [0.4s] "euh"
+  [0.7s] "Découvre"      ← DÉBUT RÉEL
+  [1.0s] "ce"
+  [1.2s] "produit"
+  [1.5s] "incroyable"    ← FIN RÉELLE
+  [1.8s] "voilà"
+
+Claude analyse :
+  speech_start = 0.55s (0.7s - 0.15s padding)
+  speech_end = 1.65s (1.5s + 0.15s padding)
+  → Ignore "hmm", "euh" et "voilà"
+```
+
+### Fallback si Claude échoue
+
+Si l'analyse Claude échoue, on utilise les timestamps Whisper bruts avec `confidence = 'low'`.
+
+---
+
+## 11. Structure des Beats
+
+### Mapping Order → Beat
+
+| Order | Beat | Description | Rôle dans la vidéo |
+|-------|------|-------------|-------------------|
+| 1 | `hook` | Accroche | Capte l'attention dans les 3 premières secondes |
+| 2 | `problem` | Problème | Présente le pain point de l'audience |
+| 3 | `solution` | Solution | Présente le produit/solution |
+| 4 | `proof` | Preuve | Social proof, résultats, témoignage |
+| 5 | `cta` | Call-to-Action | Incitation à l'action finale |
+
+> **Note** : Le beat `agitation` peut remplacer `problem` selon le preset choisi.
+
+### Types de beat dans le code
+
+```typescript
+// types/index.ts
+export type ScriptBeat = "hook" | "problem" | "agitation" | "solution" | "proof" | "cta";
+```
+
+### Labels UI
+
+```typescript
+// step6-generate.tsx
+const BEAT_LABELS: Record<string, string> = {
+  hook: 'HOOK',
+  problem: 'PROBLÈME',
+  agitation: 'AGITATION',
+  solution: 'SOLUTION',
+  proof: 'PREUVE',
+  cta: 'CTA',
+}
+```
+
+---
+
+## 12. Race Conditions et Patterns
+
+### Functional Updater Pattern
+
+> **Commits `2df633e`, `ec11682`** : Pour éviter les race conditions lors de mises à jour
+> concurrentes de state React, toujours utiliser le **functional updater**.
+
+```typescript
+// ❌ INTERDIT - Race condition possible
+setAdjustments({
+  ...adjustments,
+  [clipId]: newValue
+})
+
+// ✅ CORRECT - Functional updater
+setAdjustments(prev => ({
+  ...prev,
+  [clipId]: newValue
+}))
+```
+
+### Lock sur les déductions de crédits
+
+> **Commit `f0852cd`** : La fonction SQL `deduct_credits` utilise `FOR UPDATE` pour
+> verrouiller la ligne pendant la transaction.
+
+```sql
+-- billing.sql
+SELECT balance INTO v_current_balance
+FROM user_credits
+WHERE user_id = p_user_id
+FOR UPDATE;  -- CRITIQUE: empêche les déductions concurrentes
+```
+
+### Génération en cours
+
+Quand une génération est en cours pour un clip, bloquer les actions suivantes :
+- Régénération du même clip
+- Modification des ajustements (trim/speed)
+- Assemblage
+
+```typescript
+// Le state isClipRegenerating() doit être vérifié avant toute action
+if (isClipRegenerating(clipId)) {
+  return // Bloquer l'action
+}
+```
+
+---
+
 ## 🔄 Historique des comportements critiques
 
 | Date | Commit | Comportement ajouté |
@@ -466,6 +759,7 @@ const prompt = "Generate a script in natural French from France (metropolitan)."
 | Nov 2024 | `04c0851` | Transloadit au lieu de fal.ai pour concat |
 | Nov 2024 | `7390684` | Préservation vidéos existantes en step5 |
 | Nov 2024 | `5b7c01b` | Retirer instructions négatives accent |
+| Nov 2024 | `2df633e` | Functional updater pattern |
 
 ---
 

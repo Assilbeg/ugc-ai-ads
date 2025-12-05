@@ -51,6 +51,143 @@ Step 5: Plan        → Génération du plan (Claude) + First Frames
 Step 6: Generate    → Génération vidéos + assemblage
 ```
 
+## 🎬 Pipeline de Génération (Step 6)
+
+Pipeline complet de génération d'un clip vidéo UGC :
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          PIPELINE DE GÉNÉRATION                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    ┌────────────────┐
+    │  1. FIRST FRAME │
+    │  ─────────────  │
+    │  fal-ai/       │
+    │  nano-banana-  │──────────────────┐
+    │  pro/edit      │                  │
+    │                │                  │
+    │  💰 25 crédits │                  │
+    │  💾 first_frame│                  │
+    └────────────────┘                  ▼
+                               ┌────────────────┐
+                               │   2. VIDÉO     │
+                               │   ──────────   │
+                               │   fal-ai/      │
+                               │   veo3.1/      │
+                               │   image-to-    │───────────────────┐
+                               │   video        │                   │
+                               │                │                   │
+                               │   💰 25 ou 60  │                   │
+                               │      créd/sec  │                   │
+                               │   💾 video.    │                   │
+                               │      raw_url   │                   │
+                               └────────────────┘                   │
+                                                                    ▼
+                                                           ┌────────────────┐
+                                                           │ 3. TRANSCRIPTN │
+                                                           │ ────────────── │
+                                                           │ fal-ai/whisper │
+                                                           │       +        │
+                                                           │ Claude analyse │
+                                                           │                │
+                                                           │ 💰 0 crédits   │
+                                                           │ 💾 transcriptn │
+                                                           │    + auto_adj  │
+                                                           └───────┬────────┘
+                                                                   │
+                              ┌─────────────────────────────────────┤
+                              ▼                                     ▼
+                     ┌────────────────┐                    ┌────────────────┐
+                     │   4. VOICE     │                    │  5. AMBIENT    │
+                     │   ─────────    │                    │  ───────────   │
+                     │   resemble-ai/ │                    │  fal-ai/       │
+                     │   chatterboxhd/│                    │  elevenlabs/   │
+                     │   speech-to-   │                    │  sound-effects │
+                     │   speech       │                    │  /v2           │
+                     │                │                    │                │
+                     │   💰 20 crédits│                    │  💰 15 crédits │
+                     │   💾 audio.    │                    │  💾 audio.     │
+                     │      voice_url │                    │     ambient_url│
+                     └───────┬────────┘                    └───────┬────────┘
+                             │                                     │
+                             └──────────────┬──────────────────────┘
+                                            ▼
+                                   ┌────────────────┐
+                                   │   6. MIX AUDIO │
+                                   │   ──────────── │
+                                   │   fal-ai/      │
+                                   │   ffmpeg-api/  │
+                                   │   compose      │
+                                   │                │
+                                   │   Voix: 100%   │
+                                   │   Ambient: 20% │
+                                   │                │
+                                   │   💰 0 crédits │
+                                   │   💾 video.    │
+                                   │      raw_url   │
+                                   │      (mixé)    │
+                                   └───────┬────────┘
+                                           │
+                                           ▼
+                                   ┌────────────────┐
+                                   │  7. PROCESS    │
+                                   │  ────────────  │
+                                   │  Transloadit   │
+                                   │                │
+                                   │  • Trim        │
+                                   │  • Speed       │
+                                   │  • Normalize   │
+                                   │    timestamps  │
+                                   │                │
+                                   │  💰 0 crédits │
+                                   │  💾 video.    │
+                                   │     final_url  │
+                                   └───────┬────────┘
+                                           │
+           (pour chaque clip × 5 beats)    │
+                                           ▼
+                                   ┌────────────────┐
+                                   │  8. ASSEMBLAGE │
+                                   │  ──────────── │
+                                   │  Transloadit   │
+                                   │  /video/concat │
+                                   │       +        │
+                                   │  /video/encode │
+                                   │  (resize 9:16) │
+                                   │                │
+                                   │  💰 0 crédits │
+                                   │  💾 campaign.  │
+                                   │     final_     │
+                                   │     video_url  │
+                                   └────────────────┘
+```
+
+### Récapitulatif des coûts par beat
+
+| Étape | Service | Coût (crédits) | Sauvegardé en BDD |
+|-------|---------|----------------|-------------------|
+| First Frame | fal.ai NanoBanana Pro | 25 | `clip.first_frame.image_url` |
+| Vidéo Fast | fal.ai Veo 3.1 Fast | 25 × durée(s) | `clip.video.raw_url` |
+| Vidéo Standard | fal.ai Veo 3.1 Standard | 60 × durée(s) | `clip.video.raw_url` |
+| Transcription | fal.ai Whisper + Claude | 0 | `clip.transcription`, `clip.auto_adjustments` |
+| Voice | fal.ai ChatterboxHD | 20 | `clip.audio.voice_url` |
+| Ambient | fal.ai ElevenLabs | 15 | `clip.audio.ambient_url` |
+| Mix | fal.ai FFmpeg | 0 | `clip.video.raw_url` (remplacé) |
+| Process | Transloadit | 0 | `clip.video.final_url` |
+| Assemblage | Transloadit | 0 | `campaign.final_video_url` |
+
+### Coût total estimé (5 beats, Veo Fast, 6s/clip)
+
+```
+First Frames : 5 × 25 = 125 crédits
+Vidéos      : 5 × 25 × 6 = 750 crédits
+Voix        : 5 × 20 = 100 crédits
+Ambiances   : 5 × 15 = 75 crédits
+─────────────────────────────────
+TOTAL       : ~1050 crédits = 10.50€
+```
+
 ## Entités Principales
 
 ```
@@ -75,6 +212,8 @@ Campaign (1)
 ## Voir aussi
 
 - [`CRITICAL_BEHAVIORS.md`](./CRITICAL_BEHAVIORS.md) - Invariants à ne jamais modifier
+- [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md) - Erreurs courantes et solutions
+- [`DATABASE.md`](./DATABASE.md) - Schéma BDD et requêtes utiles
 - [`API_DOCUMENTATION.md`](./API_DOCUMENTATION.md) - Documentation des endpoints
 - [`DOCS_DES_APIS.md`](./DOCS_DES_APIS.md) - Documentation des APIs externes
 
