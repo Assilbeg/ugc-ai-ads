@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { generateSoulImage, buildActorPrompt, ActorDescription } from '@/lib/api/higgsfield'
 import { isAdmin } from '@/lib/admin'
 
@@ -40,10 +40,12 @@ export async function POST(request: NextRequest) {
     console.log('[Generate Actor] Generated:', result.image_url)
 
     // Optionally save to DB
+    // On utilise le service client pour bypass RLS car les acteurs preset ont user_id = null
     let savedActor = null
     if (saveToDb) {
-      const { data, error } = await supabase
-        .from('actors')
+      const serviceSupabase = await createServiceClient()
+      const { data, error } = await (serviceSupabase
+        .from('actors') as any)
         .insert({
           name: actor.name,
           soul_image_url: result.image_url,
