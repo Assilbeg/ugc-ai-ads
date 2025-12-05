@@ -18,6 +18,7 @@
 - Utiliser `.single()` sur `campaign_clips` filtré par `order` (plusieurs clips possibles par beat)
 - Écraser `video.raw_url` ou `video.final_url` si elles existent déjà
 - Oublier de gérer `is_selected` pour le versioning des clips
+- Oublier le cast `as any` sur les requêtes Supabase (voir section Supabase ci-dessous)
 
 ### Vidéo / Audio
 - Ralentir les vidéos (speed < 1.0) - UGC TikTok = toujours >= 1.0
@@ -53,6 +54,17 @@
 - Documenter les nouveaux comportements critiques
 - Mettre à jour CRITICAL_BEHAVIORS.md après un fix de bug majeur
 - Inclure le commit de référence dans la doc
+
+### Supabase TypeScript
+- TOUJOURS utiliser `(supabase.from('table') as any)` pour `.update()` et `.insert()`
+- Sans ce cast, erreur au build : "Argument of type is not assignable to parameter of type 'never'"
+- Exemple correct :
+  ```typescript
+  const { error } = await (supabase
+    .from('campaign_clips') as any)
+    .update({ video: { ...clip.video, prompt: newPrompt } })
+    .eq('id', clipId)
+  ```
 
 ## 📁 Fichiers importants
 
