@@ -101,7 +101,7 @@ export function CampaignCard({ campaign, presetName, statusConfig, onDelete }: C
           <div className="relative aspect-[9/16] bg-gradient-to-br from-zinc-100 to-zinc-200 dark:from-zinc-800 dark:to-zinc-900 overflow-hidden cursor-pointer">
             {campaign.final_video_url ? (
               <video 
-                src={campaign.final_video_url} 
+                src={`${campaign.final_video_url}#t=0.1`}
                 className="w-full h-full object-cover"
                 muted
                 playsInline
