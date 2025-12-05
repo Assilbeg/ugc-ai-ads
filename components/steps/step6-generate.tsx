@@ -124,18 +124,29 @@ function AssemblyModal({ isOpen, clipCount }: { isOpen: boolean; clipCount: numb
 }
 
 // ══════════════════════════════════════════════════════════════
-// HELPER: Remplacer le script dans le video.prompt de manière robuste
-// Le replace() simple peut échouer si le texte exact n'est pas trouvé
+// HELPER: S'assurer que le script est TOUJOURS dans le video.prompt
+// Le prompt DOIT contenir le script avec le format: 
+// "speaks in ... accent: [SCRIPT]" ou "[SCRIPT OVERRIDE]: ..."
 // ══════════════════════════════════════════════════════════════
 function replaceScriptInPrompt(originalPrompt: string, oldScript: string, newScript: string): string {
-  if (!originalPrompt || !oldScript) return originalPrompt
-  if (oldScript === newScript) return originalPrompt
+  if (!originalPrompt) {
+    // Pas de prompt original → créer un prompt minimal avec le script
+    console.warn('[replaceScriptInPrompt] No original prompt, creating minimal prompt with script')
+    return `speaks in standard metropolitan French accent, Parisian pronunciation, clear and neutral: ${newScript}`
+  }
   
-  // Méthode 1: Replace direct
-  let updatedPrompt = originalPrompt.replace(oldScript, newScript)
+  // Vérifier si le prompt contient DÉJÀ le nouveau script
+  if (originalPrompt.includes(newScript)) {
+    console.log('[replaceScriptInPrompt] ✓ Prompt already contains the new script')
+    return originalPrompt
+  }
   
-  // Vérifier si le replace a fonctionné
-  if (updatedPrompt !== originalPrompt) {
+  // Le prompt ne contient PAS le nouveau script → on doit l'ajouter/remplacer
+  
+  // Méthode 1: Replace direct de l'ancien script par le nouveau
+  if (oldScript && oldScript !== newScript && originalPrompt.includes(oldScript)) {
+    const updatedPrompt = originalPrompt.replace(oldScript, newScript)
+    console.log('[replaceScriptInPrompt] ✓ Direct replace succeeded')
     return updatedPrompt
   }
   
@@ -167,14 +178,29 @@ function replaceScriptInPrompt(originalPrompt: string, oldScript: string, newScr
     }
     
     const afterScript = afterAccent.substring(scriptEndIndex)
-    updatedPrompt = beforeAccent + newScript + afterScript
+    const updatedPrompt = beforeAccent + newScript + afterScript
     console.log('[replaceScriptInPrompt] ✓ Replaced using accent pattern method')
     return updatedPrompt
   }
   
-  // Méthode 3: Fallback - ajouter le nouveau script avec un marqueur clair
-  console.warn('[replaceScriptInPrompt] Could not find accent pattern, appending script override')
-  return originalPrompt + `\n\n[SCRIPT OVERRIDE - Actor says exactly]: "${newScript}"`
+  // Méthode 3: Aucun pattern trouvé → AJOUTER le script avec le format standard
+  // C'est CRITIQUE car le prompt original ne contenait peut-être jamais le script !
+  console.warn('[replaceScriptInPrompt] No accent pattern found, ADDING script with standard format')
+  
+  // Chercher où insérer (avant NEGATIVES si présent, sinon à la fin)
+  const negativesIndex = originalPrompt.indexOf('NEGATIVES:')
+  const negativePromptIndex = originalPrompt.indexOf('Negative prompt:')
+  const insertIndex = negativesIndex !== -1 ? negativesIndex : 
+                      negativePromptIndex !== -1 ? negativePromptIndex : 
+                      originalPrompt.length
+  
+  const beforeInsert = originalPrompt.substring(0, insertIndex).trimEnd()
+  const afterInsert = originalPrompt.substring(insertIndex)
+  
+  // Ajouter le script avec le format standard
+  const scriptSection = `\n\nSpeech/Dialogue: speaks in standard metropolitan French accent, Parisian pronunciation, clear and neutral: "${newScript}"\n\n`
+  
+  return beforeInsert + scriptSection + afterInsert
 }
 
 // Vitesses disponibles (UGC TikTok = dynamique, JAMAIS de ralentissement)
