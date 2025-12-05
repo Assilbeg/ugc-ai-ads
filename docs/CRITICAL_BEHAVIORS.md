@@ -615,6 +615,44 @@ const saveEdit = async () => {
 
 ---
 
+## 8.1 Remplacement du Script dans video.prompt (CRITIQUE)
+
+### Le problème
+
+Quand l'utilisateur modifie le script à l'étape 6 et clique sur "Sauvegarder & Régénérer", le nouveau texte doit être injecté dans le `video.prompt` pour que Veo génère la vidéo avec les nouvelles paroles.
+
+**Le problème** : Le `String.replace()` direct échoue souvent car :
+1. Le `video.prompt` contient le script avec un préfixe d'accent (ex: `"speaks in standard metropolitan French accent... : [script]"`)
+2. Des variations de caractères (apostrophes typographiques vs ASCII)
+3. Des variations subtiles dans le formatage
+
+### Solution : Fonction `replaceScriptInPrompt`
+
+> **Fix Dec 2024** : Utiliser la fonction helper robuste `replaceScriptInPrompt()` dans `step6-generate.tsx`
+
+```typescript
+// ❌ PROBLÈME - Le replace direct peut échouer silencieusement
+updatedVideoPrompt = originalPrompt.replace(oldScript, newScript)
+// Si oldScript n'est pas trouvé, originalPrompt est retourné tel quel !
+
+// ✅ CORRECT - Utiliser la fonction helper robuste
+const updatedVideoPrompt = replaceScriptInPrompt(originalPrompt, oldScript, newScript)
+```
+
+### Stratégie de la fonction
+
+1. **Méthode 1** : `replace()` direct (cas simple)
+2. **Méthode 2** : Parser le pattern d'accent `speaks in ... : [script]` et remplacer
+3. **Méthode 3 (fallback)** : Ajouter `[SCRIPT OVERRIDE]: "nouveau texte"` à la fin
+
+### Fonctions concernées
+
+- `replaceScriptInPrompt()` - Helper en haut de `step6-generate.tsx`
+- `saveScript()` - Sauvegarde du script modifié
+- Bouton "Sauvegarder & Régénérer" - Construction du clip avec script mis à jour
+
+---
+
 ## 9. Prompts Claude
 
 ### Règle sur les accents
@@ -779,6 +817,38 @@ if (isClipRegenerating(clipId)) {
 }
 ```
 
+### Index uniqueBeats vs Index generatedClips
+
+> **Fix 5 déc 2024** : Le bug "régénère le mauvais clip" était causé par une confusion d'index.
+
+**Le problème** : Dans le rendu de l'UI, on itère sur `uniqueBeats` (trié par order). Quand on régénère un clip, on passait `index` (index dans uniqueBeats) mais on l'utilisait pour indexer `generatedClips` (qui a potentiellement un ordre différent).
+
+```typescript
+// ❌ BUG - index est l'index dans uniqueBeats, pas dans generatedClips !
+{uniqueBeats.map((clip, index) => {
+  // ...
+  askRegenerate(index, 'video', clipWithUpdatedScript)
+})}
+
+// Plus tard dans handleConfirmRegenerate:
+const updatedClips = generatedClips.map((c, idx) => {
+  if (idx === clipIndex) {  // ← MAUVAIS clip sélectionné !
+    return { ...c, is_selected: false }
+  }
+  return c
+})
+
+// ✅ CORRECT - Utiliser l'ID du clip pour l'identifier
+const updatedClips = generatedClips.map((c) => {
+  if (c.id === oldClipId) {  // ← Identifie par ID unique
+    return { ...c, is_selected: false }
+  }
+  return c
+})
+```
+
+**Règle** : Ne JAMAIS utiliser un index de boucle pour identifier un clip dans un autre tableau. Toujours utiliser `clip.id` ou `clip.order` pour identifier les clips de manière fiable.
+
 ---
 
 ## 13. Patterns "Fix puis Revert" - Leçons apprises
@@ -835,6 +905,7 @@ if (isClipRegenerating(clipId)) {
 
 | Date | Commit | Comportement ajouté |
 |------|--------|---------------------|
+| 5 Dec 2024 | - | Fix régénération mauvais clip : utiliser oldClipId au lieu de clipIndex pour identifier le clip (index uniqueBeats ≠ index generatedClips) |
 | Dec 2024 | - | Fix "Sauvegarder & Régénérer" : passer le clip avec script mis à jour directement à askRegenerate pour éviter timing issues |
 | Dec 2024 | - | Preview affiche automatiquement le nouveau clip après régénération (reset displayedVersionIndex + tri is_selected) |
 | Dec 2024 | - | Fix allCompleted : ne vérifier que les clips avec vidéo (pas les squelettes pending) |

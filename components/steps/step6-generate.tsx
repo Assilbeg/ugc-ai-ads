@@ -123,6 +123,60 @@ function AssemblyModal({ isOpen, clipCount }: { isOpen: boolean; clipCount: numb
   )
 }
 
+// ══════════════════════════════════════════════════════════════
+// HELPER: Remplacer le script dans le video.prompt de manière robuste
+// Le replace() simple peut échouer si le texte exact n'est pas trouvé
+// ══════════════════════════════════════════════════════════════
+function replaceScriptInPrompt(originalPrompt: string, oldScript: string, newScript: string): string {
+  if (!originalPrompt || !oldScript) return originalPrompt
+  if (oldScript === newScript) return originalPrompt
+  
+  // Méthode 1: Replace direct
+  let updatedPrompt = originalPrompt.replace(oldScript, newScript)
+  
+  // Vérifier si le replace a fonctionné
+  if (updatedPrompt !== originalPrompt) {
+    return updatedPrompt
+  }
+  
+  console.warn('[replaceScriptInPrompt] Direct replace failed, trying regex pattern...')
+  
+  // Méthode 2: Chercher le pattern avec instruction d'accent et remplacer
+  // Pattern: "speaks in ... accent, ... pronunciation, clear and neutral: [script]"
+  const accentPattern = /(speaks in[^:]+:)\s*/g
+  const matches = [...originalPrompt.matchAll(accentPattern)]
+  
+  if (matches.length > 0) {
+    // Trouver la dernière occurrence du pattern d'accent
+    const lastMatch = matches[matches.length - 1]
+    const accentEndIndex = lastMatch.index! + lastMatch[0].length
+    
+    // Le script commence après "clear and neutral: " et peut finir avant la prochaine section
+    const afterAccent = originalPrompt.substring(accentEndIndex)
+    const beforeAccent = originalPrompt.substring(0, accentEndIndex)
+    
+    // Trouver où finit le script (après le texte parlé)
+    // Chercher la fin: généralement avant "NEGATIVES:" ou une section majeure
+    const endMarkers = ['NEGATIVES:', '\n\n', 'Sound:', 'Background:', '\n7.', '\n8.']
+    let scriptEndIndex = afterAccent.length
+    for (const marker of endMarkers) {
+      const markerIndex = afterAccent.indexOf(marker)
+      if (markerIndex !== -1 && markerIndex < scriptEndIndex) {
+        scriptEndIndex = markerIndex
+      }
+    }
+    
+    const afterScript = afterAccent.substring(scriptEndIndex)
+    updatedPrompt = beforeAccent + newScript + afterScript
+    console.log('[replaceScriptInPrompt] ✓ Replaced using accent pattern method')
+    return updatedPrompt
+  }
+  
+  // Méthode 3: Fallback - ajouter le nouveau script avec un marqueur clair
+  console.warn('[replaceScriptInPrompt] Could not find accent pattern, appending script override')
+  return originalPrompt + `\n\n[SCRIPT OVERRIDE - Actor says exactly]: "${newScript}"`
+}
+
 // Vitesses disponibles (UGC TikTok = dynamique, JAMAIS de ralentissement)
 // On n'utilise JAMAIS 0.8x ou 0.9x - ça tue l'énergie du contenu
 const SPEED_OPTIONS = [
@@ -1664,8 +1718,10 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       // - Garder l'ancien clip avec is_selected = false
       // - Ajouter le nouveau clip avec is_selected = true
       // - L'UI affichera le nouveau clip car il est is_selected = true
-      const updatedClips = generatedClips.map((c, idx) => {
-        if (idx === clipIndex) {
+      // FIX: Utiliser oldClipId (pas clipIndex) car clipIndex est l'index dans uniqueBeats,
+      // pas dans generatedClips. Les deux tableaux peuvent avoir des ordres différents !
+      const updatedClips = generatedClips.map((c) => {
+        if (c.id === oldClipId) {
           // Garder l'ancien clip mais le marquer comme non sélectionné
           return { ...c, is_selected: false }
         }
@@ -1796,12 +1852,12 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     // Mettre à jour le clip dans le state local (script ET video.prompt)
     const updatedClips = generatedClips.map(c => {
       if (c.order === beatOrder) {
-        // Mettre à jour le script dans video.prompt aussi (remplacer l'ancien texte)
-        let updatedVideoPrompt = c.video?.prompt || ''
-        if (c.script?.text && updatedVideoPrompt) {
-          // Remplacer l'ancien script dans le video.prompt par le nouveau
-          updatedVideoPrompt = updatedVideoPrompt.replace(c.script.text, editScriptText)
-        }
+        // Utiliser la fonction helper robuste pour remplacer le script
+        const updatedVideoPrompt = replaceScriptInPrompt(
+          c.video?.prompt || '',
+          c.script?.text || '',
+          editScriptText
+        )
         return {
           ...c,
           script: { text: editScriptText, word_count: newWordCount },
@@ -1815,10 +1871,11 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     // Mettre à jour aussi le state parent (clips du plan)
     onClipsUpdate(clips.map(c => {
       if (c.order === beatOrder) {
-        let updatedVideoPrompt = c.video?.prompt || ''
-        if (c.script?.text && updatedVideoPrompt) {
-          updatedVideoPrompt = updatedVideoPrompt.replace(c.script.text, editScriptText)
-        }
+        const updatedVideoPrompt = replaceScriptInPrompt(
+          c.video?.prompt || '',
+          c.script?.text || '',
+          editScriptText
+        )
         return {
           ...c,
           script: { text: editScriptText, word_count: newWordCount },
@@ -1830,10 +1887,11 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
 
     // Sauvegarder en BDD si le clip a un ID
     if (selectedClip?.id) {
-      let updatedVideoPrompt = selectedClip.video?.prompt || ''
-      if (selectedClip.script?.text && updatedVideoPrompt) {
-        updatedVideoPrompt = updatedVideoPrompt.replace(selectedClip.script.text, editScriptText)
-      }
+      const updatedVideoPrompt = replaceScriptInPrompt(
+        selectedClip.video?.prompt || '',
+        selectedClip.script?.text || '',
+        editScriptText
+      )
       
       const { error } = await (supabase
         .from('campaign_clips') as any)
@@ -2309,10 +2367,19 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                       // Construire le clip avec le script mis à jour AVANT de sauvegarder
                                       // pour éviter les problèmes de timing avec le state React
                                       const newWordCount = editScriptText.split(/\s+/).filter(w => w.length > 0).length
-                                      let updatedVideoPrompt = generatedClip?.video?.prompt || clip.video?.prompt || ''
-                                      if (generatedClip?.script?.text && updatedVideoPrompt) {
-                                        updatedVideoPrompt = updatedVideoPrompt.replace(generatedClip.script.text, editScriptText)
-                                      }
+                                      const originalPrompt = generatedClip?.video?.prompt || clip.video?.prompt || ''
+                                      const oldScript = generatedClip?.script?.text || ''
+                                      
+                                      // Utiliser la fonction helper robuste pour remplacer le script
+                                      const updatedVideoPrompt = replaceScriptInPrompt(originalPrompt, oldScript, editScriptText)
+                                      
+                                      console.log('[Script] Video prompt update:', {
+                                        oldScriptPreview: oldScript?.slice(0, 50),
+                                        newScriptPreview: editScriptText.slice(0, 50),
+                                        promptChanged: updatedVideoPrompt !== originalPrompt,
+                                        newPromptPreview: updatedVideoPrompt.slice(0, 100)
+                                      })
+                                      
                                       const clipWithUpdatedScript: CampaignClip = {
                                         ...(generatedClip || clip),
                                         script: { text: editScriptText, word_count: newWordCount },
