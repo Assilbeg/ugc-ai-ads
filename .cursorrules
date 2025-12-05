@@ -35,6 +35,14 @@
 - Créer des fichiers sans justification - modifier l'existant d'abord
 - Mettre des instructions négatives dans les prompts Claude ("don't use X accent")
 - Utiliser l'index au lieu de clip.id pour les ajustements
+- Utiliser un index de boucle (ex: `uniqueBeats[index]`) pour identifier un clip dans un autre tableau (ex: `generatedClips`) - les ordres peuvent différer ! Toujours utiliser `clip.id` ou `clip.order`
+
+### Modifications UI (tous composants React)
+- Modifier les `onClick`, `disabled`, `value`, `onChange` - c'est la logique métier
+- Supprimer ou modifier les conditions `{loading && ...}`, `{error && ...}`
+- Changer la structure des `.map()` ou les `key={...}`
+- Toucher aux useEffect ou callbacks métier
+- Voir **section 15 de CRITICAL_BEHAVIORS.md** pour les règles détaillées
 
 ## ✅ TOUJOURS FAIRE
 
@@ -54,6 +62,15 @@
 - Documenter les nouveaux comportements critiques
 - Mettre à jour CRITICAL_BEHAVIORS.md après un fix de bug majeur
 - Inclure le commit de référence dans la doc
+
+### Modifications UI (tous composants React) - CE QUI EST SAFE
+- Modifier uniquement les `className` (Tailwind)
+- Changer les constantes de style (`BEAT_COLORS`, `BEAT_LABELS`, etc.)
+- Modifier les textes/labels affichés
+- Changer les icônes (Lucide) sans modifier les props fonctionnels
+- Ajuster le layout (grid/flex) SANS toucher aux .map() ou key
+- Modifier les composants UI isolés (sans logique métier)
+- Tester après chaque modification !
 
 ### Supabase TypeScript
 - TOUJOURS utiliser `(supabase.from('table') as any)` pour `.update()` et `.insert()`

@@ -887,6 +887,44 @@ const updatedClips = generatedClips.map((c) => {
 
 **Règle** : Ne JAMAIS utiliser un index de boucle pour identifier un clip dans un autre tableau. Toujours utiliser `clip.id` ou `clip.order` pour identifier les clips de manière fiable.
 
+### Fonctions getClipStatus et getClipErrorInfo
+
+> **Fix 5 déc 2024** : L'animation de régénération s'affichait sur le mauvais clip (ex: HOOK régénéré → animation sur CTA).
+
+**Problème 1** : Les fonctions `getClipStatus(index)` utilisaient `clips[index]` mais `index` venait de `uniqueBeats.map()`.
+
+**Problème 2** : Le progress était indexé par `clip.id` mais les IDs sont différents entre `uniqueBeats` (clips du plan) et `clipToRegenerate` (clips de clipsByBeat).
+
+```typescript
+// ❌ BUG - Deux problèmes cumulés
+{uniqueBeats.map((clip, index) => {
+  const currentStatus = getClipStatus(index)  // 1. clips[index] ≠ clip !
+})}
+
+const getClipStatus = (index: number): ClipStatus => {
+  const clipProgress = progress[clips[index]?.id || `clip-${clipOrder}`]  // 2. ID différent !
+}
+
+// ✅ CORRECT - Passer le clip + utiliser order comme clé
+{uniqueBeats.map((clip, index) => {
+  const currentStatus = getClipStatus(clip)
+})}
+
+const getClipStatus = (clip: CampaignClip): ClipStatus => {
+  const clipProgress = progress[`clip-${clip.order}`]  // order est stable !
+}
+```
+
+### Distinction clip.id vs clip.order
+
+| Usage | Clé | Pourquoi |
+|-------|-----|----------|
+| **Ajustements (trim/speed)** | `clip.id` via `getClipKey()` | Chaque VERSION peut avoir des ajustements différents |
+| **Progress de génération** | `clip-${clip.order}` | L'animation doit s'afficher sur le BEAT/tuile |
+| **isClipRegenerating** | `clip-${clip.order}` | On vérifie si le BEAT est en cours de génération |
+
+⚠️ **Ne PAS utiliser `clip.order` pour les ajustements** - ça casserait le versioning (commit `c3c5549`).
+
 ---
 
 ## 13. Patterns "Fix puis Revert" - Leçons apprises
@@ -943,6 +981,7 @@ const updatedClips = generatedClips.map((c) => {
 
 | Date | Commit | Comportement ajouté |
 |------|--------|---------------------|
+| 5 Dec 2024 | - | Fix animation régénération : 1) `getClipStatus(clip)` au lieu de `getClipStatus(index)`, 2) Progress indexé par `clip-${order}` au lieu de `clip.id` (order est stable pour chaque tuile/beat) |
 | 5 Dec 2024 | - | Fix replaceScriptInPrompt : AJOUTE le script même si le prompt original ne le contient pas (pas de pattern `speaks in...`) |
 | 5 Dec 2024 | - | Fix oldScript fallback : `generatedClip?.script?.text || clip.script?.text` évite que le prompt reste inchangé quand generatedClip est undefined |
 | 5 Dec 2024 | - | Fix régénération mauvais clip : utiliser oldClipId au lieu de clipIndex pour identifier le clip (index uniqueBeats ≠ index generatedClips) |

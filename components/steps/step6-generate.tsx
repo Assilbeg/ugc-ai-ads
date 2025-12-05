@@ -1979,22 +1979,27 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   // Beats restants à générer (sans aucune version avec vidéo)
   const remainingClips = totalBeats - beatsWithVideo
 
-  const getClipStatus = (index: number): ClipStatus => {
-    const clipOrder = clips[index]?.order
-    const clipProgress = progress[clips[index]?.id || `clip-${clipOrder}`]
+  // FIX: Accepter le clip directement au lieu d'un index
+  // Car l'index dans uniqueBeats.map() ≠ index dans clips[]
+  // Voir CRITICAL_BEHAVIORS.md section 12 "Index uniqueBeats vs Index generatedClips"
+  // FIX 2: Utiliser clip.order comme clé (pas clip.id) car l'order est stable pour chaque beat/tuile
+  const getClipStatus = (clip: CampaignClip): ClipStatus => {
+    const clipOrder = clip.order
+    const clipProgress = progress[`clip-${clipOrder}`]
     // VERSIONING: Trouver le clip sélectionné ou le plus récent pour ce beat
     const versions = clipsByBeat.get(clipOrder) || []
     const selectedClip = versions.find(v => v.is_selected) || versions[0]
     // Si on a une vidéo générée, c'est completed
-    const hasVideo = selectedClip?.video?.raw_url || selectedClip?.video?.final_url || clips[index]?.video?.raw_url || clips[index]?.video?.final_url
+    const hasVideo = selectedClip?.video?.raw_url || selectedClip?.video?.final_url || clip?.video?.raw_url || clip?.video?.final_url
     if (hasVideo && !clipProgress) return 'completed'
     return clipProgress?.status || selectedClip?.status || 'pending'
   }
 
   // Vérifier si un clip a échoué par manque de crédits
-  const getClipErrorInfo = (index: number): GenerationProgress | null => {
-    const clipOrder = clips[index]?.order
-    const clipProgress = progress[clips[index]?.id || `clip-${clipOrder}`]
+  // FIX: Accepter le clip directement au lieu d'un index
+  const getClipErrorInfo = (clip: CampaignClip): GenerationProgress | null => {
+    const clipOrder = clip.order
+    const clipProgress = progress[`clip-${clipOrder}`]
     if (clipProgress?.errorCode === 'INSUFFICIENT_CREDITS') {
       return clipProgress
     }
@@ -2191,9 +2196,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
               // Afficher la version navigée, ou la sélectionnée, ou la première (plus récente)
               const generatedClip = versions[versionIndex] || selectedClip || versions[0] || generatedClips.find(c => c.order === clip.order)
               
-              const currentStatus = getClipStatus(index)
+              const currentStatus = getClipStatus(clip)
               const currentStep = getCurrentStep(currentStatus)
-              const clipProgress = progress[clip.id || `clip-${clip.order}`]
+              const clipProgress = progress[`clip-${clip.order}`]
               const isCompleted = currentStatus === 'completed'
               const isFailed = currentStatus === 'failed'
               const isGenerating = currentStatus !== 'pending' && currentStatus !== 'completed' && currentStatus !== 'failed'
@@ -2503,7 +2508,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                       {isFailed && (
                         <div className="mb-4">
                           {(() => {
-                            const errorInfo = getClipErrorInfo(index)
+                            const errorInfo = getClipErrorInfo(clip)
                             const isCreditsError = errorInfo?.errorCode === 'INSUFFICIENT_CREDITS'
                             
                             if (isCreditsError) {
@@ -2551,7 +2556,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                     size="sm"
                                     className="h-9 text-sm rounded-lg"
                                     onClick={() => askRegenerate(index, 'all')}
-                                    disabled={isClipRegenerating(clip.id || `clip-${clip.order}`)}
+                                    disabled={isClipRegenerating(`clip-${clip.order}`)}
                                   >
                                     <RefreshCw className="w-4 h-4 mr-1" />
                                     Réessayer
@@ -2745,7 +2750,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                 size="sm"
                                 className="h-8 text-xs rounded-lg border-orange-500/40 text-orange-600 hover:bg-orange-50 hover:border-orange-500"
                                 onClick={() => askRegenerate(index, 'video')}
-                                disabled={isClipRegenerating(clip.id || `clip-${clip.order}`)}
+                                disabled={isClipRegenerating(`clip-${clip.order}`)}
                               >
                                 <Video className="w-3 h-3 mr-1" />
                                 Vidéo
@@ -2755,7 +2760,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                 size="sm"
                                 className="h-8 text-xs rounded-lg"
                                 onClick={() => askRegenerate(index, 'voice')}
-                                disabled={isClipRegenerating(clip.id || `clip-${clip.order}`)}
+                                disabled={isClipRegenerating(`clip-${clip.order}`)}
                               >
                                 <Mic className="w-3 h-3 mr-1" />
                                 Voix
@@ -2765,7 +2770,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                 size="sm"
                                 className="h-8 text-xs rounded-lg"
                                 onClick={() => askRegenerate(index, 'ambient')}
-                                disabled={isClipRegenerating(clip.id || `clip-${clip.order}`)}
+                                disabled={isClipRegenerating(`clip-${clip.order}`)}
                               >
                                 <Music className="w-3 h-3 mr-1" />
                                 Ambiance

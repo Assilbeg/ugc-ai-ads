@@ -48,7 +48,10 @@ export function useVideoGeneration() {
     presetId?: string,
     videoQuality: VideoQuality = 'standard'
   ): Promise<CampaignClip | null> => {
-    const clipId = clip.id || `clip-${clip.order}`
+    // FIX: Toujours utiliser clip.order comme clé (pas clip.id)
+    // Car dans l'UI, on itère sur uniqueBeats (clips du plan) mais on régénère 
+    // des clips de clipsByBeat qui ont des IDs différents. L'order est stable.
+    const clipId = `clip-${clip.order}`
 
     const updateProgress = (status: ClipStatus, progressValue: number, message: string) => {
       setProgress(prev => ({
@@ -470,7 +473,10 @@ export function useVideoGeneration() {
     presetId?: string,
     videoQuality: VideoQuality = 'standard'
   ): Promise<CampaignClip | null> => {
-    const clipId = clip.id || `clip-${clip.order}`
+    // FIX: Toujours utiliser clip.order comme clé (pas clip.id)
+    // Car dans l'UI, on itère sur uniqueBeats (clips du plan) mais on régénère 
+    // des clips de clipsByBeat qui ont des IDs différents. L'order est stable.
+    const clipId = `clip-${clip.order}`
 
     const updateProgress = (status: ClipStatus, progressValue: number, message: string) => {
       setProgress(prev => ({
@@ -853,7 +859,10 @@ export function useVideoGeneration() {
     presetId?: string,
     videoQuality: VideoQuality = 'standard'
   ): Promise<CampaignClip | null> => {
-    const clipId = clip.id || `clip-${clip.order}`
+    // FIX: Toujours utiliser clip.order comme clé (pas clip.id)
+    // Car dans l'UI, on itère sur uniqueBeats (clips du plan) mais on régénère 
+    // des clips de clipsByBeat qui ont des IDs différents. L'order est stable.
+    const clipId = `clip-${clip.order}`
     
     // Créer un AbortController pour ce clip
     const abortController = new AbortController()
