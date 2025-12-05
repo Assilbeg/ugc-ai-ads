@@ -5,6 +5,9 @@ import { getUserCredits, getGenerationCost, GenerationType, isAdminEmail } from 
 import { createGenerationLog, markGenerationCompleted, markGenerationFailed, updateGenerationLog } from '@/lib/generation-logger'
 import { VideoEngine } from '@/types'
 
+// Veo 3.1 génération peut prendre 5-10 minutes - augmenter le timeout
+export const maxDuration = 300 // 5 minutes (max sur Vercel Pro)
+
 // Map quality to generation type for credits
 function getGenerationTypeForQuality(quality: VideoQuality): GenerationType {
   return quality === 'fast' ? 'video_veo31_fast' : 'video_veo31_standard'

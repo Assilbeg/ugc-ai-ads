@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { transcribeAudio } from '@/lib/api/falai'
 import { analyzeSpeechBoundaries } from '@/lib/api/claude'
 
+// Whisper + Claude analysis peut prendre jusqu'à 2 minutes
+export const maxDuration = 120 // 2 minutes
+
 interface TranscribeInput {
   audioUrl: string
   language?: string | null

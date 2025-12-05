@@ -5,6 +5,9 @@ import { checkCredits, deductCredits, getGenerationCost } from '@/lib/credits'
 import { createGenerationLog, markGenerationCompleted, markGenerationFailed } from '@/lib/generation-logger'
 import crypto from 'crypto'
 
+// NanoBanana Pro est généralement rapide mais on met 60s par sécurité
+export const maxDuration = 60 // 1 minute
+
 // Template si on utilise la soul_image (sans intention_media pré-générée)
 const DEFAULT_TEMPLATE = `Make me another photo like this as if it was another first frame of the same TikTok UGC but in a different position since she's talking to the camera. WEARING THE EXACT SAME CLOTHES AND OUTFIT as in the reference photo - do NOT change clothing. {PROMPT}. Same person as reference, same clothing. NO TIKTOK UI, NO TEXT, NO WATERMARKS, NO OVERLAYS.`
 

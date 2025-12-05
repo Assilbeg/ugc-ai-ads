@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { Transloadit } from 'transloadit'
 
+// L'assemblage de plusieurs clips peut prendre plusieurs minutes
+export const maxDuration = 300 // 5 minutes (max Vercel Pro)
+
 // Transloadit credentials
 const TRANSLOADIT_KEY = process.env.TRANSLOADIT_KEY
 const TRANSLOADIT_SECRET = process.env.TRANSLOADIT_SECRET

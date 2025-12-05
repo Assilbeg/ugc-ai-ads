@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Transloadit } from 'transloadit'
 
+// Transloadit encoding peut prendre 2-3 minutes
+export const maxDuration = 180 // 3 minutes
+
 // Transloadit credentials
 const TRANSLOADIT_KEY = process.env.TRANSLOADIT_KEY
 const TRANSLOADIT_SECRET = process.env.TRANSLOADIT_SECRET

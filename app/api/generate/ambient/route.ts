@@ -4,6 +4,9 @@ import { generateAmbientAudio } from '@/lib/api/falai'
 import { checkCredits, deductCredits, getGenerationCost } from '@/lib/credits'
 import { createGenerationLog, markGenerationCompleted, markGenerationFailed, updateGenerationLog } from '@/lib/generation-logger'
 
+// ElevenLabs génération peut prendre jusqu'à 3 minutes
+export const maxDuration = 180 // 3 minutes
+
 export async function POST(request: NextRequest) {
   let logId: string | null = null
   const startTime = Date.now()
