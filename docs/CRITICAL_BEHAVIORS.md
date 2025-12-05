@@ -25,6 +25,7 @@
 13. [Génération d'Images d'Acteurs (Higgsfield Soul)](#13-génération-dimages-dacteurs-higgsfield-soul)
 14. [RLS et APIs Admin (Service Role)](#14-rls-et-apis-admin-service-role)
 15. [Règles de Modifications UI (Tous Composants)](#15-règles-de-modifications-ui-tous-composants)
+16. [Dashboard - Previews Vidéo](#16-dashboard---previews-vidéo)
 
 ---
 
@@ -1263,6 +1264,50 @@ Ce projet utilise React avec Next.js. Les composants mélangent souvent logique 
 | `use-video-generation.ts` | ~900 | **Élevé** | Logique de génération |
 
 Pour ces fichiers, privilégier des modifications très ciblées et tester systématiquement.
+
+---
+
+## 16. Dashboard - Previews Vidéo
+
+### Contexte
+> Commit `51406ef` - Affichage d'une frame de preview pour les campagnes terminées.
+
+### Le problème
+
+Les thumbnails générées par Transloadit lors de l'assemblage sont **temporaires** (URLs R2 qui expirent).
+Le simple `<video preload="metadata">` ne garantit pas l'affichage d'une frame selon les navigateurs.
+
+### La solution
+
+Utiliser le fragment URL `#t=0.1` pour forcer le navigateur à charger la frame à 0.1 seconde :
+
+```tsx
+// ✅ CORRECT - Force l'affichage de la frame à 0.1s
+<video 
+  src={`${campaign.final_video_url}#t=0.1`}
+  preload="metadata"
+  muted
+  playsInline
+/>
+
+// ❌ INSUFFISANT - Ne garantit pas l'affichage d'une frame
+<video 
+  src={campaign.final_video_url}
+  preload="metadata"
+/>
+```
+
+### Règles
+
+| Règle | Description |
+|-------|-------------|
+| **Toujours utiliser `#t=0.1`** | Force le navigateur à se positionner et afficher cette frame |
+| **Pas de thumbnails Transloadit** | Les URLs R2 de Transloadit expirent, ne pas les stocker |
+| **`preload="metadata"`** | Charge juste assez de données pour la frame, pas toute la vidéo |
+
+### Fichier concerné
+
+- `app/(dashboard)/dashboard/campaign-card.tsx` - Cartes des campagnes dans le dashboard
 
 ---
 
