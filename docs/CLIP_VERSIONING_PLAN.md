@@ -1,5 +1,9 @@
 # Plan d'implémentation : Versioning des clips
 
+> ⚠️ **DOCUMENT HISTORIQUE** : Ce fichier documente le plan d'implémentation tel qu'il a été conçu.
+> L'implémentation réelle peut différer légèrement. Pour le comportement actuel, référez-vous à 
+> `CRITICAL_BEHAVIORS.md` et au code dans `step6-generate.tsx`.
+
 ## Contexte du projet
 
 Application UGC AI qui génère des vidéos publicitaires avec des acteurs IA. Une campagne contient plusieurs "beats" (hook, problem, solution, proof, cta) et chaque beat a un clip vidéo.

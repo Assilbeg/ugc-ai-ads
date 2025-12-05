@@ -186,22 +186,31 @@ const ensureMinSpeed = (speed: number): number => Math.max(1.0, speed)
 ```typescript
 // TOUJOURS utiliser cette fonction pour obtenir les ajustements effectifs
 function getEffectiveAdjustments(
-  autoAdj?: AutoAdjustments,
-  userAdj?: UserAdjustments,
+  autoAdj?: AutoAdjustments | null,
+  userAdj?: UserAdjustments | null,
   videoDuration?: number
-): { trimStart, trimEnd, speed, source: 'auto' | 'user' | 'default' } {
-  // Si user_adjustments existe et est plus récent → user gagne
+): { trimStart: number; trimEnd: number; speed: number; source: 'auto' | 'user' | 'default' } {
+  const defaultDuration = videoDuration || 6
+  
+  // CAS 1: Les deux existent → comparer les timestamps
   if (userAdj?.updated_at && autoAdj?.updated_at) {
     if (new Date(userAdj.updated_at) > new Date(autoAdj.updated_at)) {
-      return { ...userAdj, source: 'user' }
+      return { trimStart: userAdj.trim_start, trimEnd: userAdj.trim_end, speed: userAdj.speed, source: 'user' }
     }
   }
-  // Sinon auto_adjustments
-  if (autoAdj?.updated_at) {
-    return { ...autoAdj, source: 'auto' }
+  
+  // CAS 2: Seulement user_adjustments existe
+  if (userAdj?.updated_at && !autoAdj?.updated_at) {
+    return { trimStart: userAdj.trim_start, trimEnd: userAdj.trim_end, speed: userAdj.speed, source: 'user' }
   }
-  // Valeurs par défaut
-  return { trimStart: 0, trimEnd: videoDuration || 6, speed: 1.0, source: 'default' }
+  
+  // CAS 3: auto_adjustments existe (user absent ou moins récent)
+  if (autoAdj?.updated_at) {
+    return { trimStart: autoAdj.trim_start, trimEnd: autoAdj.trim_end, speed: autoAdj.speed, source: 'auto' }
+  }
+  
+  // CAS 4: Aucun ajustement → valeurs par défaut
+  return { trimStart: 0, trimEnd: defaultDuration, speed: 1.0, source: 'default' }
 }
 ```
 

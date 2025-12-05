@@ -288,9 +288,10 @@ export async function estimateCampaignCost(clipCount: number): Promise<{
   const costs = await getAllGenerationCosts()
   
   // Each clip = 1 first frame + 1 video + 1 voice conversion + 1 ambient
+  // NOTE: On utilise video_veo31_fast par défaut (le plus courant)
   const breakdown = {
     firstFrames: costs.first_frame * clipCount,
-    videos: costs.video_veo31 * clipCount,
+    videos: (costs.video_veo31_fast || costs.video_veo31_standard) * clipCount,
     voices: costs.voice_chatterbox * clipCount,
     ambients: costs.ambient_elevenlabs * clipCount,
   }
@@ -474,13 +475,16 @@ export async function getRemainingGenerations(balance: number): Promise<{
 }> {
   const costs = await getAllGenerationCosts()
   
+  // NOTE: On utilise video_veo31_fast par défaut (le plus courant)
+  const videoCost = costs.video_veo31_fast || costs.video_veo31_standard
+  
   // Cost per full campaign (4 clips)
   const campaignCost = 
-    (costs.first_frame + costs.video_veo31 + costs.voice_chatterbox + costs.ambient_elevenlabs) * 4
+    (costs.first_frame + videoCost + costs.voice_chatterbox + costs.ambient_elevenlabs) * 4
   
   return {
     firstFrames: Math.floor(balance / costs.first_frame),
-    videos: Math.floor(balance / costs.video_veo31),
+    videos: Math.floor(balance / videoCost),
     fullCampaigns: Math.floor(balance / campaignCost),
   }
 }

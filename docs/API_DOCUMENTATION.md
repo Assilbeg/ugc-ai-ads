@@ -223,7 +223,7 @@ Génère un plan de campagne UGC avec Claude AI.
 Génère la première frame d'une vidéo avec NanoBanana Pro.
 
 **Auth**: `User`  
-**Coût**: `first_frame` (15 crédits par défaut)
+**Coût**: `first_frame` (25 crédits par défaut)
 
 **Request Body**
 ```json

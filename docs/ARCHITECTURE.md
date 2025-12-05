@@ -75,8 +75,8 @@ Campaign (1)
 ## Voir aussi
 
 - [`CRITICAL_BEHAVIORS.md`](./CRITICAL_BEHAVIORS.md) - Invariants à ne jamais modifier
-- [`../API_DOCUMENTATION.md`](../API_DOCUMENTATION.md) - Documentation des endpoints
-- [`../DOCS_DES_APIS.md`](../DOCS_DES_APIS.md) - Documentation des APIs externes
+- [`API_DOCUMENTATION.md`](./API_DOCUMENTATION.md) - Documentation des endpoints
+- [`DOCS_DES_APIS.md`](./DOCS_DES_APIS.md) - Documentation des APIs externes
 
 ---
 
