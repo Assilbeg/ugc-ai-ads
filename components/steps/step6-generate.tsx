@@ -1778,8 +1778,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
 
     // Sauvegarder en BDD si le clip a un ID
     if (selectedClip?.id) {
-      const { error } = await supabase
-        .from('campaign_clips')
+      const { error } = await (supabase
+        .from('campaign_clips') as any)
         .update({ 
           video: { ...selectedClip.video, prompt: editVideoPromptText }
         })
