@@ -833,38 +833,84 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
     setEditText(clips[index].script.text)
   }
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (editingClip !== null) {
       const clipIndex = editingClip
       const newText = editText
       const currentClip = clips[clipIndex]
       const scriptChanged = currentClip?.script.text !== newText
       
-      // Utiliser functional updater pour éviter race conditions
-      // Met à jour le script ET invalide la vidéo si nécessaire en une seule opération
-      setClips(prevClips => {
-        const updatedClips = [...prevClips]
-        if (updatedClips[clipIndex]) {
-          updatedClips[clipIndex] = {
-            ...updatedClips[clipIndex],
-            script: {
-              ...updatedClips[clipIndex].script,
-              text: newText,
-              word_count: newText.split(/\s+/).filter(Boolean).length
+      // ══════════════════════════════════════════════════════════════
+      // FIX: Calculer les nouveaux clips PUIS synchroniser immédiatement
+      // avec le parent ET sauvegarder en BDD (pas via useEffect asynchrone)
+      // ══════════════════════════════════════════════════════════════
+      const updatedClips = [...clips]
+      if (updatedClips[clipIndex]) {
+        updatedClips[clipIndex] = {
+          ...updatedClips[clipIndex],
+          script: {
+            ...updatedClips[clipIndex].script,
+            text: newText,
+            word_count: newText.split(/\s+/).filter(Boolean).length
+          },
+          // Invalider la vidéo existante si le script a changé
+          ...(scriptChanged && updatedClips[clipIndex].video?.raw_url ? {
+            video: {
+              ...updatedClips[clipIndex].video,
+              raw_url: undefined,
+              final_url: undefined,
             },
-            // Invalider la vidéo existante si le script a changé
-            ...(scriptChanged && updatedClips[clipIndex].video?.raw_url ? {
-              video: {
-                ...updatedClips[clipIndex].video,
-                raw_url: undefined,
-                final_url: undefined,
-              },
-              status: 'pending' as const,
-            } : {}),
-          }
+            status: 'pending' as const,
+          } : {}),
         }
-        return updatedClips
-      })
+      }
+      
+      // 1. Mettre à jour le state local
+      setClips(updatedClips)
+      
+      // 2. IMMÉDIATEMENT synchroniser avec le parent (pas via useEffect)
+      onClipsGenerated(updatedClips)
+      console.log('[Step5] ✓ Script updated and synced with parent for clip', clipIndex + 1)
+      
+      // 3. Sauvegarder en BDD immédiatement si on a un campaign_id
+      if (state.campaign_id && currentClip.order !== undefined) {
+        const clipToSave = updatedClips[clipIndex]
+        try {
+          // Chercher le clip existant par campaign_id + order
+          const { data: foundList } = await (supabase
+            .from('campaign_clips') as any)
+            .select('id, video')
+            .eq('campaign_id', state.campaign_id)
+            .eq('order', currentClip.order)
+            .order('is_selected', { ascending: false, nullsFirst: false })
+            .limit(1)
+          
+          const found = foundList?.[0]
+          if (found) {
+            const updateData: Record<string, unknown> = {
+              script: clipToSave.script,
+            }
+            // Invalider la vidéo si le script a changé
+            if (scriptChanged && found.video?.raw_url) {
+              updateData.video = { ...found.video, raw_url: null, final_url: null }
+              updateData.status = 'pending'
+            }
+            
+            const { error } = await (supabase
+              .from('campaign_clips') as any)
+              .update(updateData)
+              .eq('id', found.id)
+            
+            if (error) {
+              console.error('[Step5] Error saving script to DB:', error)
+            } else {
+              console.log('[Step5] ✓ Script saved to DB for clip', currentClip.order)
+            }
+          }
+        } catch (err) {
+          console.error('[Step5] Error saving script to DB:', err)
+        }
+      }
       
       setEditingClip(null)
       setEditText('')
@@ -883,7 +929,8 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
 
   const saveVisualEdit = async () => {
     if (editingVisualPrompt !== null) {
-      const currentClip = clips[editingVisualPrompt]
+      const clipIndex = editingVisualPrompt
+      const currentClip = clips[clipIndex]
       const promptChanged = currentClip.first_frame.prompt !== editVisualText
       
       const newFirstFrame = {
@@ -894,25 +941,32 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
       }
       
       const updatedClips = [...clips]
-      updatedClips[editingVisualPrompt] = {
-        ...updatedClips[editingVisualPrompt],
+      updatedClips[clipIndex] = {
+        ...updatedClips[clipIndex],
         first_frame: newFirstFrame,
         // Invalider la vidéo existante si le prompt visuel a changé
         // Pour forcer une régénération à l'étape 6
         ...(promptChanged && currentClip.video?.raw_url ? {
           video: {
-            ...updatedClips[editingVisualPrompt].video,
+            ...updatedClips[clipIndex].video,
             raw_url: undefined,
             final_url: undefined,
           },
           status: 'pending' as const,
         } : {}),
       }
+      
+      // 1. Mettre à jour le state local
       setClips(updatedClips)
+      
+      // 2. IMMÉDIATEMENT synchroniser avec le parent (pas via useEffect)
+      onClipsGenerated(updatedClips)
+      console.log('[Step5] ✓ Visual prompt updated and synced with parent for clip', clipIndex + 1)
+      
       setEditingVisualPrompt(null)
       setEditVisualText('')
       
-      // Sauvegarder en BDD si on a un campaign_id
+      // 3. Sauvegarder en BDD si on a un campaign_id
       if (state.campaign_id && currentClip.order !== undefined) {
         try {
           const { error } = await (supabase

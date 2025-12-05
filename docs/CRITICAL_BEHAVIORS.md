@@ -565,6 +565,42 @@ const handleRegeneratePlan = () => {
 }
 ```
 
+### Règle CRITIQUE : Synchronisation immédiate lors des éditions manuelles
+
+> **Fix Dec 2024** : Quand l'utilisateur édite le script ou le prompt visuel manuellement
+> dans step5, les modifications doivent être synchronisées IMMÉDIATEMENT avec le parent
+> et sauvegardées en BDD. Ne PAS compter sur les useEffect asynchrones.
+
+**Le problème** : L'utilisateur pouvait cliquer sur "Continuer" avant que le useEffect de
+synchronisation ne s'exécute, ce qui causait la perte des modifications.
+
+```typescript
+// ❌ PROBLÈME - La synchronisation via useEffect peut ne pas s'exécuter à temps
+const saveEdit = () => {
+  setClips(updatedClips)  // State local mis à jour
+  // ... mais onClipsGenerated() est appelé dans un useEffect, 
+  // qui peut ne pas s'exécuter avant la navigation
+}
+
+// ✅ CORRECT - Synchronisation immédiate
+const saveEdit = async () => {
+  const updatedClips = [...]  // Calculer les nouveaux clips
+  
+  // 1. Mettre à jour le state local
+  setClips(updatedClips)
+  
+  // 2. IMMÉDIATEMENT synchroniser avec le parent
+  onClipsGenerated(updatedClips)
+  
+  // 3. Sauvegarder en BDD immédiatement
+  await saveToDb(updatedClips)
+}
+```
+
+**Fonctions concernées dans step5-plan.tsx** :
+- `saveEdit()` - Édition du script
+- `saveVisualEdit()` - Édition du prompt visuel
+
 ### Commits de référence
 
 | Comportement | Commit |
@@ -573,6 +609,7 @@ const handleRegeneratePlan = () => {
 | Sauver clips en step5 (pas juste step6) | `f859e7b` |
 | Empêcher régénération auto du plan | `1c7450b`, `2deb19b` |
 | Functional updater pour éviter race conditions | `2df633e`, `ec11682` |
+| Synchronisation immédiate des éditions manuelles | Dec 2024 |
 
 ---
 
