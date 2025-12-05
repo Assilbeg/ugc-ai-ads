@@ -497,6 +497,20 @@ WHERE user_id = 'USER_UUID'
   AND is_custom = true;
 ```
 
+#### Acteurs preset disponibles (décembre 2024)
+
+| Nom | Genre | Âge | Ethnicité |
+|-----|-------|-----|-----------|
+| Luna | Femme | 25-30 | - |
+| Emma | Femme | 24-28 | European |
+| Sofia | Femme | 22-28 | Latin American |
+| Aisha | Femme | 26-32 | African |
+| Marco | Homme | 30-35 | Mediterranean |
+| Kenji | Homme | 25-30 | East Asian |
+
+> Les images soul sont générées via **Higgsfield Soul** (preset 0.5 selfie).
+> Voir `CRITICAL_BEHAVIORS.md` section 13 pour les guidelines de prompt.
+
 ---
 
 ## 📂 Fichiers de référence

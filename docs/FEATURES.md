@@ -120,6 +120,18 @@ POST /api/generate/first-frame
 Les acteurs peuvent avoir des images pré-générées par preset (`intention_media`).
 Si disponible, utilisée comme base pour la first frame → meilleure cohérence.
 
+### Templates par filming_type
+
+Les prompts de first frame s'adaptent au `filming_type` du preset :
+
+| filming_type | Style de prompt | Cadrage |
+|--------------|-----------------|---------|
+| `handheld` | 🤳 Selfie avec bras tendu visible | Portrait rapproché |
+| `filmed_by_other` | 🎬 Filmé par quelqu'un d'autre | Demi-corps / corps entier |
+| `setup_phone` | 📱 Téléphone sur trépied, mains libres | Demi-corps avec bureau |
+
+> Fichiers : `app/api/generate/intention-media/route.ts`, `app/(admin)/admin/actors/page.tsx`
+
 ### Coût
 
 ~25 crédits par first frame

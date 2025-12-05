@@ -204,10 +204,24 @@ Campaign (1)
 | Service | Usage | Fichier principal |
 |---------|-------|-------------------|
 | **Supabase** | Auth, BDD, Storage | `lib/supabase/` |
-| **fal.ai** | Veo 3.1, NanoBanana, ChatterboxHD | `lib/api/falai.ts` |
+| **fal.ai** | Veo 3.1, NanoBanana, ChatterboxHD, Whisper | `lib/api/falai.ts` |
 | **Claude** | Génération de plans et scripts | `lib/api/claude.ts` |
+| **Higgsfield** | Génération d'images d'acteurs (Soul) | `lib/api/higgsfield.ts` |
 | **Transloadit** | Processing vidéo (trim, concat) | `app/api/generate/process-clip/` |
 | **Stripe** | Paiements | `lib/stripe.ts` |
+
+### Higgsfield Soul (Génération d'acteurs)
+
+Pour créer de nouveaux acteurs preset, utiliser l'API Higgsfield Soul :
+
+```
+Endpoint: https://platform.higgsfield.ai/higgsfield-ai/soul/standard
+Preset: 0.5 selfie (TOUJOURS)
+Format: 3:4 ou 9:16 portrait
+```
+
+> ⚠️ Le style de prompt est crucial : selfie UGC authentique, pas portrait studio.
+> Voir `CRITICAL_BEHAVIORS.md` section 13 pour les guidelines.
 
 ## Voir aussi
 
