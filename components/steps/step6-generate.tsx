@@ -1454,19 +1454,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     setConfirmRegen(null)
     
     // ══════════════════════════════════════════════════════════════
-    // ARCHIVER LA VERSION ACTUELLE AVANT RÉGÉNÉRATION
+    // LANCER LA RÉGÉNÉRATION D'ABORD
+    // (on archive APRÈS succès pour éviter les versions orphelines)
     // ══════════════════════════════════════════════════════════════
-    const actionMap: Record<RegenerateWhat, ClipVersionAction> = {
-      video: 'regenerate_video',
-      voice: 'regenerate_voice',
-      ambient: 'regenerate_ambient',
-      frame: 'regenerate_frame',
-      all: 'regenerate_all',
-    }
-    
-    const newVersion = await archiveClipVersion(clipToRegenerate, actionMap[what])
-    console.log(`[Regenerate] Archived version, new version will be: ${newVersion}`)
-    
     const result = await regenerateSingleClip(
       clipToRegenerate,
       actor,
@@ -1478,6 +1468,20 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     )
 
     if (result) {
+      // ══════════════════════════════════════════════════════════════
+      // ARCHIVER LA VERSION ACTUELLE SEULEMENT APRÈS SUCCÈS
+      // ══════════════════════════════════════════════════════════════
+      const actionMap: Record<RegenerateWhat, ClipVersionAction> = {
+        video: 'regenerate_video',
+        voice: 'regenerate_voice',
+        ambient: 'regenerate_ambient',
+        frame: 'regenerate_frame',
+        all: 'regenerate_all',
+      }
+      
+      const newVersion = await archiveClipVersion(clipToRegenerate, actionMap[what])
+      console.log(`[Regenerate] ✓ Generation succeeded, archived version ${newVersion - 1}, new version: ${newVersion}`)
+      
       // ══════════════════════════════════════════════════════════════
       // VERSIONING: Créer un NOUVEAU clip et désélectionner l'ancien
       // ══════════════════════════════════════════════════════════════
