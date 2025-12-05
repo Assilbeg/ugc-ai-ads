@@ -667,6 +667,28 @@ const oldScript = generatedClip?.script?.text || clip.script?.text || ''
 
 **Contexte** : Dans le bouton "Sauvegarder & Régénérer", si `generatedClip` est `undefined` (premier clip, pas encore généré), `oldScript` devient une chaîne vide. La fonction `replaceScriptInPrompt()` vérifie `if (!oldScript)` et retourne le prompt original sans modification. Résultat : fal.ai génère avec l'ANCIEN script !
 
+### Règle CRITIQUE : Le script doit TOUJOURS être dans le video.prompt
+
+> **Fix 5 Dec 2024** : `replaceScriptInPrompt()` doit AJOUTER le script même si le prompt original ne le contient pas
+
+**Le problème** : Certains prompts générés par Claude ne contiennent PAS le pattern `speaks in ... accent: [script]`. Quand l'utilisateur clique "Sauvegarder & Régénérer", le script n'est jamais injecté car les méthodes 1 et 2 échouent et l'ancien fallback n'ajoutait rien.
+
+```typescript
+// ❌ ANCIEN FALLBACK - N'ajoutait pas le script si oldScript === newScript
+if (oldScript === newScript) return originalPrompt  // Short-circuit, prompt inchangé !
+
+// ✅ NOUVEAU COMPORTEMENT - Vérifie si le prompt contient déjà le script
+if (originalPrompt.includes(newScript)) {
+  return originalPrompt  // OK, le script est déjà là
+}
+// Sinon, AJOUTER le script avec le format standard
+```
+
+**Format d'injection** : Si aucun pattern accent trouvé, le script est ajouté avant les NEGATIVES :
+```
+Speech/Dialogue: speaks in standard metropolitan French accent, Parisian pronunciation, clear and neutral: "[nouveau script]"
+```
+
 ---
 
 ## 9. Prompts Claude
@@ -921,6 +943,7 @@ const updatedClips = generatedClips.map((c) => {
 
 | Date | Commit | Comportement ajouté |
 |------|--------|---------------------|
+| 5 Dec 2024 | - | Fix replaceScriptInPrompt : AJOUTE le script même si le prompt original ne le contient pas (pas de pattern `speaks in...`) |
 | 5 Dec 2024 | - | Fix oldScript fallback : `generatedClip?.script?.text || clip.script?.text` évite que le prompt reste inchangé quand generatedClip est undefined |
 | 5 Dec 2024 | - | Fix régénération mauvais clip : utiliser oldClipId au lieu de clipIndex pour identifier le clip (index uniqueBeats ≠ index generatedClips) |
 | Dec 2024 | - | Fix "Sauvegarder & Régénérer" : passer le clip avec script mis à jour directement à askRegenerate pour éviter timing issues |
