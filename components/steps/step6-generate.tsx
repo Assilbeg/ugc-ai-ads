@@ -2100,9 +2100,10 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
               const isGenerating = currentStatus !== 'pending' && currentStatus !== 'completed' && currentStatus !== 'failed'
               
               // Utiliser final_url (vidéo mixée avec audio) en priorité, sinon raw_url
-              // Ajouter un cache-buster pour forcer le refresh après régénération
+              // Ajouter un cache-buster basé sur clip.id pour forcer le refresh lors de la navigation entre versions
               const baseVideoUrl = generatedClip?.video?.final_url || generatedClip?.video?.raw_url
-              const videoUrl = baseVideoUrl ? `${baseVideoUrl}${baseVideoUrl.includes('?') ? '&' : '?'}t=${generatedClip?.video?.raw_url?.slice(-8) || ''}` : undefined
+              const clipCacheBuster = generatedClip?.id || generatedClip?.created_at || ''
+              const videoUrl = baseVideoUrl ? `${baseVideoUrl}${baseVideoUrl.includes('?') ? '&' : '?'}v=${clipCacheBuster}` : undefined
               const firstFrameUrl = clip.first_frame?.image_url || state.generated_first_frames?.[index]?.url
               
               return (
