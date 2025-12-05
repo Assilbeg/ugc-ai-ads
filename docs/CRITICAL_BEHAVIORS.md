@@ -833,6 +833,7 @@ if (isClipRegenerating(clipId)) {
 
 | Date | Commit | Comportement ajouté |
 |------|--------|---------------------|
+| Dec 2024 | - | Fix allCompleted : ne vérifier que les clips avec vidéo (pas les squelettes pending) |
 | Dec 2024 | - | Policy RLS actors : admin peut modifier acteurs preset |
 | Dec 2024 | `81785dc` | Fix comptage clips par beats |
 | Dec 2024 | `53749b0` | Charger clip_versions pour navigation |

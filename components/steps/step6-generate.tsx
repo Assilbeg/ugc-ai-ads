@@ -288,10 +288,15 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       if (!c?.video?.raw_url && !c?.video?.final_url) return // Ignorer clips sans vidéo
       const list = map.get(c.order) || []
       list.push(c)
-      // Trier par date de création décroissante (plus récent en premier)
-      map.set(c.order, list.sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      ))
+      // Trier par is_selected d'abord, puis par date de création décroissante
+      // Cela garantit que le clip sélectionné est toujours à l'index 0
+      map.set(c.order, list.sort((a, b) => {
+        // Priorité 1: is_selected = true en premier
+        if (a.is_selected && !b.is_selected) return -1
+        if (!a.is_selected && b.is_selected) return 1
+        // Priorité 2: plus récent en premier
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      }))
     })
     return map
   }, [generatedClips])
@@ -704,6 +709,13 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
             }
             return c
           }))
+          
+          // Réinitialiser l'index affiché à 0 (le clip restauré sera trié en premier)
+          setDisplayedVersionIndex(prev => ({
+            ...prev,
+            [beat]: 0
+          }))
+          
           console.log(`[Versioning] ✓ Restored archived version ${versionData.version_number} for beat ${beat}`)
         }
         return
@@ -731,6 +743,12 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         ...c,
         is_selected: c.id === clipId ? true : (c.order === beat ? false : c.is_selected)
       })))
+      
+      // 4. Réinitialiser l'index affiché à 0 (le clip sélectionné sera trié en premier)
+      setDisplayedVersionIndex(prev => ({
+        ...prev,
+        [beat]: 0
+      }))
       
       console.log(`[Versioning] ✓ Selected version ${clipId} for beat ${beat}`)
     } catch (err) {
@@ -1662,6 +1680,16 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       setGeneratedClips(sortedClips)
       onClipsUpdate(sortedClips)
       
+      // ═══════════════════════════════════════════════════════════════
+      // VERSIONING: Réinitialiser l'index de version affiché pour ce beat
+      // Cela garantit que la preview affiche automatiquement le nouveau clip
+      // (qui est maintenant à l'index 0 car is_selected = true et trié en premier)
+      // ═══════════════════════════════════════════════════════════════
+      setDisplayedVersionIndex(prev => ({
+        ...prev,
+        [beatOrder]: 0
+      }))
+      
       // Rafraîchir l'affichage des crédits
       triggerCreditsRefresh()
       
@@ -1843,8 +1871,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       beatsCompleted.add(c.order)
     }
   })
-  const allCompleted = totalBeats > 0 && beatsCompleted.size === totalBeats && 
-    generatedClips.every(c => c.status === 'completed')
+  // VERSIONING: allCompleted = tous les beats ont au moins un clip completed avec vidéo
+  // Note: ne PAS utiliser generatedClips.every() car ça inclut les clips "squelettes" sans vidéo
+  const allCompleted = totalBeats > 0 && beatsCompleted.size === totalBeats
 
   const hasFailures = generatedClips.some(c => c.status === 'failed')
   
