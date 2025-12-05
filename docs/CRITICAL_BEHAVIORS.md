@@ -24,6 +24,7 @@
 12. [Race Conditions et Patterns](#12-race-conditions-et-patterns)
 13. [Génération d'Images d'Acteurs (Higgsfield Soul)](#13-génération-dimages-dacteurs-higgsfield-soul)
 14. [RLS et APIs Admin (Service Role)](#14-rls-et-apis-admin-service-role)
+15. [Règles de Modifications UI (Tous Composants)](#15-règles-de-modifications-ui-tous-composants)
 
 ---
 
@@ -651,6 +652,21 @@ const updatedVideoPrompt = replaceScriptInPrompt(originalPrompt, oldScript, newS
 - `saveScript()` - Sauvegarde du script modifié
 - Bouton "Sauvegarder & Régénérer" - Construction du clip avec script mis à jour
 
+### Règle CRITIQUE : Fallback sur oldScript
+
+> **Fix 5 Dec 2024** : `oldScript` doit TOUJOURS avoir un fallback vers `clip.script.text`
+
+```typescript
+// ❌ BUG - Si generatedClip n'existe pas, oldScript sera vide
+// et replaceScriptInPrompt() ne fera rien !
+const oldScript = generatedClip?.script?.text || ''
+
+// ✅ CORRECT - Fallback vers clip.script.text
+const oldScript = generatedClip?.script?.text || clip.script?.text || ''
+```
+
+**Contexte** : Dans le bouton "Sauvegarder & Régénérer", si `generatedClip` est `undefined` (premier clip, pas encore généré), `oldScript` devient une chaîne vide. La fonction `replaceScriptInPrompt()` vérifie `if (!oldScript)` et retourne le prompt original sans modification. Résultat : fal.ai génère avec l'ANCIEN script !
+
 ---
 
 ## 9. Prompts Claude
@@ -905,6 +921,7 @@ const updatedClips = generatedClips.map((c) => {
 
 | Date | Commit | Comportement ajouté |
 |------|--------|---------------------|
+| 5 Dec 2024 | - | Fix oldScript fallback : `generatedClip?.script?.text || clip.script?.text` évite que le prompt reste inchangé quand generatedClip est undefined |
 | 5 Dec 2024 | - | Fix régénération mauvais clip : utiliser oldClipId au lieu de clipIndex pour identifier le clip (index uniqueBeats ≠ index generatedClips) |
 | Dec 2024 | - | Fix "Sauvegarder & Régénérer" : passer le clip avec script mis à jour directement à askRegenerate pour éviter timing issues |
 | Dec 2024 | - | Preview affiche automatiquement le nouveau clip après régénération (reset displayedVersionIndex + tri is_selected) |
@@ -1072,6 +1089,118 @@ const supabase = createServiceClient()  // Utilise SERVICE_ROLE_KEY → bypass R
 
 - `app/api/generate/intention-media/route.ts` - Génération images intention (service role)
 - `app/(admin)/admin/actors/page.tsx` - Gestion acteurs (bénéficie de la policy RLS admin)
+
+---
+
+## 15. Règles de Modifications UI (Tous Composants)
+
+### Contexte
+
+Ce projet utilise React avec Next.js. Les composants mélangent souvent logique métier et UI. Pour modifier l'apparence **sans casser la logique**, respecter ces règles.
+
+> **Note** : Les composants `step5-plan.tsx` (~1 400 lignes) et `step6-generate.tsx` (~2 900 lignes) sont particulièrement sensibles car très longs avec beaucoup d'états interdépendants.
+
+### ✅ Modifications SAFE (zéro risque)
+
+| Élément | Exemple | Applicable à |
+|---------|---------|--------------|
+| **Classes Tailwind** | `className="p-4"` → `className="p-6"` | Tous composants |
+| **Constantes de style** | `BEAT_COLORS`, `BEAT_LABELS` | Fichiers avec constantes UI |
+| **Tailles / paddings / margins** | `w-32` → `w-48`, `gap-4` → `gap-6` | Tous composants |
+| **Icônes Lucide** | `<Sparkles />` → `<Wand2 />` | Tous composants |
+| **Textes / labels** | `"Générer"` → `"Lancer"` | Tous composants |
+| **Animations CSS** | Ajouter `animate-pulse`, modifier keyframes | Tous composants |
+| **Layout grid/flex** | `grid-cols-2` → `flex flex-col` | Tous composants |
+| **Composants UI isolés** | `LoadingAnimation`, `AssemblyModal` | Composants sans logique métier |
+| **Couleurs / thèmes** | `bg-violet-500` → `bg-blue-600` | Tous composants |
+
+### ⚠️ Modifications INTERDITES (casse la logique)
+
+| Élément | Pourquoi | Impact |
+|---------|----------|--------|
+| **`onClick={...}`** | Déclenche actions métier | Boutons ne fonctionnent plus |
+| **`disabled={...}`** | Conditions métier (loading, crédits...) | UX cassée |
+| **`value={...}` / `onChange={...}`** | Binding de données | Inputs/sliders cassés |
+| **`{condition && ...}`** | Affichage conditionnel | Éléments manquants ou en trop |
+| **`{array.map(...)}`** | Itération sur données | Liste cassée |
+| **`key={...}`** | React reconciliation | Bugs de rendering |
+| **`ref={...}`** | Focus, scroll, animations | Comportements JS cassés |
+| **useEffect / useCallback** | Logique réactive | Effets de bord cassés |
+| **Ordre des conditions** | `loading → error → content` | Affichage incohérent |
+
+### 🔧 Règles pratiques
+
+**1. Modifier par blocs visuels**
+```tsx
+{/* Header section */}  // ← Repérer les commentaires
+<div className="flex items-center">
+  // Modifier UNIQUEMENT les className ici
+</div>
+```
+
+**2. Ne JAMAIS supprimer d'attributs fonctionnels**
+```tsx
+// ❌ INTERDIT
+<Button onClick={handleSubmit}>  →  <Button>
+
+// ✅ OK
+<Button onClick={handleSubmit} className="h-11">  →  
+<Button onClick={handleSubmit} className="h-14 rounded-full">
+```
+
+**3. Garder les conditions d'affichage intactes**
+```tsx
+// ❌ INTERDIT - Retirer la condition
+{loading && <Spinner />}  →  <Spinner />
+
+// ✅ OK - Modifier le style à l'intérieur
+{loading && <Spinner className="w-8" />}  →  
+{loading && <Spinner className="w-12 text-blue-500" />}
+```
+
+**4. Tester après chaque modification**
+- [ ] Le composant s'affiche correctement
+- [ ] Les états de loading fonctionnent
+- [ ] Les erreurs s'affichent
+- [ ] Les boutons/actions fonctionnent
+- [ ] La navigation fonctionne
+
+### Exemples concrets
+
+```tsx
+// ✅ Changer le style d'une card
+<Card className="rounded-2xl border-border">
+// →
+<Card className="rounded-3xl border-2 border-violet-500/20 shadow-xl">
+
+// ✅ Changer le layout d'une liste (GARDER le map)
+<div className="space-y-4">
+  {items.map((item) => <Item key={item.id} />)}
+</div>
+// →
+<div className="grid grid-cols-2 gap-6">
+  {items.map((item) => <Item key={item.id} />)}  // map intact !
+</div>
+
+// ✅ Changer une icône
+<Sparkles className="w-4 h-4 mr-2" />
+// →
+<Wand2 className="w-5 h-5 mr-2" />
+
+// ❌ INTERDIT - Toucher au onClick
+<Button onClick={() => generateVideo(clipId)}>
+// Ne pas modifier cette ligne !
+```
+
+### Composants particulièrement sensibles
+
+| Fichier | Lignes | Risque | Raison |
+|---------|--------|--------|--------|
+| `step5-plan.tsx` | ~1 400 | **Élevé** | 10+ useEffects interdépendants |
+| `step6-generate.tsx` | ~2 900 | **Très élevé** | 15+ useEffects, logique complexe |
+| `use-video-generation.ts` | ~900 | **Élevé** | Logique de génération |
+
+Pour ces fichiers, privilégier des modifications très ciblées et tester systématiquement.
 
 ---
 
