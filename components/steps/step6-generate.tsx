@@ -256,6 +256,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     what: RegenerateWhat
     label: string
     warning?: string
+    clipToRegenerate?: CampaignClip // Clip avec les dernières modifications (script, prompt, etc.)
   } | null>(null)
   
   // Qualité vidéo sélectionnée
@@ -1541,15 +1542,23 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   const handleConfirmRegenerate = async () => {
     if (!confirmRegen || !actor || !preset) return
 
-    const { clipIndex, what } = confirmRegen
+    const { clipIndex, what, clipToRegenerate: passedClip } = confirmRegen
     const planClip = clips[clipIndex]
     
-    // VERSIONING: Trouver le clip à régénérer en utilisant le beat (order)
-    // car les indices de generatedClips ne correspondent plus au plan
-    const versions = clipsByBeat.get(planClip.order) || []
-    const versionIndex = displayedVersionIndex[planClip.order] || 0
-    const selectedClip = versions.find(v => v.is_selected) || versions[0]
-    const clipToRegenerate = versions[versionIndex] || selectedClip || planClip
+    // VERSIONING: Utiliser le clip passé directement (avec les dernières modifications)
+    // OU trouver le clip via clipsByBeat (fallback pour les autres boutons de régénération)
+    let clipToRegenerate: CampaignClip
+    if (passedClip) {
+      // Cas "Sauvegarder & Régénérer" : on utilise le clip avec le script mis à jour
+      clipToRegenerate = passedClip
+      console.log('[Regenerate] Using passed clip with updated script:', passedClip.script?.text?.slice(0, 50))
+    } else {
+      // Cas régénération standard : trouver via clipsByBeat
+      const versions = clipsByBeat.get(planClip.order) || []
+      const versionIndex = displayedVersionIndex[planClip.order] || 0
+      const selectedClip = versions.find(v => v.is_selected) || versions[0]
+      clipToRegenerate = versions[versionIndex] || selectedClip || planClip
+    }
     
     const oldClipId = clipToRegenerate.id
     const beatOrder = clipToRegenerate.order
@@ -1736,7 +1745,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     }
   }
 
-  const askRegenerate = (clipIndex: number, what: RegenerateWhat) => {
+  const askRegenerate = (clipIndex: number, what: RegenerateWhat, clipToRegenerate?: CampaignClip) => {
     const labels: Record<RegenerateWhat, string> = {
       video: 'la vidéo',
       voice: 'la voix',
@@ -1749,7 +1758,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       clipIndex,
       what,
       label: labels[what],
-      warning: what === 'video' ? '⚠️ Coûteux (~1-2€)' : undefined
+      warning: what === 'video' ? '⚠️ Coûteux (~1-2€)' : undefined,
+      clipToRegenerate, // Clip avec les dernières modifications (optionnel)
     })
   }
 
@@ -2296,8 +2306,21 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                   </button>
                                   <button
                                     onClick={async () => {
+                                      // Construire le clip avec le script mis à jour AVANT de sauvegarder
+                                      // pour éviter les problèmes de timing avec le state React
+                                      const newWordCount = editScriptText.split(/\s+/).filter(w => w.length > 0).length
+                                      let updatedVideoPrompt = generatedClip?.video?.prompt || clip.video?.prompt || ''
+                                      if (generatedClip?.script?.text && updatedVideoPrompt) {
+                                        updatedVideoPrompt = updatedVideoPrompt.replace(generatedClip.script.text, editScriptText)
+                                      }
+                                      const clipWithUpdatedScript: CampaignClip = {
+                                        ...(generatedClip || clip),
+                                        script: { text: editScriptText, word_count: newWordCount },
+                                        video: { ...(generatedClip?.video || clip.video), prompt: updatedVideoPrompt }
+                                      }
+                                      
                                       await saveScript(clip.order)
-                                      askRegenerate(index, 'video')
+                                      askRegenerate(index, 'video', clipWithUpdatedScript)
                                     }}
                                     className="px-2 py-1 text-xs bg-orange-500 text-white hover:bg-orange-600 rounded font-medium"
                                   >
