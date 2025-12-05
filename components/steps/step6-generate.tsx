@@ -1733,7 +1733,12 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       .filter(c => c.video?.raw_url || c.video?.final_url)
       .map(c => c.order)
   ).size
-  const allClipsHaveVideo = beatsWithVideo === clips.length && clips.length > 0
+  
+  // VERSIONING: Nombre total de BEATS uniques dans le plan
+  // (clips peut contenir plusieurs versions par beat, on ne compte que les beats uniques)
+  const totalBeats = new Set(clips.map(c => c.order)).size
+  
+  const allClipsHaveVideo = beatsWithVideo === totalBeats && totalBeats > 0
   
   // VERSIONING: Tous les beats sont complétés si chaque beat a au moins un clip completed
   const beatsCompleted = new Set<number>()
@@ -1742,13 +1747,13 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       beatsCompleted.add(c.order)
     }
   })
-  const allCompleted = clips.length > 0 && beatsCompleted.size === clips.length && 
+  const allCompleted = totalBeats > 0 && beatsCompleted.size === totalBeats && 
     generatedClips.every(c => c.status === 'completed')
 
   const hasFailures = generatedClips.some(c => c.status === 'failed')
   
   // Beats restants à générer (sans aucune version avec vidéo)
-  const remainingClips = clips.length - beatsWithVideo
+  const remainingClips = totalBeats - beatsWithVideo
 
   const getClipStatus = (index: number): ClipStatus => {
     const clipOrder = clips[index]?.order
@@ -1802,7 +1807,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         </h2>
         <p className="text-muted-foreground mt-3 text-lg">
           {!started 
-            ? `${clips.length} clips à générer` 
+            ? `${totalBeats} clips à générer` 
             : generating 
               ? 'Cela peut prendre quelques minutes...'
               : hasFailures
@@ -1820,7 +1825,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
               <span className="text-5xl">🎬</span>
             </div>
             <h3 className="text-2xl font-semibold mb-3">
-              Prêt à générer {clips.length} clips
+              Prêt à générer {totalBeats} clips
             </h3>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
               Chaque clip passe par : Vidéo → Voix → Ambiance
@@ -2604,7 +2609,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           }}
           requiredCredits={creditsNeeded?.required}
           currentBalance={creditsNeeded?.current}
-          clipCount={clips.length}
+          clipCount={totalBeats}
           onSuccess={() => {
             setShowUpgradeModal(false)
             setCreditsNeeded(null)
