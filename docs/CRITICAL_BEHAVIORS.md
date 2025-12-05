@@ -873,7 +873,7 @@ Les images d'intention et first frames utilisent des templates différents selon
 
 | filming_type | Description | Prompt clé |
 |--------------|-------------|------------|
-| `handheld` | Selfie bras tendu | "arm extended holding phone visible in frame" |
+| `handheld` | Selfie cadrage naturel | "close-up selfie angle, looking directly at camera" (sans montrer le téléphone) |
 | `filmed_by_other` | Filmé par quelqu'un | "as if filmed by someone else, half-body or full-body" |
 | `setup_phone` | Téléphone sur trépied | "both hands free (as if phone is on tripod)" |
 

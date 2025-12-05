@@ -145,8 +145,8 @@ const INTENTION_EMOJIS: Record<string, string> = {
 
 // Templates par filming_type pour générer l'image de l'acteur
 const FILMING_TYPE_TEMPLATES: Record<string, string> = {
-  // Selfie tenu à la main - bras tendu visible
-  handheld: `Generate a photo of this same person as a first frame for a TikTok UGC video. {CONTEXT}. Same person as reference, natural selfie pose with arm extended holding phone visible in frame, looking at camera, authentic UGC selfie style. KEEP THE EXACT SAME FACE AND IDENTITY. NO TIKTOK UI, NO TEXT, NO WATERMARKS, NO OVERLAYS ON THE IMAGE.`,
+  // Selfie tenu à la main - cadrage selfie naturel sans montrer le téléphone
+  handheld: `Generate a photo of this same person as a first frame for a TikTok UGC video. {CONTEXT}. Same person as reference, close-up selfie angle, looking directly at camera, authentic UGC style. KEEP THE EXACT SAME FACE AND IDENTITY. NO TIKTOK UI, NO TEXT, NO WATERMARKS, NO OVERLAYS ON THE IMAGE. Do not show phone or arm holding phone.`,
   
   // Filmé par quelqu'un d'autre - pas de bras tendu, cadrage plus large
   filmed_by_other: `Generate a photo of this same person as a first frame for a TikTok UGC video. {CONTEXT}. Same person as reference, natural pose as if filmed by someone else, looking at camera or slightly off-camera, half-body or full-body framing, authentic UGC style. KEEP THE EXACT SAME FACE AND IDENTITY. NO TIKTOK UI, NO TEXT, NO WATERMARKS, NO OVERLAYS ON THE IMAGE.`,

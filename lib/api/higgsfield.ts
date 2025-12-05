@@ -217,9 +217,9 @@ export function buildActorPrompt(actor: ActorDescription): string {
     'natural golden hour lighting from window',
     // Clothing: casual
     actor.style ? `wearing casual ${actor.style} outfit` : 'wearing casual everyday clothes',
-    // Pose: selfie authentique
-    'arm extended holding phone',
-    'looking at camera with confident natural expression',
+    // Pose: selfie authentique (sans montrer le téléphone)
+    'selfie angle close-up',
+    'looking directly at camera with confident natural expression',
     // Style: UGC TikTok
     'authentic UGC TikTok style',
     'photorealistic, natural skin',
