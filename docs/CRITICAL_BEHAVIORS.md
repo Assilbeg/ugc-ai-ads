@@ -982,6 +982,7 @@ const getClipStatus = (clip: CampaignClip): ClipStatus => {
 
 | Date | Commit | Comportement ajouté |
 |------|--------|---------------------|
+| 8 Dec 2024 | - | Thumbnails dashboard permanentes : upload vers Supabase Storage (bucket: thumbnails) avec fallback first_frame du hook |
 | 5 Dec 2024 | - | Fix animation régénération : 1) `getClipStatus(clip)` au lieu de `getClipStatus(index)`, 2) Progress indexé par `clip-${order}` au lieu de `clip.id` (order est stable pour chaque tuile/beat) |
 | 5 Dec 2024 | - | Fix replaceScriptInPrompt : AJOUTE le script même si le prompt original ne le contient pas (pas de pattern `speaks in...`) |
 | 5 Dec 2024 | - | Fix oldScript fallback : `generatedClip?.script?.text || clip.script?.text` évite que le prompt reste inchangé quand generatedClip est undefined |
@@ -1267,47 +1268,72 @@ Pour ces fichiers, privilégier des modifications très ciblées et tester syst�
 
 ---
 
-## 16. Dashboard - Previews Vidéo
+## 16. Dashboard - Thumbnails Vidéo
 
 ### Contexte
-> Commit `51406ef` - Affichage d'une frame de preview pour les campagnes terminées.
+> Fix 8 Dec 2024 - Thumbnails permanentes stockées dans Supabase Storage
 
-### Le problème
+### Le problème initial
 
-Les thumbnails générées par Transloadit lors de l'assemblage sont **temporaires** (URLs R2 qui expirent).
-Le simple `<video preload="metadata">` ne garantit pas l'affichage d'une frame selon les navigateurs.
+Les thumbnails générées par Transloadit lors de l'assemblage étaient **temporaires** (URLs R2 qui expirent).
+Le hack `<video src="#t=0.1">` n'était pas fiable sur tous les navigateurs.
 
 ### La solution
 
-Utiliser le fragment URL `#t=0.1` pour forcer le navigateur à charger la frame à 0.1 seconde :
+**Architecture en 3 niveaux de priorité :**
+
+```
+1. Thumbnail Transloadit → Upload vers Supabase Storage (bucket: thumbnails)
+         ↓ (si échec)
+2. First frame du clip HOOK (order=1) → Déjà stocké dans campaign_clips
+         ↓ (si pas dispo)  
+3. Fallback vidéo : <video src="#t=0.1"> (dernier recours)
+```
+
+### Pipeline d'upload (assemble/route.ts)
+
+```typescript
+// 1. Transloadit génère une thumbnail (720x1280 JPG)
+const thumbnailUrl = result.results?.thumbnail?.[0]?.ssl_url
+
+// 2. Upload vers Supabase Storage (permanente)
+let permanentThumbnailUrl = await uploadThumbnailToSupabase(thumbnailUrl, campaignId)
+
+// 3. Fallback vers first_frame du hook si l'upload échoue
+if (!permanentThumbnailUrl) {
+  permanentThumbnailUrl = await getHookFirstFrameUrl(supabase, campaignId)
+}
+
+// 4. Sauvegarde dans campaigns.thumbnail_url
+await supabase.from('campaigns').update({ thumbnail_url: permanentThumbnailUrl })
+```
+
+### Affichage (campaign-card.tsx)
 
 ```tsx
-// ✅ CORRECT - Force l'affichage de la frame à 0.1s
-<video 
-  src={`${campaign.final_video_url}#t=0.1`}
-  preload="metadata"
-  muted
-  playsInline
-/>
-
-// ❌ INSUFFISANT - Ne garantit pas l'affichage d'une frame
-<video 
-  src={campaign.final_video_url}
-  preload="metadata"
-/>
+// ✅ CORRECT - Priorité à la thumbnail stockée
+{campaign.thumbnail_url ? (
+  <img src={campaign.thumbnail_url} className="w-full h-full object-cover" />
+) : (
+  // Fallback si pas de thumbnail
+  <video src={`${campaign.final_video_url}#t=0.1`} preload="metadata" muted playsInline />
+)}
 ```
 
 ### Règles
 
 | Règle | Description |
 |-------|-------------|
-| **Toujours utiliser `#t=0.1`** | Force le navigateur à se positionner et afficher cette frame |
-| **Pas de thumbnails Transloadit** | Les URLs R2 de Transloadit expirent, ne pas les stocker |
-| **`preload="metadata"`** | Charge juste assez de données pour la frame, pas toute la vidéo |
+| **Thumbnail dans Supabase Storage** | Bucket `thumbnails`, nom: `{campaign_id}.jpg` |
+| **URLs permanentes** | Ne jamais stocker d'URLs Transloadit temporaires |
+| **Fallback first_frame hook** | Si upload échoue, utiliser `clips[order=1].first_frame.image_url` |
+| **`#t=0.1` en dernier recours** | Seulement si aucune thumbnail disponible |
 
-### Fichier concerné
+### Fichiers concernés
 
-- `app/(dashboard)/dashboard/campaign-card.tsx` - Cartes des campagnes dans le dashboard
+- `app/api/assemble/route.ts` - Upload thumbnail vers Supabase Storage
+- `app/(dashboard)/dashboard/campaign-card.tsx` - Affichage avec priorité thumbnail
+- Bucket Supabase Storage: `thumbnails` (public)
 
 ---
 
@@ -1323,4 +1349,4 @@ Utiliser le fragment URL `#t=0.1` pour forcer le navigateur à charger la frame 
 
 ---
 
-*Dernière mise à jour : 5 décembre 2024*
+*Dernière mise à jour : 8 décembre 2024*

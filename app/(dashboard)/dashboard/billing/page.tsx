@@ -17,7 +17,7 @@ import {
   AlertTriangle
 } from 'lucide-react'
 import { BillingActions } from './billing-actions'
-import { formatCredits, getRemainingGenerations, getAllGenerationCosts, CreditTransaction } from '@/lib/credits'
+import { formatCredits, formatAsCredits, getRemainingGenerations, getAllGenerationCosts, CreditTransaction } from '@/lib/credits'
 import { isAdmin } from '@/lib/admin'
 
 export default async function BillingPage() {
@@ -129,7 +129,7 @@ export default async function BillingPage() {
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold text-lg text-red-600 dark:text-red-400">
-                  Solde négatif : {formatCredits(userCredits?.balance || 0)}
+                  Solde négatif : {formatAsCredits(userCredits?.balance || 0)}
                 </h3>
                 <p className="text-muted-foreground">
                   Votre compte a un solde négatif. Rechargez vos crédits pour continuer à générer du contenu.
@@ -191,12 +191,12 @@ export default async function BillingPage() {
           </CardHeader>
           <CardContent>
             <p className={`text-4xl font-bold ${isNegativeBalance ? 'text-red-500' : ''}`}>
-              {formatCredits(userCredits?.balance || 0)}
+              {formatAsCredits(userCredits?.balance || 0)}
             </p>
             <p className="text-sm text-muted-foreground mt-1">
               {isNegativeBalance 
                 ? 'Rechargement requis' 
-                : 'de crédits disponibles'}
+                : 'disponibles'}
             </p>
           </CardContent>
         </Card>
@@ -262,28 +262,28 @@ export default async function BillingPage() {
               <Image className="w-5 h-5 text-blue-500" />
               <div>
                 <p className="font-medium">First Frame</p>
-                <p className="text-sm text-muted-foreground">{formatCredits(costs.first_frame)}</p>
+                <p className="text-sm text-muted-foreground">{formatAsCredits(costs.first_frame)}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
               <Video className="w-5 h-5 text-purple-500" />
               <div>
                 <p className="font-medium">Vidéo Veo 3.1</p>
-                <p className="text-sm text-muted-foreground">{formatCredits(costs.video_veo31)}</p>
+                <p className="text-sm text-muted-foreground">{formatAsCredits(costs.video_veo31_fast || costs.video_veo31)}/s</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
               <Mic className="w-5 h-5 text-green-500" />
               <div>
                 <p className="font-medium">Voice</p>
-                <p className="text-sm text-muted-foreground">{formatCredits(costs.voice_chatterbox)}</p>
+                <p className="text-sm text-muted-foreground">{formatAsCredits(costs.voice_chatterbox)}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
               <Music className="w-5 h-5 text-amber-500" />
               <div>
                 <p className="font-medium">Ambient</p>
-                <p className="text-sm text-muted-foreground">{formatCredits(costs.ambient_elevenlabs)}</p>
+                <p className="text-sm text-muted-foreground">{formatAsCredits(costs.ambient_elevenlabs)}</p>
               </div>
             </div>
           </div>
@@ -332,10 +332,10 @@ export default async function BillingPage() {
                     <p className={`font-semibold ${
                       tx.amount > 0 ? 'text-green-500' : 'text-foreground'
                     }`}>
-                      {tx.amount > 0 ? '+' : ''}{formatCredits(tx.amount)}
+                      {tx.amount > 0 ? '+' : ''}{formatAsCredits(tx.amount)}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Solde: {formatCredits(tx.balance_after)}
+                      Solde: {formatAsCredits(tx.balance_after)}
                     </p>
                   </div>
                 </div>

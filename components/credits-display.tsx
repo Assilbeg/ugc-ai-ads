@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { formatCredits } from '@/lib/credits-client'
+import { formatAsCredits } from '@/lib/credits-client'
 
 interface CreditsDisplayProps {
   isAdmin?: boolean
@@ -110,7 +110,7 @@ export function CreditsDisplay({ isAdmin = false, initialBalance = 0 }: CreditsD
         </svg>
       )}
       <span className={`text-sm font-medium ${getTextColor()} ${isLoading ? 'opacity-50' : ''}`}>
-        {isAdmin ? '∞' : formatCredits(balance)}
+        {isAdmin ? '∞' : formatAsCredits(balance)}
       </span>
     </Link>
   )

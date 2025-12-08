@@ -77,3 +77,4 @@ CREATE POLICY "Authenticated users can create assets" ON generated_assets
 
 
 
+

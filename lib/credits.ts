@@ -454,7 +454,7 @@ export async function updateSubscription(
 }
 
 // ─────────────────────────────────────────────────────────────────
-// HELPER: Format credits for display
+// HELPER: Format credits for display (en euros - legacy)
 // ─────────────────────────────────────────────────────────────────
 
 export function formatCredits(cents: number): string {
@@ -462,6 +462,58 @@ export function formatCredits(cents: number): string {
     style: 'currency',
     currency: 'EUR',
   }).format(cents / 100)
+}
+
+// ─────────────────────────────────────────────────────────────────
+// HELPER: Format credits as "X crédits" (user-facing)
+// ─────────────────────────────────────────────────────────────────
+
+export function formatAsCredits(credits: number): string {
+  const formatted = new Intl.NumberFormat('fr-FR').format(credits)
+  return `${formatted} crédit${credits !== 1 ? 's' : ''}`
+}
+
+// ─────────────────────────────────────────────────────────────────
+// HELPER: Estimate number of videos from credits (dynamic)
+// ─────────────────────────────────────────────────────────────────
+
+const DEFAULT_VIDEO_DURATION = 6 // secondes
+
+export async function estimateVideosFromCredits(
+  credits: number,
+  clipCount: number = 5
+): Promise<number> {
+  const costs = await getAllGenerationCosts()
+  
+  // Coût par clip complet (first_frame + vidéo 6s + voice + ambient)
+  const videoCost = costs.video_veo31_fast || costs.video_veo31_standard || 25
+  const costPerClip = 
+    (costs.first_frame || 25) + 
+    (videoCost * DEFAULT_VIDEO_DURATION) + 
+    (costs.voice_chatterbox || 20) + 
+    (costs.ambient_elevenlabs || 15)
+  
+  // Coût d'une campagne complète
+  const costPerCampaign = costPerClip * clipCount
+  
+  return Math.floor(credits / costPerCampaign)
+}
+
+// ─────────────────────────────────────────────────────────────────
+// HELPER: Get cost per video (for dynamic display)
+// ─────────────────────────────────────────────────────────────────
+
+export async function getCostPerVideo(clipCount: number = 5): Promise<number> {
+  const costs = await getAllGenerationCosts()
+  
+  const videoCost = costs.video_veo31_fast || costs.video_veo31_standard || 25
+  const costPerClip = 
+    (costs.first_frame || 25) + 
+    (videoCost * DEFAULT_VIDEO_DURATION) + 
+    (costs.voice_chatterbox || 20) + 
+    (costs.ambient_elevenlabs || 15)
+  
+  return costPerClip * clipCount
 }
 
 // ─────────────────────────────────────────────────────────────────

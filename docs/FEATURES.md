@@ -369,9 +369,37 @@ L'assemblage peut prendre 30s à 2min selon le nombre de clips.
 
 ### Principe
 
-- 1 crédit = 0.01€
+- 1 crédit = 0.01€ (1 centime)
 - Chaque génération coûte des crédits
 - Vérification AVANT génération
+- **Affichage user-facing en "crédits"** (pas en euros)
+
+### Coûts par génération (dynamiques)
+
+Les coûts sont configurés dans la table `generation_costs` et modifiables via Admin > Billing.
+
+| Type | ID | Coût par défaut |
+|------|-----|-----------------|
+| First Frame | `first_frame` | 25 crédits |
+| Vidéo Veo 3.1 Fast | `video_veo31_fast` | 25 crédits/seconde |
+| Vidéo Veo 3.1 Standard | `video_veo31_standard` | 60 crédits/seconde |
+| Voice Conversion | `voice_chatterbox` | 20 crédits |
+| Ambient Audio | `ambient_elevenlabs` | 15 crédits |
+
+**Coût d'une vidéo complète (5 clips × 6s)** :
+```
+= 5 × (25 + 25×6 + 20 + 15) = 5 × 210 = 1050 crédits ≈ 10.50€
+```
+
+### Fonctions de formatage
+
+| Fonction | Usage | Exemple |
+|----------|-------|---------|
+| `formatAsCredits(credits)` | Affichage user-facing | `"1 500 crédits"` |
+| `formatCredits(cents)` | Affichage en euros (legacy) | `"15,00 €"` |
+| `estimateVideosFromCredits(credits)` | Calcul dynamique | `10000 → ~9 vidéos` |
+
+**Règle** : Utiliser `formatAsCredits()` pour tout affichage destiné aux utilisateurs.
 
 ### Obtention de crédits
 
@@ -382,9 +410,25 @@ L'assemblage peut prendre 30s à 2min selon le nombre de clips.
 
 ### Affichage
 
-- Header : Badge avec solde actuel
+- Header : Badge avec solde actuel en crédits
 - Refresh automatique après génération
 - Alerte visuelle si solde faible/négatif
+- Page Facturation : coûts par génération + historique
+
+### Estimation du nombre de vidéos
+
+Le nombre de vidéos estimées est calculé dynamiquement :
+- Récupère les coûts depuis `generation_costs`
+- Calcule le coût par vidéo complète (5 clips × coûts)
+- Divise le solde par ce coût
+
+```typescript
+// Côté serveur
+const videos = await estimateVideosFromCredits(balance, clipCount)
+
+// Côté client (avec coûts pré-chargés)
+const videos = estimateVideosFromCreditsSync(balance, costs, clipCount)
+```
 
 ### Admin
 
@@ -408,10 +452,10 @@ Les admins (vérifiés par email dans `lib/admin.ts`) :
 | Mix | `app/api/generate/mix-video/route.ts` |
 | Trim/Speed | `app/api/generate/process-clip/route.ts` |
 | Assemblage | `app/api/assemble/route.ts` |
-| Crédits | `lib/credits.ts`, `app/api/credits/route.ts` |
+| Crédits | `lib/credits.ts`, `lib/credits-client.ts`, `app/api/credits/route.ts` |
 | Presets/Intentions | `lib/presets.ts`, `app/(admin)/admin/presets/page.tsx` (filming_type), `components/steps/step3-preset.tsx` (badge filming_type) |
 
 ---
 
-*Dernière mise à jour : 5 décembre 2024*
+*Dernière mise à jour : 8 décembre 2024*
 

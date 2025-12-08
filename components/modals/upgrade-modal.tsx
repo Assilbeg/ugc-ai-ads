@@ -138,8 +138,10 @@ export function UpgradeModal({
     }).format(cents / 100)
   }
 
-  const formatCredits = (cents: number) => {
-    return formatPrice(cents)
+  // Afficher les crédits en "X crédits"
+  const formatAsCredits = (credits: number) => {
+    const formatted = new Intl.NumberFormat('fr-FR').format(credits)
+    return `${formatted} crédit${credits !== 1 ? 's' : ''}`
   }
 
   // Bloquer le scroll
@@ -207,18 +209,18 @@ export function UpgradeModal({
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Solde actuel</p>
-                  <p className="text-lg font-semibold">{formatCredits(currentBalance)}</p>
+                  <p className="text-lg font-semibold">{formatAsCredits(currentBalance)}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-muted-foreground">Requis pour cette génération</p>
-                  <p className="text-lg font-semibold text-amber-500">{formatCredits(requiredCredits)}</p>
+                  <p className="text-lg font-semibold text-amber-500">{formatAsCredits(requiredCredits)}</p>
                 </div>
               </div>
               {missingCredits > 0 && (
                 <div className="mt-3 pt-3 border-t border-border">
                   <p className="text-sm">
                     <span className="text-muted-foreground">Il vous manque </span>
-                    <span className="font-semibold text-destructive">{formatCredits(missingCredits)}</span>
+                    <span className="font-semibold text-destructive">{formatAsCredits(missingCredits)}</span>
                   </p>
                 </div>
               )}
@@ -304,10 +306,7 @@ export function UpgradeModal({
                     {/* Credits */}
                     <div className="flex items-center gap-2 text-sm">
                       <CreditCard className="w-4 h-4 text-muted-foreground" />
-                      <span>
-                        <span className="font-semibold">{formatCredits(plan.monthly_credits)}</span>
-                        <span className="text-muted-foreground"> de crédits</span>
-                      </span>
+                      <span className="font-semibold">{formatAsCredits(plan.monthly_credits)}</span>
                     </div>
 
                     {/* Features */}
@@ -358,6 +357,7 @@ export function UpgradeModal({
     </div>
   )
 }
+
 
 
 

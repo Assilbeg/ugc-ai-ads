@@ -142,8 +142,10 @@ export function FirstPurchaseModal({
     }).format(cents / 100)
   }
 
-  const formatCredits = (cents: number) => {
-    return formatPrice(cents)
+  // Afficher les crédits en "X crédits"
+  const formatAsCredits = (credits: number) => {
+    const formatted = new Intl.NumberFormat('fr-FR').format(credits)
+    return `${formatted} crédit${credits !== 1 ? 's' : ''}`
   }
 
   // Bloquer le scroll
@@ -284,7 +286,7 @@ export function FirstPurchaseModal({
                     )}
                   </div>
                   <p className="text-sm text-muted-foreground mb-4">
-                    {formatCredits(recommendedPlan.monthly_credits)} de crédits inclus
+                    {formatAsCredits(recommendedPlan.monthly_credits)} inclus
                   </p>
                   
                   <Button
@@ -342,6 +344,7 @@ export function FirstPurchaseModal({
     </div>
   )
 }
+
 
 
 

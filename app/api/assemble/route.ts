@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { Transloadit } from 'transloadit'
 
 // L'assemblage de plusieurs clips peut prendre plusieurs minutes
@@ -100,6 +101,92 @@ async function updateCampaignStatus(supabase: any, campaignId: string, status: s
       .eq('id', campaignId)
   } catch (err) {
     console.error('[Assemble] Failed to update campaign status:', err)
+  }
+}
+
+/**
+ * Upload une thumbnail vers Supabase Storage
+ * Télécharge l'image depuis l'URL temporaire Transloadit et l'upload vers le bucket 'thumbnails'
+ * @returns URL publique permanente de la thumbnail, ou null en cas d'échec
+ */
+async function uploadThumbnailToSupabase(
+  transloaditUrl: string,
+  campaignId: string
+): Promise<string | null> {
+  try {
+    console.log('[Assemble] 📸 Upload thumbnail vers Supabase Storage...')
+    
+    // Télécharger l'image depuis Transloadit
+    const response = await fetch(transloaditUrl)
+    if (!response.ok) {
+      console.error('[Assemble] ❌ Échec téléchargement thumbnail:', response.status)
+      return null
+    }
+    
+    const imageBuffer = await response.arrayBuffer()
+    const fileName = `${campaignId}.jpg`
+    
+    // Upload vers Supabase Storage (service client pour bypass RLS)
+    const supabaseService = createServiceClient()
+    
+    // Supprimer l'ancienne thumbnail si elle existe (overwrite)
+    await supabaseService.storage
+      .from('thumbnails')
+      .remove([fileName])
+    
+    const { data, error } = await supabaseService.storage
+      .from('thumbnails')
+      .upload(fileName, imageBuffer, {
+        contentType: 'image/jpeg',
+        upsert: true
+      })
+    
+    if (error) {
+      console.error('[Assemble] ❌ Erreur upload Supabase:', error.message)
+      return null
+    }
+    
+    // Obtenir l'URL publique
+    const { data: { publicUrl } } = supabaseService.storage
+      .from('thumbnails')
+      .getPublicUrl(data.path)
+    
+    console.log('[Assemble] ✓ Thumbnail uploadée:', publicUrl.slice(0, 60))
+    return publicUrl
+    
+  } catch (err) {
+    console.error('[Assemble] ❌ Erreur upload thumbnail:', err)
+    return null
+  }
+}
+
+/**
+ * Récupère le first_frame.image_url du clip HOOK (order=1) comme fallback
+ */
+async function getHookFirstFrameUrl(
+  supabase: any,
+  campaignId: string
+): Promise<string | null> {
+  try {
+    const { data: hookClips } = await (supabase
+      .from('campaign_clips') as any)
+      .select('first_frame')
+      .eq('campaign_id', campaignId)
+      .eq('order', 1)
+      .order('is_selected', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
+    
+    const hookFirstFrame = hookClips?.[0]?.first_frame?.image_url
+    if (hookFirstFrame) {
+      console.log('[Assemble] ✓ Fallback: first_frame du hook trouvé')
+      return hookFirstFrame
+    }
+    
+    return null
+  } catch (err) {
+    console.error('[Assemble] ❌ Erreur récup first_frame hook:', err)
+    return null
   }
 }
 
@@ -368,13 +455,37 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('[Assemble] ✓ Vidéo:', videoUrl.slice(0, 60))
-    console.log('[Assemble] ✓ Thumbnail:', thumbnailUrl?.slice(0, 60) || 'aucune')
+    console.log('[Assemble] ✓ Thumbnail Transloadit:', thumbnailUrl?.slice(0, 60) || 'aucune')
 
     // Calculer la durée totale
     const totalDuration = sortedClips.reduce((sum, c) => sum + (c.duration || 0), 0)
 
     // ════════════════════════════════════════════════════════════════
-    // ÉTAPE 5: SAUVEGARDE EN BASE
+    // ÉTAPE 5: UPLOAD THUMBNAIL VERS SUPABASE STORAGE
+    // ════════════════════════════════════════════════════════════════
+    let permanentThumbnailUrl: string | null = null
+    
+    if (campaignId) {
+      // Priorité 1: Upload la thumbnail Transloadit vers Supabase Storage
+      if (thumbnailUrl) {
+        permanentThumbnailUrl = await uploadThumbnailToSupabase(thumbnailUrl, campaignId)
+      }
+      
+      // Priorité 2: Fallback vers le first_frame du hook si l'upload a échoué
+      if (!permanentThumbnailUrl) {
+        console.log('[Assemble] 🔄 Fallback vers first_frame du hook...')
+        permanentThumbnailUrl = await getHookFirstFrameUrl(supabase, campaignId)
+      }
+      
+      if (permanentThumbnailUrl) {
+        console.log('[Assemble] ✓ Thumbnail finale:', permanentThumbnailUrl.slice(0, 60))
+      } else {
+        console.log('[Assemble] ⚠️ Aucune thumbnail disponible')
+      }
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // ÉTAPE 6: SAUVEGARDE EN BASE
     // ════════════════════════════════════════════════════════════════
     if (campaignId) {
       const clipAdjustments = sortedClips.map((c, i) => ({
@@ -387,7 +498,7 @@ export async function POST(request: NextRequest) {
         .insert({
           campaign_id: campaignId,
           final_video_url: videoUrl,
-          thumbnail_url: thumbnailUrl || null,
+          thumbnail_url: permanentThumbnailUrl || null,
           duration_seconds: totalDuration,
           clip_adjustments: clipAdjustments
         })
@@ -403,6 +514,7 @@ export async function POST(request: NextRequest) {
             .from('campaigns') as any)
             .update({ 
               final_video_url: videoUrl,
+              thumbnail_url: permanentThumbnailUrl || null,
               status: 'completed'
             })
             .eq('id', campaignId)
@@ -411,16 +523,17 @@ export async function POST(request: NextRequest) {
         console.log('[Assemble] ✓ Assembly sauvegardé, version:', assembly?.version || 'N/A')
       }
 
-      // Mettre à jour la campagne
+      // Mettre à jour la campagne avec la thumbnail permanente
       await (supabase
         .from('campaigns') as any)
         .update({ 
           final_video_url: videoUrl,
+          thumbnail_url: permanentThumbnailUrl || null,
           status: 'completed'
         })
         .eq('id', campaignId)
       
-      console.log('[Assemble] ✓ Campagne mise à jour')
+      console.log('[Assemble] ✓ Campagne mise à jour avec thumbnail')
     }
 
     console.log('[Assemble] ════════════════════════════════════════════════')
@@ -429,7 +542,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       videoUrl,
-      thumbnailUrl: thumbnailUrl || null,
+      thumbnailUrl: permanentThumbnailUrl || null,
       duration: totalDuration,
       clipCount: sortedClips.length,
       method: 'transloadit-concat-robust',
