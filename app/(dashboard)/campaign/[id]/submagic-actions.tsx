@@ -91,18 +91,39 @@ export function SubmagicActions({
   // Terminé avec succès
   if (submagicStatus === 'completed' && submagicVideoUrl) {
     return (
-      <a 
-        href={submagicVideoUrl} 
-        download
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <Button size="sm" variant="outline" className="gap-2 rounded-lg border-violet-200 text-violet-700 hover:bg-violet-50 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-950">
-          <Subtitles className="w-4 h-4" />
-          Avec sous-titres
-          <Download className="w-3 h-3" />
+      <>
+        <a 
+          href={submagicVideoUrl} 
+          download
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <Button size="sm" variant="outline" className="gap-2 rounded-lg border-violet-200 text-violet-700 hover:bg-violet-50 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-950">
+            <Subtitles className="w-4 h-4" />
+            Avec sous-titres
+            <Download className="w-3 h-3" />
+          </Button>
+        </a>
+        
+        {/* Bouton pour regénérer avec d'autres paramètres */}
+        <Button 
+          size="sm" 
+          variant="ghost" 
+          onClick={() => setShowModal(true)}
+          className="gap-2 rounded-lg text-muted-foreground hover:text-foreground"
+          title="Regénérer les sous-titres avec d'autres paramètres"
+        >
+          <RefreshCw className="w-4 h-4" />
         </Button>
-      </a>
+
+        <SubmagicModal
+          isOpen={showModal}
+          onClose={() => setShowModal(false)}
+          campaignId={campaignId}
+          campaignTitle={campaignTitle}
+          currentBalance={credits}
+        />
+      </>
     )
   }
 
