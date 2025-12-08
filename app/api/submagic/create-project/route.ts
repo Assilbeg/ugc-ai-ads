@@ -71,8 +71,12 @@ export async function POST(request: Request) {
     const dictionary = extractDictionary(campaign)
 
     // Construire le payload Submagic
+    // Tronquer le titre à 100 caractères max (limite Submagic)
+    const rawTitle = campaign.brief?.what_selling || 'UGC Video'
+    const title = rawTitle.length > 100 ? rawTitle.slice(0, 97) + '...' : rawTitle
+    
     const submagicPayload: Record<string, unknown> = {
-      title: campaign.brief?.what_selling || 'UGC Video',
+      title,
       language: languageMap[campaign.brief?.language] || 'fr',
       videoUrl: campaign.final_video_url,
       templateName: config.templateName || 'Sara',
