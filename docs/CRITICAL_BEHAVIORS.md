@@ -1342,15 +1342,16 @@ await supabase.from('campaigns').update({ thumbnail_url: permanentThumbnailUrl }
 
 ### Contexte
 > Ajout 8 Dec 2024 - Intégration Submagic pour sous-titres automatiques
+> Mise à jour 8 Dec 2024 - Historique des versions de sous-titres
 
 ### Architecture du flow
 
 ```
-1. User clique "Sous-titres" sur page campagne (à côté de "Télécharger")
+1. User clique "Ajouter/Modifier sous-titres"
         ↓
-2. Modal SubmagicModal s'ouvre avec configuration complète
-   └── Template de sous-titres (Sara, Daniel, Beast, etc.)
-   └── Hook animé (optionnel)
+2. Modal SubmagicModal s'ouvre avec configuration
+   └── Template de sous-titres (grille visuelle)
+   └── Hook animé (génération IA possible)
    └── Magic Zooms, B-rolls
    └── Suppression silences, mauvaises prises
         ↓
@@ -1360,25 +1361,44 @@ await supabase.from('campaigns').update({ thumbnail_url: permanentThumbnailUrl }
    └── Vérifie crédits
    └── Déduit 25 crédits
    └── Envoie vers API Submagic
-   └── Stocke submagic_project_id en BDD
+   └── Stocke config dans submagic_config
    └── Met submagic_status = 'processing'
         ↓
-5. Submagic traite en async (1-5 min)
+5. Page affiche overlay "En cours..." sur la vidéo
         ↓
-6. POST /api/webhooks/submagic (callback)
+6. Submagic traite en async (1-5 min)
+        ↓
+7. POST /api/webhooks/submagic (callback)
    └── Met à jour submagic_video_url
-   └── Met submagic_status = 'completed' ou 'failed'
+   └── **CRÉE entrée dans submagic_versions** (historique)
+   └── Met submagic_status = 'completed'
         ↓
-7. Page campagne affiche bouton "Avec sous-titres" pour télécharger
+8. Page affiche nouvelle version + historique complet
 ```
 
-### Colonnes BDD (table campaigns)
+### Tables BDD
+
+#### `campaigns` (colonnes Submagic)
 
 | Colonne | Type | Description |
 |---------|------|-------------|
-| `submagic_project_id` | VARCHAR | ID du projet Submagic |
-| `submagic_video_url` | TEXT | URL de la vidéo avec sous-titres |
+| `submagic_project_id` | VARCHAR | ID du projet en cours |
+| `submagic_video_url` | TEXT | URL dernière vidéo (legacy) |
 | `submagic_status` | VARCHAR | 'none', 'processing', 'completed', 'failed' |
+| `submagic_config` | JSONB | Config de la génération en cours |
+| `submagic_updated_at` | TIMESTAMPTZ | Date dernière mise à jour |
+
+#### `submagic_versions` (HISTORIQUE - CRITIQUE)
+
+| Colonne | Type | Description |
+|---------|------|-------------|
+| `id` | UUID | ID unique |
+| `campaign_id` | UUID | Référence campagne |
+| `project_id` | VARCHAR | ID projet Submagic |
+| `video_url` | TEXT | URL vidéo sous-titrée |
+| `config` | JSONB | Config utilisée |
+| `version_number` | INTEGER | Numéro incrémenté |
+| `created_at` | TIMESTAMPTZ | Date création |
 
 ### Coût
 
@@ -1386,47 +1406,59 @@ await supabase.from('campaigns').update({ thumbnail_url: permanentThumbnailUrl }
 |------|--------------|
 | `submagic_subtitles` | 25 crédits (0.25€) |
 
-### Règles CRITIQUES
+### ⚠️ Règles CRITIQUES
 
 | Règle | Pourquoi |
 |-------|----------|
 | **Vérifier crédits AVANT appel Submagic** | Évite de créer un projet qu'on ne peut pas payer |
 | **Déduire crédits APRÈS succès API** | Si Submagic échoue, pas de facturation |
-| **Webhook retourne 200 même si erreur** | Évite les retries intempestifs de Submagic |
-| **Service client pour webhook** | Bypass RLS car pas de session utilisateur |
-| **Dictionnaire auto-extrait** | Améliore la transcription avec les mots du script |
+| **CRÉER entrée submagic_versions à chaque succès** | Historique complet des versions |
+| **NE JAMAIS supprimer une version existante** | User peut vouloir revenir en arrière |
+| **Webhook retourne 200 même si erreur** | Évite les retries intempestifs |
+| **Overlay sur vidéo pendant processing** | Feedback visuel clair |
 
-### Mapping langues brief → Submagic
+### Format de `config` (JSONB)
 
-| brief.language | Submagic |
-|----------------|----------|
-| fr | fr |
-| en-us, en-uk | en |
-| es, es-latam | es |
-| de | de |
-| it | it |
-| pt-br, pt | pt |
-| nl | nl |
+```json
+{
+  "templateName": "Hormozi 2",
+  "hasHook": true,
+  "hookText": "Le secret que personne ne dit 🤫",
+  "magicZooms": false,
+  "magicBrolls": true,
+  "removeBadTakes": false
+}
+```
 
-### États UI (SubmagicActions component)
+### États UI
 
-| submagic_status | UI affichée |
-|-----------------|-------------|
-| `none` / undefined | Bouton "Sous-titres" → ouvre modal |
-| `processing` | Bouton disabled "Sous-titres en cours..." |
-| `completed` | Bouton "Avec sous-titres" → téléchargement |
-| `failed` | Bouton "Réessayer sous-titres" → ouvre modal |
+| submagic_status | Vidéo principale | Historique |
+|-----------------|------------------|------------|
+| `none` | Originale | - |
+| `processing` | Originale + overlay | "⏳ En cours..." |
+| `completed` | Dernière version sous-titrée | Liste v1, v2, v3... |
+| `failed` | Originale | - |
+
+### Boutons page campagne
+
+**Sous la vidéo :**
+- "Télécharger" → vidéo originale
+- "Avec sous-titres" → dernière version (si dispo)
+
+**À droite :**
+- "Modifier la vidéo" → `/new/{id}`
+- "Ajouter/Modifier sous-titres" → modal
 
 ### Fichiers concernés
 
 | Fichier | Rôle |
 |---------|------|
-| `app/api/submagic/templates/route.ts` | Liste des templates (cache 6h) |
-| `app/api/submagic/hook-templates/route.ts` | Templates de hook (cache 6h) |
-| `app/api/submagic/create-project/route.ts` | Création projet + déduction crédits |
-| `app/api/webhooks/submagic/route.ts` | Réception des notifications |
+| `app/api/submagic/create-project/route.ts` | Création projet + config |
+| `app/api/submagic/generate-hook/route.ts` | Génération hook via Claude |
+| `app/api/webhooks/submagic/route.ts` | Webhook + création version |
 | `components/modals/submagic-modal.tsx` | Modal de configuration |
-| `app/(dashboard)/campaign/[id]/submagic-actions.tsx` | Boutons d'action |
+| `app/(dashboard)/campaign/[id]/page.tsx` | Affichage + historique |
+| `app/(dashboard)/campaign/[id]/submagic-actions.tsx` | Bouton modifier |
 
 ### Variable d'environnement
 

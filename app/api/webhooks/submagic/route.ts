@@ -19,9 +19,9 @@ export async function POST(request: Request) {
     // Utiliser service client pour bypass RLS
     const supabase = createServiceClient()
 
-    // Trouver la campagne par submagic_project_id
+    // Trouver la campagne par submagic_project_id avec sa config
     const { data: campaign, error: fetchError } = await (supabase.from('campaigns') as any)
-      .select('id, submagic_status')
+      .select('id, submagic_status, submagic_config')
       .eq('submagic_project_id', projectId)
       .single()
 
@@ -48,11 +48,34 @@ export async function POST(request: Request) {
     }
 
     // Ajouter l'URL vidéo si disponible
-    if (status === 'completed') {
-      // Préférer directUrl (CDN) sur downloadUrl
-      const videoUrl = directUrl || downloadUrl
-      if (videoUrl) {
-        updateData.submagic_video_url = videoUrl
+    const videoUrl = directUrl || downloadUrl
+    if (status === 'completed' && videoUrl) {
+      updateData.submagic_video_url = videoUrl
+      
+      // Créer une entrée dans l'historique des versions
+      // D'abord, compter les versions existantes pour cette campagne
+      const { count } = await (supabase.from('submagic_versions') as any)
+        .select('*', { count: 'exact', head: true })
+        .eq('campaign_id', campaign.id)
+      
+      const versionNumber = (count || 0) + 1
+      
+      // Insérer la nouvelle version
+      const { error: versionError } = await (supabase.from('submagic_versions') as any)
+        .insert({
+          campaign_id: campaign.id,
+          project_id: projectId,
+          video_url: videoUrl,
+          config: campaign.submagic_config || {},
+          status: 'completed',
+          version_number: versionNumber,
+        })
+      
+      if (versionError) {
+        console.error('[Submagic Webhook] Error creating version:', versionError)
+        // On continue quand même, ce n'est pas bloquant
+      } else {
+        console.log(`[Submagic Webhook] Created version ${versionNumber} for campaign ${campaign.id}`)
       }
     }
 

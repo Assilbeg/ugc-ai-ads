@@ -49,6 +49,14 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
     .order('created_at', { ascending: false })
     .limit(10)
 
+  // Récupérer l'historique des versions de sous-titres
+  const { data: submagicVersions } = await (supabase
+    .from('submagic_versions') as any)
+    .select('*')
+    .eq('campaign_id', id)
+    .order('created_at', { ascending: false })
+    .limit(10)
+
   // Le dernier assemblage (version la plus récente)
   const latestAssembly = assemblies?.[0] as any
   
@@ -61,9 +69,10 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
     ? `${baseVideoUrl}${baseVideoUrl.includes('?') ? '&' : '?'}v=${cacheBuster}`
     : null
   
-  // Dernière version = sous-titres si disponible, sinon originale
-  const hasSubtitles = campaign.submagic_status === 'completed' && campaign.submagic_video_url
-  const latestVersionVideo = hasSubtitles ? campaign.submagic_video_url : originalVideoUrl
+  // Dernière version de sous-titres (depuis l'historique)
+  const latestSubmagicVersion = submagicVersions?.[0] as any
+  const hasSubtitles = latestSubmagicVersion?.video_url && campaign.submagic_status !== 'processing'
+  const latestVersionVideo = hasSubtitles ? latestSubmagicVersion.video_url : originalVideoUrl
 
   const preset = campaign.preset_id ? getPresetById(campaign.preset_id) : null
   const brief = campaign.brief as { what_selling?: string; target_duration?: number }
@@ -205,10 +214,10 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
                     </a>
                   )}
                   {/* Bouton Télécharger avec sous-titres (si disponible) */}
-                  {hasSubtitles && (
+                  {hasSubtitles && latestSubmagicVersion && (
                     <a 
-                      href={campaign.submagic_video_url} 
-                      download={`ugc-subtitles-${id.slice(0, 8)}.mp4`}
+                      href={latestSubmagicVersion.video_url} 
+                      download={`ugc-subtitles-v${latestSubmagicVersion.version_number}-${id.slice(0, 8)}.mp4`}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -325,13 +334,13 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
       ) : null}
 
       {/* Historique des versions (assemblages + sous-titres) */}
-      {((assemblies && assemblies.length > 0) || campaign.submagic_video_url || campaign.submagic_status === 'processing') && campaign.status !== 'failed' && (
+      {((assemblies && assemblies.length > 0) || (submagicVersions && submagicVersions.length > 0) || campaign.submagic_status === 'processing') && campaign.status !== 'failed' && (
         <div className="mb-8 p-4 rounded-xl bg-muted/30 border border-border">
           <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            Historique des versions ({(assemblies?.length || 0) + (campaign.submagic_video_url || campaign.submagic_status === 'processing' ? 1 : 0)})
+            Historique des versions ({(assemblies?.length || 0) + (submagicVersions?.length || 0) + (campaign.submagic_status === 'processing' ? 1 : 0)})
           </h3>
           <div className="space-y-2">
             {/* Sous-titres en cours de génération */}
@@ -355,58 +364,72 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
               </div>
             )}
             
-            {/* Version sous-titrée terminée */}
-            {campaign.submagic_video_url && campaign.submagic_status === 'completed' && (
-              <div 
-                className="flex items-center justify-between p-3 rounded-lg bg-violet-50 border border-violet-200 dark:bg-violet-950/30 dark:border-violet-800"
-              >
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-medium text-violet-700 dark:text-violet-300">
-                    🎬 Sous-titres
-                  </span>
-                  {/* Afficher le template utilisé */}
-                  {(campaign as any).submagic_config?.templateName && (
-                    <Badge variant="secondary" className="text-xs">
-                      {(campaign as any).submagic_config.templateName}
-                    </Badge>
-                  )}
-                  {/* Afficher les options activées */}
-                  {(campaign as any).submagic_config?.hasHook && (
-                    <Badge variant="outline" className="text-xs border-violet-300 text-violet-600">
-                      Hook
-                    </Badge>
-                  )}
-                  {(campaign as any).submagic_config?.magicZooms && (
-                    <Badge variant="outline" className="text-xs border-violet-300 text-violet-600">
-                      Zooms
-                    </Badge>
-                  )}
-                  {(campaign as any).submagic_config?.magicBrolls && (
-                    <Badge variant="outline" className="text-xs border-violet-300 text-violet-600">
-                      B-rolls
-                    </Badge>
-                  )}
-                  <span className="text-xs text-muted-foreground ml-2">
-                    {campaign.submagic_updated_at ? new Date(campaign.submagic_updated_at).toLocaleDateString('fr-FR', {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    }) : 'Récent'}
-                  </span>
-                </div>
-                <a 
-                  href={campaign.submagic_video_url}
-                  download={`ugc-subtitles-${id.slice(0, 8)}.mp4`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+            {/* Toutes les versions de sous-titres */}
+            {submagicVersions?.map((version: any, index: number) => {
+              const isLatest = index === 0
+              const config = version.config || {}
+              return (
+                <div 
+                  key={version.id}
+                  className={`flex items-center justify-between p-3 rounded-lg ${
+                    isLatest 
+                      ? 'bg-violet-50 border border-violet-200 dark:bg-violet-950/30 dark:border-violet-800'
+                      : 'bg-background border border-border'
+                  }`}
                 >
-                  <Button size="sm" className="h-8 text-xs bg-violet-600 hover:bg-violet-700 text-white">
-                    📥 Télécharger
-                  </Button>
-                </a>
-              </div>
-            )}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-sm font-medium ${isLatest ? 'text-violet-700 dark:text-violet-300' : 'text-muted-foreground'}`}>
+                      🔤 v{version.version_number}
+                    </span>
+                    {config.templateName && (
+                      <Badge variant="secondary" className="text-xs">
+                        {config.templateName}
+                      </Badge>
+                    )}
+                    {config.hasHook && (
+                      <Badge variant="outline" className="text-xs border-violet-300 text-violet-600">
+                        Hook
+                      </Badge>
+                    )}
+                    {config.magicZooms && (
+                      <Badge variant="outline" className="text-xs border-violet-300 text-violet-600">
+                        Zooms
+                      </Badge>
+                    )}
+                    {config.magicBrolls && (
+                      <Badge variant="outline" className="text-xs border-violet-300 text-violet-600">
+                        B-rolls
+                      </Badge>
+                    )}
+                    <span className="text-xs text-muted-foreground ml-2">
+                      {new Date(version.created_at).toLocaleDateString('fr-FR', {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                    {isLatest && (
+                      <Badge className="bg-violet-500 text-white text-xs ml-1">Actuelle</Badge>
+                    )}
+                  </div>
+                  <a 
+                    href={version.video_url}
+                    download={`ugc-subtitles-v${version.version_number}-${id.slice(0, 8)}.mp4`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button 
+                      size="sm" 
+                      variant={isLatest ? 'default' : 'ghost'}
+                      className={`h-8 text-xs ${isLatest ? 'bg-violet-600 hover:bg-violet-700 text-white' : ''}`}
+                    >
+                      📥 Télécharger
+                    </Button>
+                  </a>
+                </div>
+              )
+            })}
             
             {/* Versions d'assemblage */}
             {assemblies?.map((assembly: any, index: number) => (
