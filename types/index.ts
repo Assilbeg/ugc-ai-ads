@@ -93,6 +93,29 @@ export type VideoEngine = "veo3.1"; // Uniquement Veo3.1 - le meilleur rapport q
 
 export type CampaignStatus = "draft" | "generating" | "completed" | "failed";
 
+// ─────────────────────────────────────────────────────────────────
+// SUBMAGIC CONFIGURATION
+// ─────────────────────────────────────────────────────────────────
+export interface SubmagicHookTitleConfig {
+  enabled: boolean;
+  text?: string;
+  template?: string;
+  top?: number;
+  size?: number;
+}
+
+export interface SubmagicConfig {
+  templateName: string;
+  hookTitle?: SubmagicHookTitleConfig;
+  magicZooms?: boolean;
+  magicBrolls?: boolean;
+  magicBrollsPercentage?: number;
+  removeSilencePace?: 'natural' | 'fast' | 'extra-fast';
+  removeBadTakes?: boolean;
+}
+
+export type SubmagicStatus = 'none' | 'processing' | 'completed' | 'failed';
+
 export type ClipStatus = "pending" | "generating_frame" | "generating_video" | "generating_voice" | "generating_ambient" | "completed" | "failed";
 
 // ─────────────────────────────────────────────────────────────────
@@ -329,6 +352,10 @@ export interface Campaign {
   status: CampaignStatus;
   clips?: CampaignClip[];
   final_video_url?: string;
+  // Submagic (sous-titres)
+  submagic_project_id?: string;
+  submagic_video_url?: string;
+  submagic_status?: SubmagicStatus;
   created_at: string;
   updated_at: string;
 }

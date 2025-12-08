@@ -21,6 +21,7 @@ export type GenerationType =
   | 'video_veo31_fast'      // Veo 3.1 Fast - prix par seconde
   | 'voice_chatterbox' 
   | 'ambient_elevenlabs'
+  | 'submagic_subtitles'    // Sous-titres Submagic
 
 export interface UserCredits {
   id: string

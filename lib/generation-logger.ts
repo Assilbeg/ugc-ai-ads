@@ -65,6 +65,7 @@ export const FAL_AI_MODELS = {
   video_veo31_fast: 'fal-ai/veo3.1/fast/image-to-video',
   voice_chatterbox: 'resemble-ai/chatterboxhd/speech-to-speech',
   ambient_elevenlabs: 'fal-ai/elevenlabs/sound-effects/v2',
+  submagic_subtitles: 'submagic/subtitles', // Service externe (pas fal.ai)
 } as const
 
 // ─────────────────────────────────────────────────────────────────

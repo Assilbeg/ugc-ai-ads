@@ -26,6 +26,7 @@
 14. [RLS et APIs Admin (Service Role)](#14-rls-et-apis-admin-service-role)
 15. [Règles de Modifications UI (Tous Composants)](#15-règles-de-modifications-ui-tous-composants)
 16. [Dashboard - Previews Vidéo](#16-dashboard---previews-vidéo)
+17. [Sous-titres Submagic](#17-sous-titres-submagic)
 
 ---
 
@@ -1334,6 +1335,104 @@ await supabase.from('campaigns').update({ thumbnail_url: permanentThumbnailUrl }
 - `app/api/assemble/route.ts` - Upload thumbnail vers Supabase Storage
 - `app/(dashboard)/dashboard/campaign-card.tsx` - Affichage avec priorité thumbnail
 - Bucket Supabase Storage: `thumbnails` (public)
+
+---
+
+## 17. Sous-titres Submagic
+
+### Contexte
+> Ajout 8 Dec 2024 - Intégration Submagic pour sous-titres automatiques
+
+### Architecture du flow
+
+```
+1. User clique "Sous-titres" sur page campagne (à côté de "Télécharger")
+        ↓
+2. Modal SubmagicModal s'ouvre avec configuration complète
+   └── Template de sous-titres (Sara, Daniel, Beast, etc.)
+   └── Hook animé (optionnel)
+   └── Magic Zooms, B-rolls
+   └── Suppression silences, mauvaises prises
+        ↓
+3. User clique "Lancer" (25 crédits)
+        ↓
+4. POST /api/submagic/create-project
+   └── Vérifie crédits
+   └── Déduit 25 crédits
+   └── Envoie vers API Submagic
+   └── Stocke submagic_project_id en BDD
+   └── Met submagic_status = 'processing'
+        ↓
+5. Submagic traite en async (1-5 min)
+        ↓
+6. POST /api/webhooks/submagic (callback)
+   └── Met à jour submagic_video_url
+   └── Met submagic_status = 'completed' ou 'failed'
+        ↓
+7. Page campagne affiche bouton "Avec sous-titres" pour télécharger
+```
+
+### Colonnes BDD (table campaigns)
+
+| Colonne | Type | Description |
+|---------|------|-------------|
+| `submagic_project_id` | VARCHAR | ID du projet Submagic |
+| `submagic_video_url` | TEXT | URL de la vidéo avec sous-titres |
+| `submagic_status` | VARCHAR | 'none', 'processing', 'completed', 'failed' |
+
+### Coût
+
+| Type | Coût facturé |
+|------|--------------|
+| `submagic_subtitles` | 25 crédits (0.25€) |
+
+### Règles CRITIQUES
+
+| Règle | Pourquoi |
+|-------|----------|
+| **Vérifier crédits AVANT appel Submagic** | Évite de créer un projet qu'on ne peut pas payer |
+| **Déduire crédits APRÈS succès API** | Si Submagic échoue, pas de facturation |
+| **Webhook retourne 200 même si erreur** | Évite les retries intempestifs de Submagic |
+| **Service client pour webhook** | Bypass RLS car pas de session utilisateur |
+| **Dictionnaire auto-extrait** | Améliore la transcription avec les mots du script |
+
+### Mapping langues brief → Submagic
+
+| brief.language | Submagic |
+|----------------|----------|
+| fr | fr |
+| en-us, en-uk | en |
+| es, es-latam | es |
+| de | de |
+| it | it |
+| pt-br, pt | pt |
+| nl | nl |
+
+### États UI (SubmagicActions component)
+
+| submagic_status | UI affichée |
+|-----------------|-------------|
+| `none` / undefined | Bouton "Sous-titres" → ouvre modal |
+| `processing` | Bouton disabled "Sous-titres en cours..." |
+| `completed` | Bouton "Avec sous-titres" → téléchargement |
+| `failed` | Bouton "Réessayer sous-titres" → ouvre modal |
+
+### Fichiers concernés
+
+| Fichier | Rôle |
+|---------|------|
+| `app/api/submagic/templates/route.ts` | Liste des templates (cache 6h) |
+| `app/api/submagic/hook-templates/route.ts` | Templates de hook (cache 6h) |
+| `app/api/submagic/create-project/route.ts` | Création projet + déduction crédits |
+| `app/api/webhooks/submagic/route.ts` | Réception des notifications |
+| `components/modals/submagic-modal.tsx` | Modal de configuration |
+| `app/(dashboard)/campaign/[id]/submagic-actions.tsx` | Boutons d'action |
+
+### Variable d'environnement
+
+```bash
+SUBMAGIC_API_KEY=sk-...  # Clé API Submagic
+```
 
 ---
 

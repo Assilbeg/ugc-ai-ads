@@ -7,6 +7,8 @@ import Link from 'next/link'
 import { AssemblingAnimation } from './assembling-animation'
 import { EditableTitle } from './editable-title'
 import { FailedCampaignState } from './failed-campaign-state'
+import { SubmagicActions } from './submagic-actions'
+import type { SubmagicStatus } from '@/types'
 
 // Désactiver le cache pour toujours avoir la dernière version de la campagne
 export const dynamic = 'force-dynamic'
@@ -163,19 +165,29 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
                   <span className="text-zinc-600">•</span>
                   <span>{clips?.length || 0} clips</span>
                 </div>
-                <a 
-                  href={finalVideoUrl} 
-                  download={`ugc-campaign-${id.slice(0, 8)}.mp4`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Button size="sm" className="bg-white text-zinc-900 hover:bg-zinc-100 font-medium rounded-lg gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    Télécharger
-                  </Button>
-                </a>
+                <div className="flex items-center gap-2">
+                  {/* Bouton Submagic (sous-titres) */}
+                  <SubmagicActions
+                    campaignId={id}
+                    campaignTitle={brief?.what_selling || 'Campagne UGC'}
+                    submagicStatus={(campaign.submagic_status || 'none') as SubmagicStatus}
+                    submagicVideoUrl={campaign.submagic_video_url}
+                  />
+                  {/* Bouton Télécharger */}
+                  <a 
+                    href={finalVideoUrl} 
+                    download={`ugc-campaign-${id.slice(0, 8)}.mp4`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button size="sm" className="bg-white text-zinc-900 hover:bg-zinc-100 font-medium rounded-lg gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Télécharger
+                    </Button>
+                  </a>
+                </div>
               </div>
             </div>
           </div>
