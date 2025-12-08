@@ -331,8 +331,10 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   const [assembling, setAssembling] = useState(false)
   
   // Modal de confirmation pour régénération
+  // FIX: Utiliser beatOrder au lieu de clipIndex pour éviter le bug d'index
+  // (voir CRITICAL_BEHAVIORS.md section 12)
   const [confirmRegen, setConfirmRegen] = useState<{
-    clipIndex: number
+    beatOrder: number // FIX: L'order du beat, pas l'index dans le tableau
     what: RegenerateWhat
     label: string
     warning?: string
@@ -1622,8 +1624,16 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   const handleConfirmRegenerate = async () => {
     if (!confirmRegen || !actor || !preset) return
 
-    const { clipIndex, what, clipToRegenerate: passedClip } = confirmRegen
-    const planClip = clips[clipIndex]
+    // FIX: Utiliser beatOrder pour trouver le bon clip
+    // (au lieu de clipIndex qui était l'index dans uniqueBeats, pas dans clips)
+    const { beatOrder, what, clipToRegenerate: passedClip } = confirmRegen
+    const planClip = clips.find(c => c.order === beatOrder) // FIX: Recherche par order, pas par index
+    
+    if (!planClip) {
+      console.error('[Regenerate] No plan clip found for beat order:', beatOrder)
+      setConfirmRegen(null)
+      return
+    }
     
     // VERSIONING: Utiliser le clip passé directement (avec les dernières modifications)
     // OU trouver le clip via clipsByBeat (fallback pour les autres boutons de régénération)
@@ -1633,20 +1643,21 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       clipToRegenerate = passedClip
       console.log('[Regenerate] ═══════════════════════════════════════════════════')
       console.log('[Regenerate] Using passed clip with updated data:')
+      console.log('[Regenerate] - Beat order:', beatOrder)
       console.log('[Regenerate] - Script text:', passedClip.script?.text?.slice(0, 80))
       console.log('[Regenerate] - Video prompt (first 200):', passedClip.video?.prompt?.slice(0, 200))
       console.log('[Regenerate] - Prompt contains script?:', passedClip.video?.prompt?.includes(passedClip.script?.text || ''))
       console.log('[Regenerate] ═══════════════════════════════════════════════════')
     } else {
       // Cas régénération standard : trouver via clipsByBeat
-      const versions = clipsByBeat.get(planClip.order) || []
-      const versionIndex = displayedVersionIndex[planClip.order] || 0
+      const versions = clipsByBeat.get(beatOrder) || [] // FIX: Utiliser beatOrder directement
+      const versionIndex = displayedVersionIndex[beatOrder] || 0
       const selectedClip = versions.find(v => v.is_selected) || versions[0]
       clipToRegenerate = versions[versionIndex] || selectedClip || planClip
     }
     
     const oldClipId = clipToRegenerate.id
-    const beatOrder = clipToRegenerate.order
+    // beatOrder vient déjà de confirmRegen (pas besoin de le redéfinir)
     
     setConfirmRegen(null)
     
@@ -1694,11 +1705,10 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       }
       
       console.log('[Regenerate] Creating new clip version:', {
-        clipIndex,
+        beatOrder,
         what,
         version: newVersion,
         oldClipId,
-        beatOrder,
         raw_url: result.video?.raw_url?.slice(0, 80),
         final_url: result.video?.final_url?.slice(0, 80),
       })
@@ -1832,7 +1842,10 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     }
   }
 
-  const askRegenerate = (clipIndex: number, what: RegenerateWhat, clipToRegenerate?: CampaignClip) => {
+  // FIX: Utiliser beatOrder (clip.order) au lieu de l'index de la boucle
+  // Car uniqueBeats est trié par order mais clips[] ne l'est pas
+  // Voir CRITICAL_BEHAVIORS.md section 12 "Index uniqueBeats vs Index generatedClips"
+  const askRegenerate = (beatOrder: number, what: RegenerateWhat, clipToRegenerate?: CampaignClip) => {
     const labels: Record<RegenerateWhat, string> = {
       video: 'la vidéo',
       voice: 'la voix',
@@ -1842,7 +1855,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     }
     
     setConfirmRegen({
-      clipIndex,
+      beatOrder, // FIX: Utiliser l'order du beat, pas un index
       what,
       label: labels[what],
       warning: what === 'video' ? '⚠️ Coûteux (~1-2€)' : undefined,
@@ -2429,7 +2442,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                       }
                                       
                                       await saveScript(clip.order)
-                                      askRegenerate(index, 'video', clipWithUpdatedScript)
+                                      askRegenerate(clip.order, 'video', clipWithUpdatedScript)
                                     }}
                                     className="px-2 py-1 text-xs bg-orange-500 text-white hover:bg-orange-600 rounded font-medium"
                                   >
@@ -2555,7 +2568,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                     variant="destructive" 
                                     size="sm"
                                     className="h-9 text-sm rounded-lg"
-                                    onClick={() => askRegenerate(index, 'all')}
+                                    onClick={() => askRegenerate(clip.order, 'all')}
                                     disabled={isClipRegenerating(`clip-${clip.order}`)}
                                   >
                                     <RefreshCw className="w-4 h-4 mr-1" />
@@ -2749,7 +2762,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                 variant="outline" 
                                 size="sm"
                                 className="h-8 text-xs rounded-lg border-orange-500/40 text-orange-600 hover:bg-orange-50 hover:border-orange-500"
-                                onClick={() => askRegenerate(index, 'video')}
+                                onClick={() => askRegenerate(clip.order, 'video')}
                                 disabled={isClipRegenerating(`clip-${clip.order}`)}
                               >
                                 <Video className="w-3 h-3 mr-1" />
@@ -2759,7 +2772,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                 variant="outline" 
                                 size="sm"
                                 className="h-8 text-xs rounded-lg"
-                                onClick={() => askRegenerate(index, 'voice')}
+                                onClick={() => askRegenerate(clip.order, 'voice')}
                                 disabled={isClipRegenerating(`clip-${clip.order}`)}
                               >
                                 <Mic className="w-3 h-3 mr-1" />
@@ -2769,7 +2782,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                 variant="outline" 
                                 size="sm"
                                 className="h-8 text-xs rounded-lg"
-                                onClick={() => askRegenerate(index, 'ambient')}
+                                onClick={() => askRegenerate(clip.order, 'ambient')}
                                 disabled={isClipRegenerating(`clip-${clip.order}`)}
                               >
                                 <Music className="w-3 h-3 mr-1" />

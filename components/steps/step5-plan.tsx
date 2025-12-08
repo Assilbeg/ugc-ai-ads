@@ -309,7 +309,7 @@ function LoadingAnimation() {
 }
 
 export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext, onBack }: Step5PlanProps) {
-  const { clips, loading, error, generatePlan, updateClipScript, setClips } = usePlanGeneration()
+  const { clips, campaignTitle, loading, error, generatePlan, updateClipScript, setClips } = usePlanGeneration()
   const { credits, checkCredits } = useCredits()
   const [editingClip, setEditingClip] = useState<number | null>(null)
   const [editText, setEditText] = useState('')
@@ -820,12 +820,25 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
   const handleGeneratePlan = async () => {
     if (!actor || !preset || !state.brief.what_selling) return
 
-    await generatePlan({
+    const result = await generatePlan({
       actor,
       preset,
       brief: state.brief as CampaignBrief,
       product: state.product,
     })
+
+    // Sauvegarder le titre généré dans le brief en BDD
+    if (result?.campaign_title && state.campaign_id) {
+      try {
+        const newBrief = { ...state.brief, what_selling: result.campaign_title }
+        await (supabase.from('campaigns') as any)
+          .update({ brief: newBrief })
+          .eq('id', state.campaign_id)
+        console.log('[Step5] ✓ Titre de campagne mis à jour:', result.campaign_title)
+      } catch (err) {
+        console.error('[Step5] Erreur mise à jour titre:', err)
+      }
+    }
   }
 
   const startEditing = (index: number) => {

@@ -344,30 +344,43 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
           </h3>
           <div className="space-y-2">
             {/* Sous-titres en cours de génération */}
-            {campaign.submagic_status === 'processing' && (
-              <div 
-                className="flex items-center justify-between p-3 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800 animate-pulse"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
-                    ⏳ Sous-titres en cours...
+            {campaign.submagic_status === 'processing' && (() => {
+              const processingTemplateName = (campaign as any).submagic_config?.templateName
+              const processingImageName = processingTemplateName?.toLowerCase().replace(/\s+/g, '-') + '.png'
+              return (
+                <div 
+                  className="flex items-center justify-between p-3 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800 animate-pulse"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                      ⏳ Sous-titres en cours...
+                    </span>
+                    {processingTemplateName && (
+                      <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900/50">
+                        <img 
+                          src={`/submagic-templates/${processingImageName}`}
+                          alt={processingTemplateName}
+                          className="h-5 w-auto rounded"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none'
+                          }}
+                        />
+                        <span className="text-xs font-medium text-amber-800 dark:text-amber-200">{processingTemplateName}</span>
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-xs text-amber-600 dark:text-amber-400">
+                    1-5 min
                   </span>
-                  {(campaign as any).submagic_config?.templateName && (
-                    <Badge variant="secondary" className="text-xs">
-                      {(campaign as any).submagic_config.templateName}
-                    </Badge>
-                  )}
                 </div>
-                <span className="text-xs text-amber-600 dark:text-amber-400">
-                  1-5 min
-                </span>
-              </div>
-            )}
+              )
+            })()}
             
             {/* Toutes les versions de sous-titres */}
             {submagicVersions?.map((version: any, index: number) => {
               const isLatest = index === 0
               const config = version.config || {}
+              const templateImageName = config.templateName?.toLowerCase().replace(/\s+/g, '-') + '.png'
               return (
                 <div 
                   key={version.id}
@@ -382,9 +395,17 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
                       🔤 v{version.version_number}
                     </span>
                     {config.templateName && (
-                      <Badge variant="secondary" className="text-xs">
-                        {config.templateName}
-                      </Badge>
+                      <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800">
+                        <img 
+                          src={`/submagic-templates/${templateImageName}`}
+                          alt={config.templateName}
+                          className="h-5 w-auto rounded"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none'
+                          }}
+                        />
+                        <span className="text-xs font-medium">{config.templateName}</span>
+                      </div>
                     )}
                     {config.hasHook && (
                       <Badge variant="outline" className="text-xs border-violet-300 text-violet-600">

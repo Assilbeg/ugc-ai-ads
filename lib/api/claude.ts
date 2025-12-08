@@ -29,6 +29,7 @@ interface GeneratePlanParams {
 }
 
 interface GeneratedPlan {
+  campaign_title: string  // Titre accrocheur généré par Claude
   clips: Omit<CampaignClip, 'id' | 'campaign_id' | 'created_at' | 'updated_at'>[]
 }
 
@@ -404,6 +405,7 @@ Tu retournes UNIQUEMENT du JSON valide, sans markdown, sans backticks, sans expl
 
 Structure attendue :
 {
+  "campaign_title": "Produit - Angle accrocheur basé sur le hook ou le pain point (max 60 caractères)",
   "clips": [
     {
       "order": 1,
@@ -427,7 +429,29 @@ Structure attendue :
       "status": "pending"
     }
   ]
-}`
+}
+
+══════════════════════════════════════════════════════════════════
+9. TITRE DE CAMPAGNE (campaign_title)
+══════════════════════════════════════════════════════════════════
+
+Tu dois générer un TITRE ACCROCHEUR pour la campagne.
+Format : "Nom du produit/service - Angle du hook ou pain point"
+Max 60 caractères.
+
+EXEMPLES :
+- "Kandi Jobs - 0 réponses sur LinkedIn"
+- "Formation dev - Je comprenais rien au code"
+- "App meditation - Stress au max tous les jours"
+- "Sérum visage - Ma peau faisait n'importe quoi"
+- "Coaching business - Je tournais en rond depuis des mois"
+
+RÈGLES :
+- Le titre doit être COURT et PERCUTANT
+- Il doit refléter l'angle d'attaque du hook ou le pain point
+- Utilise la même langue que le brief (français par défaut)
+- PAS de formulation générique ("Découvrez...", "La solution pour...")
+- Le nom du produit/service en premier, suivi d'un tiret, puis l'angle`
 
   // ═══════════════════════════════════════════════════════════════
   // USER PROMPT — Contexte spécifique de la campagne
@@ -564,7 +588,10 @@ Chaque first_frame.location DOIT être "${preset.first_frame.location}".`
     },
   }))
 
-  return { clips: clipsWithAudio }
+  return { 
+    campaign_title: parsed.campaign_title || brief.what_selling, // Fallback sur what_selling si pas de titre
+    clips: clipsWithAudio 
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════

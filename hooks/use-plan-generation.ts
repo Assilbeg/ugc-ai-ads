@@ -10,12 +10,18 @@ interface GeneratePlanParams {
   product: ProductConfig
 }
 
+interface GeneratePlanResult {
+  clips: CampaignClip[]
+  campaign_title: string
+}
+
 export function usePlanGeneration() {
   const [clips, setClips] = useState<CampaignClip[]>([])
+  const [campaignTitle, setCampaignTitle] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const generatePlan = useCallback(async (params: GeneratePlanParams) => {
+  const generatePlan = useCallback(async (params: GeneratePlanParams): Promise<GeneratePlanResult | null> => {
     setLoading(true)
     setError(null)
 
@@ -33,7 +39,8 @@ export function usePlanGeneration() {
 
       const data = await response.json()
       setClips(data.clips)
-      return data.clips
+      setCampaignTitle(data.campaign_title || null)
+      return { clips: data.clips, campaign_title: data.campaign_title }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erreur de génération'
       setError(message)
@@ -103,6 +110,7 @@ export function usePlanGeneration() {
 
   return {
     clips,
+    campaignTitle,
     loading,
     error,
     generatePlan,
