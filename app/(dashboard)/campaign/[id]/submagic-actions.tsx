@@ -125,10 +125,10 @@ export function SubmagicActions({
             <Button 
               variant="outline"
               onClick={() => setShowModal(true)}
-              className="rounded-xl h-11 px-4 gap-2"
+              className="rounded-xl h-11 px-4 gap-2 border-2 border-violet-300 text-violet-700 hover:bg-violet-50 hover:border-violet-400 dark:border-violet-600 dark:text-violet-300 dark:hover:bg-violet-950"
             >
               <RefreshCw className="w-4 h-4" />
-              <span className="hidden sm:inline">Autre style</span>
+              Autre style
             </Button>
           </div>
 
