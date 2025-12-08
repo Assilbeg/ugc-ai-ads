@@ -22,7 +22,9 @@ import {
   Film,
   Volume2,
   Scissors,
-  Info
+  Info,
+  Trash2,
+  Check
 } from 'lucide-react'
 import type { SubmagicConfig } from '@/types'
 
@@ -37,9 +39,87 @@ interface SubmagicModalProps {
   currentBalance?: number
 }
 
-// Templates par défaut en cas d'échec API
-const DEFAULT_TEMPLATES = ['Sara', 'Daniel', 'Hormozi 2', 'Beast', 'Ali']
-const DEFAULT_HOOK_TEMPLATES = ['tiktok', 'hormozi', 'ali', 'laura', 'steph']
+// ═══════════════════════════════════════════════════════════════
+// METADATA DES TEMPLATES DE SOUS-TITRES
+// ═══════════════════════════════════════════════════════════════
+interface TemplateMetadata {
+  category: string[]
+  isNew?: boolean
+  bgColor: string
+  textColor: string
+  fontWeight?: string
+  textTransform?: 'uppercase' | 'capitalize' | 'none'
+}
+
+const TEMPLATE_METADATA: Record<string, TemplateMetadata> = {
+  'Laura': { category: ['trend', 'new'], isNew: true, bgColor: '#374151', textColor: '#84cc16', fontWeight: '600' },
+  'Kelly 2': { category: ['trend', 'new'], isNew: true, bgColor: '#374151', textColor: '#fff', fontWeight: '500' },
+  'Caleb': { category: ['new'], isNew: true, bgColor: '#374151', textColor: '#fff', fontWeight: '400' },
+  'Kendrick': { category: ['new'], isNew: true, bgColor: '#374151', textColor: '#84cc16', fontWeight: '700' },
+  'Lewis': { category: ['trend'], bgColor: '#374151', textColor: '#fff', fontWeight: '500' },
+  'Doug': { category: ['trend'], bgColor: '#374151', textColor: '#fff', textTransform: 'uppercase', fontWeight: '900' },
+  'Carlos': { category: ['all'], bgColor: '#374151', textColor: '#fff', textTransform: 'uppercase', fontWeight: '600' },
+  'Luke': { category: ['all'], bgColor: '#374151', textColor: '#fff', textTransform: 'uppercase', fontWeight: '500' },
+  'Mark': { category: ['trend'], bgColor: '#374151', textColor: '#fff', textTransform: 'uppercase', fontWeight: '700' },
+  'Sara': { category: ['emoji', 'trend'], bgColor: '#6b7280', textColor: '#fff', fontWeight: '500' },
+  'Daniel': { category: ['trend'], bgColor: '#6b7280', textColor: '#fff', fontWeight: '500' },
+  'Dan 2': { category: ['all'], bgColor: '#374151', textColor: '#facc15', textTransform: 'uppercase', fontWeight: '800' },
+  'Hormozi 1': { category: ['premium', 'trend'], bgColor: '#374151', textColor: '#fff', textTransform: 'uppercase', fontWeight: '800' },
+  'Hormozi 2': { category: ['premium', 'trend'], bgColor: '#1f2937', textColor: '#fff', textTransform: 'uppercase', fontWeight: '700' },
+  'Hormozi 3': { category: ['premium'], bgColor: '#374151', textColor: '#fff', textTransform: 'uppercase', fontWeight: '700' },
+  'Hormozi 4': { category: ['premium', 'new'], isNew: true, bgColor: '#374151', textColor: '#f97316', textTransform: 'uppercase', fontWeight: '800' },
+  'Hormozi 5': { category: ['premium'], bgColor: '#374151', textColor: '#fff', fontWeight: '600' },
+  'Dan': { category: ['all'], bgColor: '#374151', textColor: '#fff', textTransform: 'uppercase', fontWeight: '600' },
+  'Devin': { category: ['all'], bgColor: '#374151', textColor: '#fff', textTransform: 'uppercase', fontWeight: '600' },
+  'Tayo': { category: ['all'], bgColor: '#374151', textColor: '#fff', fontWeight: '500' },
+  'Ella': { category: ['all'], bgColor: '#374151', textColor: '#fff', textTransform: 'uppercase', fontWeight: '500' },
+  'Tracy': { category: ['all'], bgColor: '#374151', textColor: '#fff', textTransform: 'uppercase', fontWeight: '600' },
+  'William': { category: ['all'], bgColor: '#3b82f6', textColor: '#fff', textTransform: 'uppercase', fontWeight: '700' },
+  'Leon': { category: ['all'], bgColor: '#ef4444', textColor: '#fff', textTransform: 'uppercase', fontWeight: '700' },
+  'Ali': { category: ['emoji'], bgColor: '#e5e7eb', textColor: '#1f2937', fontWeight: '500' },
+  'Beast': { category: ['premium', 'emoji'], bgColor: '#374151', textColor: '#fff', textTransform: 'uppercase', fontWeight: '900' },
+  'Maya': { category: ['emoji'], bgColor: '#ec4899', textColor: '#fff', fontWeight: '600' },
+  'Karl': { category: ['all'], bgColor: '#374151', textColor: '#fff', fontWeight: '500' },
+  'Iman': { category: ['all'], bgColor: '#374151', textColor: '#fff', fontWeight: '500' },
+  'David': { category: ['all'], bgColor: '#374151', textColor: '#fff', fontWeight: '500' },
+  'Noah': { category: ['all'], bgColor: '#374151', textColor: '#fff', fontWeight: '500' },
+  'Gstaad': { category: ['premium'], bgColor: '#374151', textColor: '#fff', fontWeight: '500' },
+  'Nema': { category: ['premium'], bgColor: '#374151', textColor: '#fff', fontWeight: '500' },
+}
+
+// ═══════════════════════════════════════════════════════════════
+// METADATA DES THEMES DE HOOK
+// ═══════════════════════════════════════════════════════════════
+interface HookThemeMetadata {
+  bgColor: string
+  textColor: string
+  isNew?: boolean
+}
+
+const HOOK_THEME_METADATA: Record<string, HookThemeMetadata> = {
+  'tiktok': { bgColor: '#1f2937', textColor: '#fff' },
+  'laura': { bgColor: '#374151', textColor: '#fff' },
+  'steph': { bgColor: '#16a34a', textColor: '#fff', isNew: true },
+  'kevin': { bgColor: '#22c55e', textColor: '#1f2937', isNew: true },
+  'kelly': { bgColor: '#6b7280', textColor: '#fff', isNew: true },
+  'mark': { bgColor: '#6b7280', textColor: '#fff', isNew: true },
+  'logan': { bgColor: '#374151', textColor: '#fff' },
+  'enrico': { bgColor: '#374151', textColor: '#fff' },
+  'mike': { bgColor: '#374151', textColor: '#fff' },
+  'devin': { bgColor: '#374151', textColor: '#fff' },
+  'hormozi': { bgColor: '#374151', textColor: '#fff' },
+  'masi': { bgColor: '#84cc16', textColor: '#1f2937' },
+  'ali': { bgColor: '#e5e7eb', textColor: '#1f2937' },
+}
+
+// Filtres disponibles
+const TEMPLATE_FILTERS = [
+  { id: 'all', label: 'All' },
+  { id: 'trend', label: 'Trend' },
+  { id: 'new', label: 'New' },
+  { id: 'premium', label: 'Premium' },
+  { id: 'emoji', label: 'Emoji' },
+]
 
 export function SubmagicModal({
   isOpen,
@@ -49,20 +129,24 @@ export function SubmagicModal({
   onSuccess,
   currentBalance = 0,
 }: SubmagicModalProps) {
-  // Templates
-  const [templates, setTemplates] = useState<string[]>(DEFAULT_TEMPLATES)
-  const [hookTemplates, setHookTemplates] = useState<string[]>(DEFAULT_HOOK_TEMPLATES)
+  // Templates depuis l'API
+  const [templates, setTemplates] = useState<string[]>(Object.keys(TEMPLATE_METADATA))
+  const [hookTemplates, setHookTemplates] = useState<string[]>(Object.keys(HOOK_THEME_METADATA))
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false)
+  
+  // Filtre des templates
+  const [templateFilter, setTemplateFilter] = useState('all')
 
   // Config state
   const [config, setConfig] = useState<SubmagicConfig>({
-    templateName: 'Sara',
+    templateName: 'Hormozi 2',
     hookTitle: {
-      enabled: false,
+      enabled: true,
       text: '',
       template: 'tiktok',
       top: 50,
       size: 30,
+      isAutoGenerated: false,
     },
     magicZooms: false,
     magicBrolls: false,
@@ -71,11 +155,14 @@ export function SubmagicModal({
     removeBadTakes: false,
   })
 
+  // Hook generation state
+  const [isGeneratingHook, setIsGeneratingHook] = useState(false)
+
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch templates
+  // Fetch templates from API
   const fetchTemplates = useCallback(async () => {
     setIsLoadingTemplates(true)
     try {
@@ -103,6 +190,43 @@ export function SubmagicModal({
       setIsLoadingTemplates(false)
     }
   }, [])
+
+  // Generate hook via Claude
+  const generateHook = useCallback(async () => {
+    setIsGeneratingHook(true)
+    setError(null)
+    
+    try {
+      const response = await fetch('/api/submagic/generate-hook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaignId }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur lors de la génération')
+      }
+
+      if (data.hook) {
+        setConfig(prev => ({
+          ...prev,
+          hookTitle: {
+            ...prev.hookTitle!,
+            enabled: true,
+            text: data.hook,
+            isAutoGenerated: true,
+          }
+        }))
+      }
+    } catch (err) {
+      console.error('Error generating hook:', err)
+      setError(err instanceof Error ? err.message : 'Erreur lors de la génération du hook')
+    } finally {
+      setIsGeneratingHook(false)
+    }
+  }, [campaignId])
 
   useEffect(() => {
     if (isOpen) {
@@ -158,7 +282,6 @@ export function SubmagicModal({
 
       onSuccess?.()
       onClose()
-      // Rafraîchir la page pour voir le nouveau statut
       window.location.reload()
 
     } catch (err) {
@@ -179,9 +302,24 @@ export function SubmagicModal({
   ) => {
     setConfig(prev => ({
       ...prev,
-      hookTitle: { ...prev.hookTitle!, [key]: value }
+      hookTitle: { ...prev.hookTitle!, [key]: value, isAutoGenerated: false }
     }))
   }
+
+  const clearHookText = () => {
+    setConfig(prev => ({
+      ...prev,
+      hookTitle: { ...prev.hookTitle!, text: '', isAutoGenerated: false }
+    }))
+  }
+
+  // Filtrer les templates selon le filtre sélectionné
+  const filteredTemplates = templates.filter(template => {
+    if (templateFilter === 'all') return true
+    const meta = TEMPLATE_METADATA[template]
+    if (!meta) return templateFilter === 'all'
+    return meta.category.includes(templateFilter)
+  })
 
   if (!isOpen) return null
 
@@ -196,7 +334,7 @@ export function SubmagicModal({
       />
       
       {/* Modal */}
-      <div className="relative bg-card border border-border rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-in zoom-in-95 fade-in duration-200">
+      <div className="relative bg-card border border-border rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden animate-in zoom-in-95 fade-in duration-200">
         {/* Close button */}
         <button
           onClick={onClose}
@@ -208,11 +346,11 @@ export function SubmagicModal({
         {/* Header */}
         <div className="p-6 pb-4 border-b border-border">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
               <Subtitles className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold">Ajouter des sous-titres</h2>
+              <h2 className="text-xl font-bold">Sous-titres & Hook</h2>
               <p className="text-sm text-muted-foreground truncate max-w-md">
                 {campaignTitle}
               </p>
@@ -231,47 +369,24 @@ export function SubmagicModal({
           </div>
         </div>
 
-        {/* Content */}
+        {/* Scrollable Content */}
+        <div className="overflow-y-auto max-h-[calc(90vh-220px)]">
         <div className="p-6 space-y-6">
-          {/* Template de sous-titres */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Type className="w-4 h-4" />
-              Style de sous-titres
-            </Label>
-            <Select
-              value={config.templateName}
-              onValueChange={(value) => updateConfig('templateName', value)}
-              disabled={isLoadingTemplates}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Choisir un style" />
-              </SelectTrigger>
-              <SelectContent>
-                {templates.map((template) => (
-                  <SelectItem key={template} value={template}>
-                    {template}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Détermine l'apparence visuelle des sous-titres (police, couleurs, animations)
-            </p>
-          </div>
-
-          {/* Hook Title */}
-          <div className="space-y-3 p-4 rounded-xl bg-muted/30 border border-border">
+            
+            {/* ═══════════════════════════════════════════════════════════════ */}
+            {/* SECTION HOOK TITLE */}
+            {/* ═══════════════════════════════════════════════════════════════ */}
+            <div className="space-y-4 p-4 rounded-xl bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 border border-orange-200 dark:border-orange-900">
             <div className="flex items-center justify-between">
-              <Label className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4" />
-                Hook animé
+                <Label className="flex items-center gap-2 text-base font-semibold">
+                  <Sparkles className="w-5 h-5 text-orange-500" />
+                  Hook Title
               </Label>
               <button
                 type="button"
                 onClick={() => updateHookTitle('enabled', !config.hookTitle?.enabled)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  config.hookTitle?.enabled ? 'bg-violet-500' : 'bg-muted'
+                    config.hookTitle?.enabled ? 'bg-orange-500' : 'bg-muted'
                 }`}
               >
                 <span
@@ -283,144 +398,318 @@ export function SubmagicModal({
             </div>
 
             {config.hookTitle?.enabled && (
-              <div className="space-y-4 pt-2">
-                <div>
-                  <Label className="text-xs">Texte du hook</Label>
+                <div className="space-y-4">
+                  {/* Input + Actions */}
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <div className="flex-1 relative">
                   <Input
-                    placeholder="Ex: Regarde ça ! 👀"
+                          placeholder="Ex: la stratégie secrète pour tripler vos ventes 🚀"
                     value={config.hookTitle.text || ''}
-                    onChange={(e) => updateHookTitle('text', e.target.value.slice(0, 100))}
+                          onChange={(e) => {
+                            setConfig(prev => ({
+                              ...prev,
+                              hookTitle: { ...prev.hookTitle!, text: e.target.value.slice(0, 100), isAutoGenerated: false }
+                            }))
+                          }}
                     maxLength={100}
-                    className="mt-1"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {(config.hookTitle.text || '').length}/100 caractères
-                  </p>
+                          className="pr-10 h-11 text-base"
+                        />
+                        {config.hookTitle.text && (
+                          <button
+                            type="button"
+                            onClick={clearHookText}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={generateHook}
+                        disabled={isGeneratingHook}
+                        className="h-11 px-4 gap-2 border-orange-300 hover:bg-orange-50 dark:border-orange-800 dark:hover:bg-orange-950"
+                      >
+                        {isGeneratingHook ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-4 h-4" />
+                        )}
+                        Générer
+                      </Button>
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>
+                        {config.hookTitle.isAutoGenerated && config.hookTitle.text && (
+                          <span className="text-orange-600 dark:text-orange-400">✨ Généré par IA</span>
+                        )}
+                      </span>
+                      <span>{(config.hookTitle.text || '').length}/100</span>
+                    </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-xs">Template</Label>
-                    <Select
-                      value={config.hookTitle.template || 'tiktok'}
-                      onValueChange={(value) => updateHookTitle('template', value)}
-                    >
-                      <SelectTrigger className="w-full mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {hookTemplates.map((template) => (
-                          <SelectItem key={template} value={template}>
-                            {template}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  {/* Theme Selection - Visual Buttons */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Theme</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {hookTemplates.map((theme) => {
+                        const meta = HOOK_THEME_METADATA[theme] || { bgColor: '#374151', textColor: '#fff' }
+                        const isSelected = config.hookTitle?.template === theme
+                        return (
+                          <button
+                            key={theme}
+                            type="button"
+                            onClick={() => updateHookTitle('template', theme)}
+                            className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                              isSelected 
+                                ? 'ring-2 ring-orange-500 ring-offset-2 dark:ring-offset-gray-900' 
+                                : 'hover:opacity-80'
+                            }`}
+                            style={{ 
+                              backgroundColor: meta.bgColor, 
+                              color: meta.textColor,
+                            }}
+                          >
+                            {theme}
+                            {meta.isNew && (
+                              <span className="absolute -top-1 -right-1 px-1.5 py-0.5 text-[10px] font-bold bg-green-500 text-white rounded">
+                                New
+                              </span>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
-                  <div>
-                    <Label className="text-xs">Position verticale ({config.hookTitle.top || 50}%)</Label>
+
+                  {/* Position & Size Sliders */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <Label className="text-xs text-muted-foreground">Position</Label>
+                        <span className="text-xs font-mono">{config.hookTitle.top || 50}%</span>
+                      </div>
                     <Slider
                       value={[config.hookTitle.top || 50]}
                       onValueChange={([value]) => updateHookTitle('top', value)}
                       min={0}
                       max={80}
                       step={5}
-                      className="mt-2"
+                        className="[&_[role=slider]]:bg-orange-500"
                     />
                   </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <Label className="text-xs text-muted-foreground">Taille</Label>
+                        <span className="text-xs font-mono">{config.hookTitle.size || 30}px</span>
                 </div>
-
-                <div>
-                  <Label className="text-xs">Taille du texte ({config.hookTitle.size || 30})</Label>
                   <Slider
                     value={[config.hookTitle.size || 30]}
                     onValueChange={([value]) => updateHookTitle('size', value)}
                     min={10}
                     max={80}
                     step={5}
-                    className="mt-2"
+                        className="[&_[role=slider]]:bg-orange-500"
                   />
+                    </div>
+                  </div>
                 </div>
+              )}
+            </div>
+
+            {/* ═══════════════════════════════════════════════════════════════ */}
+            {/* SECTION TEMPLATES DE SOUS-TITRES */}
+            {/* ═══════════════════════════════════════════════════════════════ */}
+            <div className="space-y-4">
+              <Label className="flex items-center gap-2 text-base font-semibold">
+                <Type className="w-5 h-5" />
+                Style de sous-titres
+              </Label>
+
+              {/* Filtres */}
+              <div className="flex gap-2">
+                {TEMPLATE_FILTERS.map((filter) => (
+                  <button
+                    key={filter.id}
+                    type="button"
+                    onClick={() => setTemplateFilter(filter.id)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      templateFilter === filter.id
+                        ? 'bg-foreground text-background'
+                        : 'bg-muted hover:bg-muted/80 text-muted-foreground'
+                    }`}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
               </div>
+
+              {/* Grille de templates */}
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[240px] overflow-y-auto p-1">
+                {isLoadingTemplates ? (
+                  <div className="col-span-full flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  filteredTemplates.map((template) => {
+                    const meta = TEMPLATE_METADATA[template] || { 
+                      category: ['all'], 
+                      bgColor: '#374151', 
+                      textColor: '#fff',
+                      fontWeight: '500'
+                    }
+                    const isSelected = config.templateName === template
+                    return (
+                      <button
+                        key={template}
+                        type="button"
+                        onClick={() => updateConfig('templateName', template)}
+                        className={`relative p-3 rounded-xl text-sm font-medium transition-all ${
+                          isSelected 
+                            ? 'ring-2 ring-orange-500 ring-offset-2 dark:ring-offset-gray-900 scale-105' 
+                            : 'hover:scale-102 hover:opacity-90'
+                        }`}
+                        style={{ 
+                          backgroundColor: meta.bgColor, 
+                          color: meta.textColor,
+                          fontWeight: meta.fontWeight || '500',
+                          textTransform: meta.textTransform || 'none',
+                        }}
+                      >
+                        {template}
+                        {isSelected && (
+                          <span className="absolute top-1 right-1">
+                            <Check className="w-4 h-4" />
+                          </span>
+                        )}
+                        {meta.isNew && (
+                          <span className="absolute -top-1 -right-1 px-1.5 py-0.5 text-[10px] font-bold bg-green-500 text-white rounded">
+                            New
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+
+              {filteredTemplates.length === 0 && !isLoadingTemplates && (
+                <p className="text-center text-sm text-muted-foreground py-4">
+                  Aucun template dans cette catégorie
+                </p>
             )}
           </div>
 
-          {/* Options avancées */}
+            {/* ═══════════════════════════════════════════════════════════════ */}
+            {/* OPTIONS VIDÉO */}
+            {/* ═══════════════════════════════════════════════════════════════ */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium flex items-center gap-2">
               <Film className="w-4 h-4" />
               Options vidéo
             </h3>
 
+              <div className="grid grid-cols-2 gap-3">
             {/* Magic Zooms */}
-            <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border">
-              <div>
-                <p className="text-sm font-medium">Magic Zooms</p>
-                <p className="text-xs text-muted-foreground">Zooms automatiques sur les mots importants</p>
-              </div>
               <button
                 type="button"
                 onClick={() => updateConfig('magicZooms', !config.magicZooms)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  config.magicZooms ? 'bg-violet-500' : 'bg-muted'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    config.magicZooms ? 'translate-x-6' : 'translate-x-1'
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    config.magicZooms 
+                      ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/20' 
+                      : 'border-border hover:border-muted-foreground/50'
                   }`}
-                />
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-medium">Magic Zooms</p>
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                      config.magicZooms ? 'border-orange-500 bg-orange-500' : 'border-muted-foreground'
+                    }`}>
+                      {config.magicZooms && <Check className="w-3 h-3 text-white" />}
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Zooms automatiques</p>
+                </button>
+
+                {/* Remove Bad Takes */}
+                <button
+                  type="button"
+                  onClick={() => updateConfig('removeBadTakes', !config.removeBadTakes)}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    config.removeBadTakes 
+                      ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/20' 
+                      : 'border-border hover:border-muted-foreground/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-medium flex items-center gap-1">
+                      <Scissors className="w-3 h-3" />
+                      Bad Takes
+                    </p>
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                      config.removeBadTakes ? 'border-orange-500 bg-orange-500' : 'border-muted-foreground'
+                    }`}>
+                      {config.removeBadTakes && <Check className="w-3 h-3 text-white" />}
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Supprime les hésitations</p>
               </button>
             </div>
 
             {/* Magic B-rolls */}
-            <div className="p-3 rounded-xl bg-muted/30 border border-border space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">Magic B-rolls</p>
-                  <p className="text-xs text-muted-foreground">Ajouter des vidéos stock IA</p>
-                </div>
+              <div className={`p-3 rounded-xl border transition-all ${
+                config.magicBrolls 
+                  ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/20' 
+                  : 'border-border'
+              }`}>
                 <button
                   type="button"
                   onClick={() => updateConfig('magicBrolls', !config.magicBrolls)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    config.magicBrolls ? 'bg-violet-500' : 'bg-muted'
-                  }`}
+                  className="w-full flex items-center justify-between text-left"
                 >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      config.magicBrolls ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
+                  <div>
+                    <p className="text-sm font-medium">Magic B-rolls</p>
+                    <p className="text-xs text-muted-foreground">Vidéos stock IA contextuelles</p>
+                  </div>
+                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                    config.magicBrolls ? 'border-orange-500 bg-orange-500' : 'border-muted-foreground'
+                  }`}>
+                    {config.magicBrolls && <Check className="w-3 h-3 text-white" />}
+                  </div>
                 </button>
-              </div>
 
               {config.magicBrolls && (
-                <div>
-                  <Label className="text-xs">Pourcentage de couverture ({config.magicBrollsPercentage || 50}%)</Label>
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <div className="flex justify-between mb-2">
+                      <Label className="text-xs text-muted-foreground">Couverture</Label>
+                      <span className="text-xs font-mono">{config.magicBrollsPercentage || 50}%</span>
+                    </div>
                   <Slider
                     value={[config.magicBrollsPercentage || 50]}
                     onValueChange={([value]) => updateConfig('magicBrollsPercentage', value)}
                     min={0}
                     max={100}
                     step={10}
-                    className="mt-2"
+                      className="[&_[role=slider]]:bg-orange-500"
                   />
                 </div>
               )}
             </div>
           </div>
 
-          {/* Audio options */}
-          <div className="space-y-4">
+            {/* ═══════════════════════════════════════════════════════════════ */}
+            {/* OPTIONS AUDIO */}
+            {/* ═══════════════════════════════════════════════════════════════ */}
+            <div className="space-y-3">
             <h3 className="text-sm font-medium flex items-center gap-2">
               <Volume2 className="w-4 h-4" />
               Options audio
             </h3>
 
-            {/* Remove Silence */}
-            <div className="p-3 rounded-xl bg-muted/30 border border-border">
-              <Label className="text-xs mb-2 block">Suppression des silences</Label>
+              <div className="p-3 rounded-xl border border-border">
+                <Label className="text-xs text-muted-foreground mb-2 block">Suppression des silences</Label>
               <Select
                 value={config.removeSilencePace || 'none'}
                 onValueChange={(value) => updateConfig('removeSilencePace', value === 'none' ? undefined : value as 'natural' | 'fast' | 'extra-fast')}
@@ -430,35 +719,11 @@ export function SubmagicModal({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Désactivé</SelectItem>
-                  <SelectItem value="natural">Naturel</SelectItem>
-                  <SelectItem value="fast">Rapide</SelectItem>
-                  <SelectItem value="extra-fast">Très rapide</SelectItem>
+                    <SelectItem value="natural">Naturel (0.6s+)</SelectItem>
+                    <SelectItem value="fast">Rapide (0.2-0.6s)</SelectItem>
+                    <SelectItem value="extra-fast">Très rapide (0.1-0.2s)</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-
-            {/* Remove Bad Takes */}
-            <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border">
-              <div>
-                <p className="text-sm font-medium flex items-center gap-1">
-                  <Scissors className="w-3 h-3" />
-                  Supprimer les mauvaises prises
-                </p>
-                <p className="text-xs text-muted-foreground">Enlève automatiquement les hésitations</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => updateConfig('removeBadTakes', !config.removeBadTakes)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  config.removeBadTakes ? 'bg-violet-500' : 'bg-muted'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    config.removeBadTakes ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
             </div>
           </div>
 
@@ -466,8 +731,7 @@ export function SubmagicModal({
           <div className="flex items-start gap-2 p-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900">
             <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
             <p className="text-xs text-blue-700 dark:text-blue-300">
-              Le traitement prend généralement 1 à 5 minutes. Vous recevrez la vidéo avec sous-titres 
-              automatiquement sur cette page.
+                Le traitement prend 1 à 5 minutes. La vidéo avec sous-titres apparaîtra automatiquement.
             </p>
           </div>
 
@@ -477,6 +741,7 @@ export function SubmagicModal({
               {error}
             </div>
           )}
+          </div>
         </div>
 
         {/* Footer */}
@@ -492,7 +757,7 @@ export function SubmagicModal({
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || !hasEnoughCredits}
-            className="flex-1 h-11 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700"
+            className="flex-1 h-11 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
           >
             {isSubmitting ? (
               <>
@@ -511,4 +776,3 @@ export function SubmagicModal({
     </div>
   )
 }
-
