@@ -166,7 +166,7 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
                   <span>{clips?.length || 0} clips</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {/* Bouton Télécharger */}
+                  {/* Bouton Télécharger (vidéo originale) */}
                   <a 
                     href={finalVideoUrl} 
                     download={`ugc-campaign-${id.slice(0, 8)}.mp4`}
@@ -180,6 +180,22 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
                       Télécharger
                     </Button>
                   </a>
+                  {/* Bouton Télécharger avec sous-titres (si disponible) */}
+                  {campaign.submagic_status === 'completed' && campaign.submagic_video_url && (
+                    <a 
+                      href={campaign.submagic_video_url} 
+                      download={`ugc-subtitles-${id.slice(0, 8)}.mp4`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Button size="sm" className="bg-violet-600 text-white hover:bg-violet-700 font-medium rounded-lg gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Avec sous-titres
+                      </Button>
+                    </a>
+                  )}
                 </div>
               </div>
             </div>
@@ -237,22 +253,19 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
               })}
             </div>
 
-            {/* Actions secondaires */}
+            {/* Actions secondaires : Modifier la vidéo + Modifier les sous-titres */}
             <div className="flex gap-3 pt-2">
               <Link href={`/new/${id}`} className="flex-1">
                 <Button variant="outline" className="w-full rounded-xl h-11">
-                  ✏️ Modifier
+                  ✏️ Modifier la vidéo
                 </Button>
               </Link>
               
-              {/* Gros bouton Sous-titres */}
               <div className="flex-1">
                 <SubmagicActions
                   campaignId={id}
                   campaignTitle={brief?.what_selling || 'Campagne UGC'}
                   submagicStatus={(campaign.submagic_status || 'none') as SubmagicStatus}
-                  submagicVideoUrl={campaign.submagic_video_url}
-                  variant="large"
                 />
               </div>
             </div>
