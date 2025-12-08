@@ -125,10 +125,10 @@ export function SubmagicActions({
             <Button 
               variant="outline"
               onClick={() => setShowModal(true)}
-              className="rounded-xl h-11 px-3"
-              title="Regénérer avec d'autres paramètres"
+              className="rounded-xl h-11 px-4 gap-2"
             >
               <RefreshCw className="w-4 h-4" />
+              <span className="hidden sm:inline">Autre style</span>
             </Button>
           </div>
 

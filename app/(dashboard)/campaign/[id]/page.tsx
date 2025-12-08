@@ -255,21 +255,6 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
                   variant="large"
                 />
               </div>
-              
-              <a 
-                href={finalVideoUrl} 
-                download={`ugc-campaign-${id.slice(0, 8)}.mp4`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1"
-              >
-                <Button className="w-full rounded-xl h-11 gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Télécharger
-                </Button>
-              </a>
             </div>
           </div>
         </div>
@@ -317,11 +302,33 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
               <div 
                 className="flex items-center justify-between p-3 rounded-lg bg-violet-50 border border-violet-200 dark:bg-violet-950/30 dark:border-violet-800"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-medium text-violet-700 dark:text-violet-300">
                     🎬 Sous-titres
                   </span>
-                  <span className="text-sm text-muted-foreground">
+                  {/* Afficher le template utilisé */}
+                  {(campaign as any).submagic_config?.templateName && (
+                    <Badge variant="secondary" className="text-xs">
+                      {(campaign as any).submagic_config.templateName}
+                    </Badge>
+                  )}
+                  {/* Afficher les options activées */}
+                  {(campaign as any).submagic_config?.hasHook && (
+                    <Badge variant="outline" className="text-xs border-violet-300 text-violet-600">
+                      Hook
+                    </Badge>
+                  )}
+                  {(campaign as any).submagic_config?.magicZooms && (
+                    <Badge variant="outline" className="text-xs border-violet-300 text-violet-600">
+                      Zooms
+                    </Badge>
+                  )}
+                  {(campaign as any).submagic_config?.magicBrolls && (
+                    <Badge variant="outline" className="text-xs border-violet-300 text-violet-600">
+                      B-rolls
+                    </Badge>
+                  )}
+                  <span className="text-xs text-muted-foreground ml-2">
                     {campaign.submagic_updated_at ? new Date(campaign.submagic_updated_at).toLocaleDateString('fr-FR', {
                       day: 'numeric',
                       month: 'short',
@@ -329,7 +336,6 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
                       minute: '2-digit'
                     }) : 'Récent'}
                   </span>
-                  <Badge className="bg-violet-500 text-white text-xs">Submagic</Badge>
                 </div>
                 <a 
                   href={campaign.submagic_video_url}

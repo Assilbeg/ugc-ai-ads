@@ -157,11 +157,22 @@ export async function POST(request: Request) {
       )
     }
 
+    // Préparer le résumé de la config pour l'affichage
+    const submagicConfig = {
+      templateName: config.templateName,
+      hasHook: !!(config.hookTitle?.enabled && config.hookTitle?.text),
+      hookText: config.hookTitle?.text || null,
+      magicZooms: config.magicZooms || false,
+      magicBrolls: config.magicBrolls || false,
+      removeBadTakes: config.removeBadTakes || false,
+    }
+
     // Mettre à jour la campagne
     const { error: updateError } = await (supabase.from('campaigns') as any)
       .update({
         submagic_project_id: submagicData.id,
         submagic_status: 'processing',
+        submagic_config: submagicConfig,
         updated_at: new Date().toISOString()
       })
       .eq('id', campaignId)
