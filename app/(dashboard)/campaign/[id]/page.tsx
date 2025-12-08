@@ -52,15 +52,18 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
   // Le dernier assemblage (version la plus récente)
   const latestAssembly = assemblies?.[0] as any
   
-  // Utiliser l'URL du dernier assemblage si disponible, sinon celle de la campagne
-  // Ajouter un cache-buster basé sur la date de création pour forcer le refresh
+  // URL de la vidéo originale (sans sous-titres)
   const baseVideoUrl = latestAssembly?.final_video_url || campaign.final_video_url
   const cacheBuster = latestAssembly?.created_at 
     ? new Date(latestAssembly.created_at).getTime() 
     : Date.now()
-  const finalVideoUrl = baseVideoUrl 
+  const originalVideoUrl = baseVideoUrl 
     ? `${baseVideoUrl}${baseVideoUrl.includes('?') ? '&' : '?'}v=${cacheBuster}`
     : null
+  
+  // Dernière version = sous-titres si disponible, sinon originale
+  const hasSubtitles = campaign.submagic_status === 'completed' && campaign.submagic_video_url
+  const latestVersionVideo = hasSubtitles ? campaign.submagic_video_url : originalVideoUrl
 
   const preset = campaign.preset_id ? getPresetById(campaign.preset_id) : null
   const brief = campaign.brief as { what_selling?: string; target_duration?: number }
@@ -139,7 +142,7 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
       </Link>
 
       {/* Hero section avec vidéo */}
-      {campaign.status === 'completed' && finalVideoUrl ? (
+      {campaign.status === 'completed' && latestVersionVideo ? (
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-10">
           {/* Vidéo - 3 colonnes */}
           <div className="lg:col-span-3">
@@ -147,7 +150,7 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(120,119,198,0.15),transparent_50%)]" />
               <div className="relative p-3 sm:p-4">
                 <video
-                  src={finalVideoUrl}
+                  src={latestVersionVideo}
                   controls
                   className="w-full rounded-xl shadow-lg"
                   style={{ maxHeight: '70vh' }}
@@ -166,22 +169,24 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
                   <span>{clips?.length || 0} clips</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {/* Bouton Télécharger (vidéo originale) */}
-                  <a 
-                    href={finalVideoUrl} 
-                    download={`ugc-campaign-${id.slice(0, 8)}.mp4`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Button size="sm" className="bg-white text-zinc-900 hover:bg-zinc-100 font-medium rounded-lg gap-2">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      Télécharger
-                    </Button>
-                  </a>
+                  {/* Bouton Télécharger (vidéo originale, sans sous-titres) */}
+                  {originalVideoUrl && (
+                    <a 
+                      href={originalVideoUrl} 
+                      download={`ugc-campaign-${id.slice(0, 8)}.mp4`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Button size="sm" className="bg-white text-zinc-900 hover:bg-zinc-100 font-medium rounded-lg gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Télécharger
+                      </Button>
+                    </a>
+                  )}
                   {/* Bouton Télécharger avec sous-titres (si disponible) */}
-                  {campaign.submagic_status === 'completed' && campaign.submagic_video_url && (
+                  {hasSubtitles && (
                     <a 
                       href={campaign.submagic_video_url} 
                       download={`ugc-subtitles-${id.slice(0, 8)}.mp4`}
@@ -422,7 +427,7 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
       )}
 
       {/* Empty state si pas de vidéo et pas en échec */}
-      {!finalVideoUrl && campaign.status !== 'failed' && (
+      {!latestVersionVideo && campaign.status !== 'failed' && (
         <div className="rounded-2xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 py-16 text-center">
           <div className="w-16 h-16 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
             <svg className="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
