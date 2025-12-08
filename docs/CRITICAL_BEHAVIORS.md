@@ -68,6 +68,7 @@
 | **Nouveau row à chaque régénération** | `id: undefined` force un INSERT, pas un UPDATE | `25957ca` |
 | **Preview sur nouveau clip après regen** | Reset `displayedVersionIndex[beat]` à 0 + trier `clipsByBeat` par `is_selected` d'abord | Dec 2024 |
 | **Script modifié → régénérer** | Passer le clip avec script mis à jour via `confirmRegen.clipToRegenerate` (évite timing React) | Dec 2024 |
+| **Ne PAS fusionner clip_versions pour navigation** | Les flèches de navigation utilisent UNIQUEMENT les clips de `campaign_clips`. `clip_versions` = snapshots pour restauration, pas pour navigation (sinon doublons) | 8 Dec 2024 |
 
 ### Code de référence
 
@@ -983,6 +984,7 @@ const getClipStatus = (clip: CampaignClip): ClipStatus => {
 
 | Date | Commit | Comportement ajouté |
 |------|--------|---------------------|
+| 8 Dec 2024 | - | Fix navigation versions : NE PAS fusionner `clip_versions` avec `campaign_clips` pour l'affichage (causait doublons, ex: 1/3 au lieu de 1/2). Les versions navigables = clips dans `campaign_clips` uniquement. |
 | 8 Dec 2024 | - | Thumbnails dashboard permanentes : upload vers Supabase Storage (bucket: thumbnails) avec fallback first_frame du hook |
 | 5 Dec 2024 | - | Fix animation régénération : 1) `getClipStatus(clip)` au lieu de `getClipStatus(index)`, 2) Progress indexé par `clip-${order}` au lieu de `clip.id` (order est stable pour chaque tuile/beat) |
 | 5 Dec 2024 | - | Fix replaceScriptInPrompt : AJOUTE le script même si le prompt original ne le contient pas (pas de pattern `speaks in...`) |
@@ -993,7 +995,7 @@ const getClipStatus = (clip: CampaignClip): ClipStatus => {
 | Dec 2024 | - | Fix allCompleted : ne vérifier que les clips avec vidéo (pas les squelettes pending) |
 | Dec 2024 | - | Policy RLS actors : admin peut modifier acteurs preset |
 | Dec 2024 | `81785dc` | Fix comptage clips par beats |
-| Dec 2024 | `53749b0` | Charger clip_versions pour navigation |
+| Dec 2024 | `53749b0` | ~~Charger clip_versions pour navigation~~ (REVERT 8 Dec - causait doublons) |
 | Dec 2024 | `91ae571` | Une seule tuile par beat (itère sur uniqueBeats) |
 | Dec 2024 | `26f5f86` | Archiver version APRÈS succès régénération |
 | Dec 2024 | `c3c5549` | Ajustements par clip.id, pas par beat |
@@ -1480,4 +1482,4 @@ SUBMAGIC_API_KEY=sk-...  # Clé API Submagic
 
 ---
 
-*Dernière mise à jour : 8 décembre 2024*
+*Dernière mise à jour : 9 décembre 2024*

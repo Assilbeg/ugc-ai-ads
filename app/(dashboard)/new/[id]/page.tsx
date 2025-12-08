@@ -94,56 +94,12 @@ export default function ExistingCampaignPage() {
       }
       
       // ══════════════════════════════════════════════════════════════
-      // VERSIONING: Charger les versions archivées depuis clip_versions
-      // Ces versions sont créées à chaque régénération mais ne sont pas
-      // dans campaign_clips. On les charge pour afficher les flèches.
+      // VERSIONING: Les différentes versions d'un clip sont dans campaign_clips
+      // (is_selected=true pour la version active, is_selected=false pour les autres)
+      // La table clip_versions n'est utilisée que pour la restauration d'anciens
+      // états (pas pour la navigation dans l'UI).
       // ══════════════════════════════════════════════════════════════
-      const clipIds = (allClips || []).map((c: any) => c.id)
-      let archivedVersions: any[] = []
-      
-      if (clipIds.length > 0) {
-        const { data: versions, error: versionsError } = await (supabase
-          .from('clip_versions') as any)
-          .select('*')
-          .in('clip_id', clipIds)
-          .order('version_number', { ascending: false })
-        
-        if (versionsError) {
-          console.error('[/new/[id]] Erreur chargement versions:', versionsError)
-        } else {
-          archivedVersions = versions || []
-        }
-      }
-      
-      // Transformer les versions archivées en format CampaignClip
-      // pour les fusionner avec les clips actuels
-      const versionsAsClips = archivedVersions.map((v: any) => {
-        // Trouver le clip parent pour récupérer order, beat, campaign_id
-        const parentClip = (allClips || []).find((c: any) => c.id === v.clip_id)
-        if (!parentClip) return null
-        
-        return {
-          id: `version-${v.id}`, // Préfixe pour différencier des vrais clips
-          campaign_id: parentClip.campaign_id,
-          order: parentClip.order,
-          beat: parentClip.beat,
-          first_frame: v.first_frame,
-          script: v.script,
-          video: v.video,
-          audio: v.audio,
-          transcription: v.transcription,
-          adjustments: v.adjustments,
-          is_selected: false, // Les versions archivées ne sont jamais sélectionnées
-          current_version: v.version_number,
-          status: 'completed',
-          created_at: v.created_at,
-          _is_archived_version: true, // Flag interne pour l'UI
-          _original_version_id: v.id, // ID original dans clip_versions
-        }
-      }).filter(Boolean)
-      
-      // Fusionner les clips actuels avec les versions archivées
-      const allClipsWithVersions = [...(allClips || []), ...versionsAsClips]
+      const allClipsWithVersions = [...(allClips || [])]
       
       // Garder TOUS les clips - step6 gère le groupement par beat (clipsByBeat)
       // et affiche les flèches de navigation quand il y a plusieurs versions
@@ -156,7 +112,9 @@ export default function ExistingCampaignPage() {
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       })
       
-      console.log('[/new/[id]] Versioning: loaded', archivedVersions.length, 'archived versions')
+      // Compter les versions (clips non-sélectionnés = anciennes versions)
+      const versionsCount = (allClips || []).filter((c: any) => !c.is_selected && (c.video?.raw_url || c.video?.final_url)).length
+      console.log('[/new/[id]] Versioning: found', versionsCount, 'alternate versions in campaign_clips')
       
       // Pour les stats, compter les clips SELECTIONNÉS (un par beat)
       const selectedClips = clips?.filter((c: any) => c.is_selected) || []

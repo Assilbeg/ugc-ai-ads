@@ -8,6 +8,7 @@ import { AssemblingAnimation } from './assembling-animation'
 import { EditableTitle } from './editable-title'
 import { FailedCampaignState } from './failed-campaign-state'
 import { SubmagicActions } from './submagic-actions'
+import { TemplateImage } from './template-image'
 import type { SubmagicStatus } from '@/types'
 
 // Désactiver le cache pour toujours avoir la dernière version de la campagne
@@ -346,7 +347,6 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
             {/* Sous-titres en cours de génération */}
             {campaign.submagic_status === 'processing' && (() => {
               const processingTemplateName = (campaign as any).submagic_config?.templateName
-              const processingImageName = processingTemplateName?.toLowerCase().replace(/\s+/g, '-') + '.png'
               return (
                 <div 
                   className="flex items-center justify-between p-3 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800 animate-pulse"
@@ -357,14 +357,7 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
                     </span>
                     {processingTemplateName && (
                       <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900/50">
-                        <img 
-                          src={`/submagic-templates/${processingImageName}`}
-                          alt={processingTemplateName}
-                          className="h-5 w-auto rounded"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none'
-                          }}
-                        />
+                        <TemplateImage templateName={processingTemplateName} />
                         <span className="text-xs font-medium text-amber-800 dark:text-amber-200">{processingTemplateName}</span>
                       </div>
                     )}
@@ -380,7 +373,6 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
             {submagicVersions?.map((version: any, index: number) => {
               const isLatest = index === 0
               const config = version.config || {}
-              const templateImageName = config.templateName?.toLowerCase().replace(/\s+/g, '-') + '.png'
               return (
                 <div 
                   key={version.id}
@@ -396,14 +388,7 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
                     </span>
                     {config.templateName && (
                       <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800">
-                        <img 
-                          src={`/submagic-templates/${templateImageName}`}
-                          alt={config.templateName}
-                          className="h-5 w-auto rounded"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none'
-                          }}
-                        />
+                        <TemplateImage templateName={config.templateName} />
                         <span className="text-xs font-medium">{config.templateName}</span>
                       </div>
                     )}
