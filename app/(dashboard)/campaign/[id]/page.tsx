@@ -166,13 +166,6 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
                   <span>{clips?.length || 0} clips</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {/* Bouton Submagic (sous-titres) */}
-                  <SubmagicActions
-                    campaignId={id}
-                    campaignTitle={brief?.what_selling || 'Campagne UGC'}
-                    submagicStatus={(campaign.submagic_status || 'none') as SubmagicStatus}
-                    submagicVideoUrl={campaign.submagic_video_url}
-                  />
                   {/* Bouton Télécharger */}
                   <a 
                     href={finalVideoUrl} 
@@ -251,6 +244,18 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
                   ✏️ Modifier
                 </Button>
               </Link>
+              
+              {/* Gros bouton Sous-titres */}
+              <div className="flex-1">
+                <SubmagicActions
+                  campaignId={id}
+                  campaignTitle={brief?.what_selling || 'Campagne UGC'}
+                  submagicStatus={(campaign.submagic_status || 'none') as SubmagicStatus}
+                  submagicVideoUrl={campaign.submagic_video_url}
+                  variant="large"
+                />
+              </div>
+              
               <a 
                 href={finalVideoUrl} 
                 download={`ugc-campaign-${id.slice(0, 8)}.mp4`}

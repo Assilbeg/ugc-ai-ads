@@ -11,6 +11,7 @@ interface SubmagicActionsProps {
   campaignTitle: string
   submagicStatus?: SubmagicStatus
   submagicVideoUrl?: string
+  variant?: 'small' | 'large'
 }
 
 export function SubmagicActions({
@@ -18,7 +19,9 @@ export function SubmagicActions({
   campaignTitle,
   submagicStatus = 'none',
   submagicVideoUrl,
+  variant = 'small',
 }: SubmagicActionsProps) {
+  const isLarge = variant === 'large'
   const [showModal, setShowModal] = useState(false)
   const [credits, setCredits] = useState(0)
   const [isPolling, setIsPolling] = useState(false)
@@ -58,10 +61,13 @@ export function SubmagicActions({
     return (
       <>
         <Button 
-          size="sm" 
-          variant="outline" 
+          size={isLarge ? 'default' : 'sm'}
+          variant={isLarge ? 'default' : 'outline'}
           onClick={() => setShowModal(true)}
-          className="gap-2 rounded-lg"
+          className={isLarge 
+            ? "w-full rounded-xl h-11 gap-2 bg-violet-600 hover:bg-violet-700 text-white" 
+            : "gap-2 rounded-lg"
+          }
         >
           <Subtitles className="w-4 h-4" />
           Sous-titres
@@ -81,7 +87,15 @@ export function SubmagicActions({
   // En cours de traitement
   if (submagicStatus === 'processing') {
     return (
-      <Button size="sm" variant="outline" disabled className="gap-2 rounded-lg">
+      <Button 
+        size={isLarge ? 'default' : 'sm'} 
+        variant={isLarge ? 'default' : 'outline'} 
+        disabled 
+        className={isLarge 
+          ? "w-full rounded-xl h-11 gap-2 bg-violet-600/50 text-white" 
+          : "gap-2 rounded-lg"
+        }
+      >
         <Loader2 className="w-4 h-4 animate-spin" />
         Sous-titres en cours...
       </Button>
@@ -90,6 +104,46 @@ export function SubmagicActions({
 
   // Terminé avec succès
   if (submagicStatus === 'completed' && submagicVideoUrl) {
+    if (isLarge) {
+      // Version large : bouton violet avec téléchargement + icône refresh
+      return (
+        <>
+          <div className="flex gap-2 w-full">
+            <a 
+              href={submagicVideoUrl} 
+              download
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1"
+            >
+              <Button className="w-full rounded-xl h-11 gap-2 bg-violet-600 hover:bg-violet-700 text-white">
+                <Subtitles className="w-4 h-4" />
+                Avec sous-titres
+                <Download className="w-4 h-4" />
+              </Button>
+            </a>
+            <Button 
+              variant="outline"
+              onClick={() => setShowModal(true)}
+              className="rounded-xl h-11 px-3"
+              title="Regénérer avec d'autres paramètres"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </Button>
+          </div>
+
+          <SubmagicModal
+            isOpen={showModal}
+            onClose={() => setShowModal(false)}
+            campaignId={campaignId}
+            campaignTitle={campaignTitle}
+            currentBalance={credits}
+          />
+        </>
+      )
+    }
+    
+    // Version small
     return (
       <>
         <a 
@@ -132,10 +186,13 @@ export function SubmagicActions({
     return (
       <>
         <Button 
-          size="sm" 
+          size={isLarge ? 'default' : 'sm'}
           variant="outline" 
           onClick={() => setShowModal(true)}
-          className="gap-2 rounded-lg border-red-200 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950"
+          className={isLarge 
+            ? "w-full rounded-xl h-11 gap-2 border-red-300 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950"
+            : "gap-2 rounded-lg border-red-200 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950"
+          }
         >
           <RefreshCw className="w-4 h-4" />
           Réessayer sous-titres
