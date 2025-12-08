@@ -154,7 +154,6 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
                   controls
                   className="w-full rounded-xl shadow-lg"
                   style={{ maxHeight: '70vh' }}
-                  poster={(clips?.[0]?.first_frame as { image_url?: string })?.image_url}
                 />
               </div>
               {/* Barre d'action en bas */}
