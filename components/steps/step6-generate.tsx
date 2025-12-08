@@ -2181,19 +2181,47 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
             </div>
           )}
           
-          {/* Overall progress */}
+          {/* Overall progress - Design moderne avec dégradé */}
           {generating && (
-            <Card className="rounded-xl bg-foreground text-background">
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="font-medium">Progression globale</span>
-                  <span className="opacity-70">
-                    {Math.round(getOverallProgress())}%
-                  </span>
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 p-[1px]">
+              <div className="relative rounded-2xl bg-gradient-to-br from-violet-950/90 via-purple-950/90 to-indigo-950/90 backdrop-blur-sm px-6 py-5">
+                {/* Effet de brillance animé */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-shimmer" />
+                
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                        <Sparkles className="w-5 h-5 text-violet-300 animate-pulse" />
+                      </div>
+                      <div>
+                        <span className="font-semibold text-white">Génération en cours</span>
+                        <p className="text-xs text-violet-200/70">
+                          {beatsWithVideo}/{totalBeats} clips terminés
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-3xl font-bold text-white tabular-nums">
+                        {Math.round(getOverallProgress())}
+                        <span className="text-lg font-normal text-violet-200/70">%</span>
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Barre de progression custom */}
+                  <div className="relative h-3 rounded-full bg-white/10 overflow-hidden">
+                    <div 
+                      className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-green-400 via-emerald-400 to-teal-400 transition-all duration-500 ease-out"
+                      style={{ width: `${getOverallProgress()}%` }}
+                    >
+                      {/* Effet de brillance sur la barre */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+                    </div>
+                  </div>
                 </div>
-                <Progress value={getOverallProgress()} className="h-2.5 bg-background/20" />
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           )}
 
           {/* Clips grid - UNE tuile par beat (order unique) */}
