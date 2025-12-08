@@ -147,11 +147,16 @@ Webhook appelé par Submagic quand le traitement est terminé.
 ### Historique des versions
 Affiche **toutes les versions** de sous-titres avec :
 - Numéro de version (v1, v2, v3...)
-- Template utilisé
+- **Miniature PNG** du template + nom (images dans `/public/submagic-templates/`)
 - Options activées (Hook, Zooms, B-rolls)
 - Date de création
 - Badge "Actuelle" pour la dernière
 - Bouton télécharger pour chaque version
+
+### Images des templates
+Les images sont stockées dans `/public/submagic-templates/` avec le format :
+- `{template-name}.png` (nom en minuscules, espaces remplacés par tirets)
+- Ex: `hormozi-2.png`, `sara.png`, `beast.png`
 
 ## Modal de configuration
 
