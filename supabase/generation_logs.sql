@@ -107,3 +107,5 @@ GROUP BY generation_type;
 
 
 
+
+

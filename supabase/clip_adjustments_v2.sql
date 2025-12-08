@@ -80,3 +80,5 @@ COMMENT ON COLUMN clip_versions.user_adjustments IS
 'Snapshot des ajustements utilisateur au moment de la version';
 
 
+
+

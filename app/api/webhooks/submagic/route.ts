@@ -40,9 +40,11 @@ export async function POST(request: Request) {
     }
 
     // Construire les données de mise à jour
+    const now = new Date().toISOString()
     const updateData: Record<string, unknown> = {
       submagic_status: newStatus,
-      updated_at: new Date().toISOString()
+      submagic_updated_at: now,
+      updated_at: now
     }
 
     // Ajouter l'URL vidéo si disponible
