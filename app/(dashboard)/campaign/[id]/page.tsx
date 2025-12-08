@@ -155,6 +155,26 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
                   className="w-full rounded-xl shadow-lg"
                   style={{ maxHeight: '70vh' }}
                 />
+                {/* Overlay de génération en cours */}
+                {campaign.submagic_status === 'processing' && (
+                  <div className="absolute inset-3 sm:inset-4 rounded-xl bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
+                    <div className="relative">
+                      <div className="w-16 h-16 rounded-full border-4 border-violet-500/30 border-t-violet-500 animate-spin" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-2xl">🔤</span>
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-white font-semibold text-lg">Sous-titres en cours...</p>
+                      <p className="text-zinc-400 text-sm mt-1">Encore 1 à 5 minutes</p>
+                    </div>
+                    {(campaign as any).submagic_config?.templateName && (
+                      <div className="px-3 py-1.5 rounded-full bg-violet-500/20 text-violet-300 text-sm">
+                        Template : {(campaign as any).submagic_config.templateName}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               {/* Barre d'action en bas */}
               <div className="relative px-4 pb-4 flex items-center justify-between">
@@ -305,16 +325,37 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
       ) : null}
 
       {/* Historique des versions (assemblages + sous-titres) */}
-      {((assemblies && assemblies.length > 0) || campaign.submagic_video_url) && campaign.status !== 'failed' && (
+      {((assemblies && assemblies.length > 0) || campaign.submagic_video_url || campaign.submagic_status === 'processing') && campaign.status !== 'failed' && (
         <div className="mb-8 p-4 rounded-xl bg-muted/30 border border-border">
           <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            Historique des versions ({(assemblies?.length || 0) + (campaign.submagic_video_url ? 1 : 0)})
+            Historique des versions ({(assemblies?.length || 0) + (campaign.submagic_video_url || campaign.submagic_status === 'processing' ? 1 : 0)})
           </h3>
           <div className="space-y-2">
-            {/* Version sous-titrée (affichée en premier si elle existe) */}
+            {/* Sous-titres en cours de génération */}
+            {campaign.submagic_status === 'processing' && (
+              <div 
+                className="flex items-center justify-between p-3 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800 animate-pulse"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                    ⏳ Sous-titres en cours...
+                  </span>
+                  {(campaign as any).submagic_config?.templateName && (
+                    <Badge variant="secondary" className="text-xs">
+                      {(campaign as any).submagic_config.templateName}
+                    </Badge>
+                  )}
+                </div>
+                <span className="text-xs text-amber-600 dark:text-amber-400">
+                  1-5 min
+                </span>
+              </div>
+            )}
+            
+            {/* Version sous-titrée terminée */}
             {campaign.submagic_video_url && campaign.submagic_status === 'completed' && (
               <div 
                 className="flex items-center justify-between p-3 rounded-lg bg-violet-50 border border-violet-200 dark:bg-violet-950/30 dark:border-violet-800"
