@@ -561,31 +561,40 @@ export function SubmagicModal({
                       fontWeight: '500'
                     }
                     const isSelected = config.templateName === template
+                    // Nom du fichier image (slugify)
+                    const imageFileName = template.toLowerCase().replace(/\s+/g, '-') + '.png'
+                    const imagePath = `/submagic-templates/${imageFileName}`
+                    
                     return (
                       <button
                         key={template}
                         type="button"
                         onClick={() => updateConfig('templateName', template)}
-                        className={`relative p-3 rounded-xl text-sm font-medium transition-all ${
+                        className={`relative rounded-lg overflow-hidden transition-all ${
                           isSelected 
                             ? 'ring-2 ring-orange-500 ring-offset-2 dark:ring-offset-gray-900 scale-105' 
                             : 'hover:scale-102 hover:opacity-90'
                         }`}
-                        style={{ 
-                          backgroundColor: meta.bgColor, 
-                          color: meta.textColor,
-                          fontWeight: meta.fontWeight || '500',
-                          textTransform: meta.textTransform || 'none',
-                        }}
                       >
-                        {template}
+                        {/* Image du template */}
+                        <img 
+                          src={imagePath} 
+                          alt={template}
+                          className="w-full h-auto block"
+                          onError={(e) => {
+                            // Fallback si l'image n'existe pas
+                            const target = e.target as HTMLImageElement
+                            target.style.display = 'none'
+                            target.parentElement!.innerHTML = `<div class="p-3 text-sm font-medium text-white" style="background-color: ${meta.bgColor}">${template}</div>`
+                          }}
+                        />
                         {isSelected && (
-                          <span className="absolute top-1 right-1">
-                            <Check className="w-4 h-4" />
+                          <span className="absolute top-1 right-1 bg-orange-500 rounded-full p-0.5">
+                            <Check className="w-3 h-3 text-white" />
                           </span>
                         )}
                         {meta.isNew && (
-                          <span className="absolute -top-1 -right-1 px-1.5 py-0.5 text-[10px] font-bold bg-green-500 text-white rounded">
+                          <span className="absolute -top-1 -left-1 px-1.5 py-0.5 text-[10px] font-bold bg-green-500 text-white rounded">
                             New
                           </span>
                         )}
