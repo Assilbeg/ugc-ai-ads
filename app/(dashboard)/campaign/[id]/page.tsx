@@ -73,7 +73,19 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
   // Dernière version de sous-titres (depuis l'historique)
   const latestSubmagicVersion = submagicVersions?.[0] as any
   const hasSubtitles = latestSubmagicVersion?.video_url && campaign.submagic_status !== 'processing'
-  const latestVersionVideo = hasSubtitles ? latestSubmagicVersion.video_url : originalVideoUrl
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RÈGLE CRITIQUE : Afficher la DERNIÈRE version modifiée (avec OU sans sous-titres)
+  // On compare les dates du dernier assemblage et des derniers sous-titres
+  // La plus récente gagne !
+  // ═══════════════════════════════════════════════════════════════════════════
+  const latestAssemblyDate = latestAssembly?.created_at ? new Date(latestAssembly.created_at).getTime() : 0
+  const latestSubmagicDate = latestSubmagicVersion?.created_at ? new Date(latestSubmagicVersion.created_at).getTime() : 0
+  
+  // Si sous-titres existent ET sont plus récents que le dernier assemblage → afficher sous-titres
+  // Sinon → afficher la vidéo originale (assemblage le plus récent)
+  const shouldShowSubtitles = hasSubtitles && latestSubmagicDate > latestAssemblyDate
+  const latestVersionVideo = shouldShowSubtitles ? latestSubmagicVersion.video_url : originalVideoUrl
 
   const preset = campaign.preset_id ? getPresetById(campaign.preset_id) : null
   const brief = campaign.brief as { what_selling?: string; target_duration?: number }
@@ -334,153 +346,173 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
         </div>
       ) : null}
 
-      {/* Historique des versions (assemblages + sous-titres) */}
-      {((assemblies && assemblies.length > 0) || (submagicVersions && submagicVersions.length > 0) || campaign.submagic_status === 'processing') && campaign.status !== 'failed' && (
-        <div className="mb-8 p-4 rounded-xl bg-muted/30 border border-border">
-          <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Historique des versions ({(assemblies?.length || 0) + (submagicVersions?.length || 0) + (campaign.submagic_status === 'processing' ? 1 : 0)})
-          </h3>
-          <div className="space-y-2">
-            {/* Sous-titres en cours de génération */}
-            {campaign.submagic_status === 'processing' && (() => {
-              const processingTemplateName = (campaign as any).submagic_config?.templateName
-              return (
-                <div 
-                  className="flex items-center justify-between p-3 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800 animate-pulse"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
-                      ⏳ Sous-titres en cours...
-                    </span>
-                    {processingTemplateName && (
-                      <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900/50">
-                        <TemplateImage templateName={processingTemplateName} />
-                        <span className="text-xs font-medium text-amber-800 dark:text-amber-200">{processingTemplateName}</span>
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-xs text-amber-600 dark:text-amber-400">
-                    1-5 min
-                  </span>
-                </div>
-              )
-            })()}
-            
-            {/* Toutes les versions de sous-titres */}
-            {submagicVersions?.map((version: any, index: number) => {
-              const isLatest = index === 0
-              const config = version.config || {}
-              return (
-                <div 
-                  key={version.id}
-                  className={`flex items-center justify-between p-3 rounded-lg ${
-                    isLatest 
-                      ? 'bg-violet-50 border border-violet-200 dark:bg-violet-950/30 dark:border-violet-800'
-                      : 'bg-background border border-border'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-sm font-medium ${isLatest ? 'text-violet-700 dark:text-violet-300' : 'text-muted-foreground'}`}>
-                      🔤 v{version.version_number}
-                    </span>
-                    {config.templateName && (
-                      <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800">
-                        <TemplateImage templateName={config.templateName} />
-                        <span className="text-xs font-medium">{config.templateName}</span>
-                      </div>
-                    )}
-                    {config.hasHook && (
-                      <Badge variant="outline" className="text-xs border-violet-300 text-violet-600">
-                        Hook
-                      </Badge>
-                    )}
-                    {config.magicZooms && (
-                      <Badge variant="outline" className="text-xs border-violet-300 text-violet-600">
-                        Zooms
-                      </Badge>
-                    )}
-                    {config.magicBrolls && (
-                      <Badge variant="outline" className="text-xs border-violet-300 text-violet-600">
-                        B-rolls
-                      </Badge>
-                    )}
-                    <span className="text-xs text-muted-foreground ml-2">
-                      {new Date(version.created_at).toLocaleDateString('fr-FR', {
-                        day: 'numeric',
-                        month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </span>
-                    {isLatest && (
-                      <Badge className="bg-violet-500 text-white text-xs ml-1">Actuelle</Badge>
-                    )}
-                  </div>
-                  <a 
-                    href={version.video_url}
-                    download={`ugc-subtitles-v${version.version_number}-${id.slice(0, 8)}.mp4`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+      {/* Historique des versions (assemblages + sous-titres) - FUSIONNÉS et triés par date */}
+      {((assemblies && assemblies.length > 0) || (submagicVersions && submagicVersions.length > 0) || campaign.submagic_status === 'processing') && campaign.status !== 'failed' && (() => {
+        // Fusionner assemblages et sous-titres dans une liste unique triée par date
+        type VersionItem = 
+          | { type: 'assembly'; data: any; created_at: string }
+          | { type: 'submagic'; data: any; created_at: string }
+        
+        const allVersions: VersionItem[] = [
+          ...(assemblies || []).map((a: any) => ({ type: 'assembly' as const, data: a, created_at: a.created_at })),
+          ...(submagicVersions || []).map((s: any) => ({ type: 'submagic' as const, data: s, created_at: s.created_at }))
+        ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        
+        // Trouver l'ID de la version courante (la plus récente globalement)
+        const currentVersionId = allVersions[0]?.data?.id
+        
+        return (
+          <div className="mb-8 p-4 rounded-xl bg-muted/30 border border-border">
+            <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Historique des versions ({allVersions.length + (campaign.submagic_status === 'processing' ? 1 : 0)})
+            </h3>
+            <div className="space-y-2">
+              {/* Sous-titres en cours de génération - Toujours en premier */}
+              {campaign.submagic_status === 'processing' && (() => {
+                const processingTemplateName = (campaign as any).submagic_config?.templateName
+                return (
+                  <div 
+                    className="flex items-center justify-between p-3 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800 animate-pulse"
                   >
-                    <Button 
-                      size="sm" 
-                      variant={isLatest ? 'default' : 'ghost'}
-                      className={`h-8 text-xs ${isLatest ? 'bg-violet-600 hover:bg-violet-700 text-white' : ''}`}
-                    >
-                      📥 Télécharger
-                    </Button>
-                  </a>
-                </div>
-              )
-            })}
-            
-            {/* Versions d'assemblage */}
-            {assemblies?.map((assembly: any, index: number) => (
-              <div 
-                key={assembly.id}
-                className={`flex items-center justify-between p-3 rounded-lg ${
-                  index === 0 && !campaign.submagic_video_url ? 'bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800' : 'bg-background border border-border'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <span className={`text-sm font-medium ${index === 0 && !campaign.submagic_video_url ? 'text-emerald-700 dark:text-emerald-300' : 'text-muted-foreground'}`}>
-                    v{assembly.version || assemblies.length - index}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    {new Date(assembly.created_at).toLocaleDateString('fr-FR', {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </span>
-                  {assembly.duration_seconds && (
-                    <span className="text-xs text-muted-foreground">
-                      • {Math.round(assembly.duration_seconds)}s
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                        ⏳ Sous-titres en cours...
+                      </span>
+                      {processingTemplateName && (
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900/50">
+                          <TemplateImage templateName={processingTemplateName} />
+                          <span className="text-xs font-medium text-amber-800 dark:text-amber-200">{processingTemplateName}</span>
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-xs text-amber-600 dark:text-amber-400">
+                      1-5 min
                     </span>
-                  )}
-                  {index === 0 && !campaign.submagic_video_url && (
-                    <Badge className="bg-emerald-500 text-white text-xs">Actuelle</Badge>
-                  )}
-                </div>
-                <a 
-                  href={assembly.final_video_url}
-                  download={`ugc-v${assembly.version || assemblies.length - index}-${id.slice(0, 8)}.mp4`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Button size="sm" variant={index === 0 && !campaign.submagic_video_url ? 'default' : 'ghost'} className="h-8 text-xs">
-                    📥 Télécharger
-                  </Button>
-                </a>
-              </div>
-            ))}
+                  </div>
+                )
+              })()}
+              
+              {/* Toutes les versions triées par date décroissante */}
+              {allVersions.map((item, index) => {
+                const isCurrentVersion = item.data.id === currentVersionId
+                
+                if (item.type === 'submagic') {
+                  const version = item.data
+                  const config = version.config || {}
+                  return (
+                    <div 
+                      key={`submagic-${version.id}`}
+                      className={`flex items-center justify-between p-3 rounded-lg ${
+                        isCurrentVersion 
+                          ? 'bg-violet-50 border border-violet-200 dark:bg-violet-950/30 dark:border-violet-800'
+                          : 'bg-background border border-border'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-sm font-medium ${isCurrentVersion ? 'text-violet-700 dark:text-violet-300' : 'text-muted-foreground'}`}>
+                          🔤 v{version.version_number}
+                        </span>
+                        {config.templateName && (
+                          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800">
+                            <TemplateImage templateName={config.templateName} />
+                            <span className="text-xs font-medium">{config.templateName}</span>
+                          </div>
+                        )}
+                        {config.hasHook && (
+                          <Badge variant="outline" className="text-xs border-violet-300 text-violet-600">
+                            Hook
+                          </Badge>
+                        )}
+                        {config.magicZooms && (
+                          <Badge variant="outline" className="text-xs border-violet-300 text-violet-600">
+                            Zooms
+                          </Badge>
+                        )}
+                        {config.magicBrolls && (
+                          <Badge variant="outline" className="text-xs border-violet-300 text-violet-600">
+                            B-rolls
+                          </Badge>
+                        )}
+                        <span className="text-xs text-muted-foreground ml-2">
+                          {new Date(version.created_at).toLocaleDateString('fr-FR', {
+                            day: 'numeric',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                        {isCurrentVersion && (
+                          <Badge className="bg-violet-500 text-white text-xs ml-1">Actuelle</Badge>
+                        )}
+                      </div>
+                      <a 
+                        href={version.video_url}
+                        download={`ugc-subtitles-v${version.version_number}-${id.slice(0, 8)}.mp4`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Button 
+                          size="sm" 
+                          variant={isCurrentVersion ? 'default' : 'ghost'}
+                          className={`h-8 text-xs ${isCurrentVersion ? 'bg-violet-600 hover:bg-violet-700 text-white' : ''}`}
+                        >
+                          📥 Télécharger
+                        </Button>
+                      </a>
+                    </div>
+                  )
+                } else {
+                  // Assembly
+                  const assembly = item.data
+                  return (
+                    <div 
+                      key={`assembly-${assembly.id}`}
+                      className={`flex items-center justify-between p-3 rounded-lg ${
+                        isCurrentVersion ? 'bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800' : 'bg-background border border-border'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`text-sm font-medium ${isCurrentVersion ? 'text-emerald-700 dark:text-emerald-300' : 'text-muted-foreground'}`}>
+                          🎬 v{assembly.version || index + 1}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          {new Date(assembly.created_at).toLocaleDateString('fr-FR', {
+                            day: 'numeric',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                        {assembly.duration_seconds && (
+                          <span className="text-xs text-muted-foreground">
+                            • {Math.round(assembly.duration_seconds)}s
+                          </span>
+                        )}
+                        {isCurrentVersion && (
+                          <Badge className="bg-emerald-500 text-white text-xs">Actuelle</Badge>
+                        )}
+                      </div>
+                      <a 
+                        href={assembly.final_video_url}
+                        download={`ugc-v${assembly.version || index + 1}-${id.slice(0, 8)}.mp4`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Button size="sm" variant={isCurrentVersion ? 'default' : 'ghost'} className="h-8 text-xs">
+                          📥 Télécharger
+                        </Button>
+                      </a>
+                    </div>
+                  )
+                }
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Failed state - campagne en échec */}
       {campaign.status === 'failed' && (

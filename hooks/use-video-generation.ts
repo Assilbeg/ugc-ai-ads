@@ -210,7 +210,7 @@ export function useVideoGeneration() {
             speech_start: transcription.speech_start,
             speech_end: transcription.speech_end,
             confidence: transcription.confidence,
-            words_per_second: transcription.words_per_second,
+            syllables_per_second: transcription.syllables_per_second,
             suggested_speed: transcription.suggested_speed,
             chunks: transcription.chunks?.length
           })
@@ -221,7 +221,7 @@ export function useVideoGeneration() {
             chunks: transcription.chunks,
             speech_start: transcription.speech_start,
             speech_end: transcription.speech_end,
-            words_per_second: transcription.words_per_second,
+            syllables_per_second: transcription.syllables_per_second,
             suggested_speed: transcription.suggested_speed,
           }
           
@@ -617,7 +617,7 @@ export function useVideoGeneration() {
               chunks: transcription.chunks,
               speech_start: transcription.speech_start,
               speech_end: transcription.speech_end,
-              words_per_second: transcription.words_per_second,
+              syllables_per_second: transcription.syllables_per_second,
               suggested_speed: transcription.suggested_speed,
             }
             

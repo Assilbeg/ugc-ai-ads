@@ -492,7 +492,7 @@ Transcrit l'audio d'une vidéo avec timestamps mot par mot.
   "speech_end": 4.8,
   "confidence": "high",
   "reasoning": "Clear speech boundaries detected...",
-  "words_per_second": 3.2,
+  "syllables_per_second": 5.8,
   "suggested_speed": 1.0
 }
 ```
@@ -524,7 +524,7 @@ Analyse un clip existant pour extraire les données de transcription.
   "speech_start": 0.2,
   "speech_end": 4.8,
   "confidence": "high",
-  "words_per_second": 3.2,
+  "syllables_per_second": 5.8,
   "suggested_speed": 1.0
 }
 ```
@@ -991,8 +991,8 @@ interface ClipTranscription {
   chunks: Array<{ text: string; timestamp: [number, number] }>
   speech_start: number
   speech_end: number
-  words_per_second: number
-  suggested_speed: number
+  syllables_per_second: number  // Débit mesuré en syllabes/seconde (plus précis que mots)
+  suggested_speed: number       // 1.0, 1.1 ou 1.2 basé sur les seuils : < 5 → 1.2x, 5-6 → 1.1x, ≥ 6 → 1.0x
 }
 ```
 

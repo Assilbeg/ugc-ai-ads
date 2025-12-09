@@ -249,7 +249,7 @@ POST /api/generate/ambient
 1. **Auto-ajustements** (après transcription Whisper)
    - `trim_start` = `speech_start` (début de la parole)
    - `trim_end` = `speech_end` (fin de la parole)
-   - `speed` = basé sur `words_per_second`
+   - `speed` = basé sur `syllables_per_second` (< 5 s/s → 1.2x, 5-6 → 1.1x, ≥ 6 → 1.0x)
 
 2. **User-ajustements** (slider dans l'UI)
    - L'utilisateur peut modifier trim et vitesse
@@ -260,12 +260,61 @@ POST /api/generate/ambient
 - **Slider trim** : Barre avec handles début/fin
 - **Boutons vitesse** : 1x, 1.1x, 1.2x
 - **Bouton reset** : Revient aux valeurs auto
+- **Indicateur de débit** : Pastille dynamique syllabes/seconde (voir section 7.1)
 
 ### Application
 
 Les ajustements sont appliqués via Transloadit au moment de :
 - La preview individuelle
 - L'assemblage final
+
+---
+
+## 7.1 Indicateur de Débit (Syllabes/Seconde)
+
+### Concept
+
+L'indicateur de débit affiche le **rythme de parole en syllabes par seconde (s/s)** de chaque clip. Il se recalcule **en temps réel** à chaque modification du trim ou de la vitesse.
+
+> **Pourquoi les syllabes ?** Le comptage par syllabes est plus précis que par mots pour mesurer le rythme de parole perçu, et fonctionne de manière cohérente dans toutes les langues.
+
+### Seuils UGC TikTok Dynamique
+
+| Débit | Icône | Label | Couleur | Signification |
+|-------|-------|-------|---------|---------------|
+| < 5 s/s | 🐢 | **Lent** | 🟠 Orange | Risque d'ennuyer, augmenter la vitesse |
+| 5-7 s/s | ✓ | **Bon** | 🟢 Vert | Rythme idéal UGC TikTok |
+| > 7 s/s | ⚡ | **Dynamique** | 🔵 Bleu | Très énergique, excellent pour TikTok |
+
+### Calcul
+
+```typescript
+// Formule dans lib/api/video-utils.ts
+syllablesPerSecond = (countSyllables(scriptText) / adjustedDuration) * speed
+
+// où adjustedDuration = (trimEnd - trimStart) / speed
+```
+
+### Caractéristiques
+
+- **Dynamique** : Se met à jour instantanément quand l'utilisateur modifie trim ou vitesse
+- **Multilingue** : Algorithme de comptage de syllabes universel (FR, EN, ES, DE, IT, PT...)
+- **Visuel** : Pastille colorée avec icône + valeur + label compréhensible en un coup d'œil
+
+### Algorithme de comptage des syllabes
+
+L'algorithme `countSyllables()` dans `lib/api/video-utils.ts` utilise une approche basée sur les groupes vocaliques :
+
+1. Nettoie le texte (ponctuation, minuscules)
+2. Détecte les diphtongues courantes (eau, ai, ou, ea, ee, oo, etc.) → comptées comme 1 syllabe
+3. Compte les voyelles restantes
+4. Applique les règles de "e" muet (français, anglais) et "-ed/-es" final (anglais)
+5. Minimum 1 syllabe par mot
+
+### Fichiers concernés
+
+- `lib/api/video-utils.ts` - Fonctions `countSyllables()` et `calculateSyllablesPerSecond()`
+- `components/steps/step6-generate.tsx` - Affichage de la pastille dans l'UI
 
 ---
 
@@ -457,5 +506,5 @@ Les admins (vérifiés par email dans `lib/admin.ts`) :
 
 ---
 
-*Dernière mise à jour : 8 décembre 2024*
+*Dernière mise à jour : 9 décembre 2024*
 

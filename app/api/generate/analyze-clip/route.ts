@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { transcribeAudio } from '@/lib/api/falai'
 import { analyzeSpeechBoundaries } from '@/lib/api/claude'
 import { createClient } from '@/lib/supabase/server'
+import { countSyllables } from '@/lib/api/video-utils'
 
 interface AnalyzeClipInput {
   clipId: string
@@ -12,7 +13,7 @@ interface AnalyzeClipInput {
 
 /**
  * Analyse un clip existant pour générer les données de transcription
- * (speech_start, speech_end, words_per_second, suggested_speed)
+ * (speech_start, speech_end, syllables_per_second, suggested_speed)
  * 
  * Utile pour les clips générés avant l'ajout de cette feature.
  * 
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
     let speech_start = whisperResult.speech_start
     let speech_end = whisperResult.speech_end
     let confidence: 'high' | 'medium' | 'low' = 'medium'
-    let words_per_second = 3.0
+    let syllables_per_second = 5.5  // Défaut (milieu de la zone "bon")
     let suggested_speed = 1.0
 
     if (originalScript && whisperResult.chunks.length > 0) {
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
         speech_start = analysis.speech_start
         speech_end = analysis.speech_end
         confidence = analysis.confidence
-        words_per_second = analysis.words_per_second
+        syllables_per_second = analysis.syllables_per_second
         // IMPORTANT: Pas de vitesse < 1.0 (pas de ralentissement pour UGC TikTok)
         suggested_speed = Math.max(1.0, analysis.suggested_speed)
 
@@ -81,20 +82,21 @@ export async function POST(request: NextRequest) {
           speech_start,
           speech_end,
           confidence,
-          words_per_second,
+          syllables_per_second,
           suggested_speed,
         })
       } catch (claudeError) {
         console.warn('[Analyze] Claude analysis failed:', claudeError)
         confidence = 'low'
         
-        // Calcul basique (UGC TikTok = pas de ralentissement)
-        const wordCount = whisperResult.text.split(/\s+/).filter((w: string) => w.length > 0).length
+        // Calcul basique en SYLLABES (UGC TikTok = pas de ralentissement)
+        const syllableCount = countSyllables(originalScript)
         const speechDuration = speech_end - speech_start
         if (speechDuration > 0) {
-          words_per_second = Math.round((wordCount / speechDuration) * 10) / 10
-          if (words_per_second < 2.5) suggested_speed = 1.2
-          else if (words_per_second < 3.0) suggested_speed = 1.1
+          syllables_per_second = Math.round((syllableCount / speechDuration) * 10) / 10
+          // Seuils : < 5 s/s = trop lent → 1.2x | 5-6 s/s = un peu lent → 1.1x | ≥ 6 s/s = bon → 1.0x
+          if (syllables_per_second < 5) suggested_speed = 1.2
+          else if (syllables_per_second < 6) suggested_speed = 1.1
           // Pas de 0.8x ou 0.9x - on garde 1.0x même si rapide
         }
       }
@@ -109,7 +111,7 @@ export async function POST(request: NextRequest) {
         chunks: whisperResult.chunks,
         speech_start,
         speech_end,
-        words_per_second,
+        syllables_per_second,
         suggested_speed,
       }
       
@@ -142,7 +144,7 @@ export async function POST(request: NextRequest) {
     console.log('[Analyze] ✓ Done:', {
       speech_start,
       speech_end,
-      words_per_second,
+      syllables_per_second,
       suggested_speed,
       confidence
     })
@@ -153,7 +155,7 @@ export async function POST(request: NextRequest) {
       speech_start,
       speech_end,
       confidence,
-      words_per_second,
+      syllables_per_second,
       suggested_speed,
     })
 

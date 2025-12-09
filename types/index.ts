@@ -289,7 +289,7 @@ export interface ClipTranscription {
   speech_start?: number;        // Début de la parole détecté (secondes)
   speech_end?: number;          // Fin de la parole détectée (secondes)
   confidence?: 'high' | 'medium' | 'low';  // Confiance de l'analyse
-  words_per_second?: number;    // Débit de parole mesuré
+  syllables_per_second?: number;  // Débit de parole mesuré en syllabes/seconde (plus précis que mots)
   suggested_speed?: number;     // Vitesse suggérée (1.0 - 1.2, UGC = pas de ralentissement)
 }
 
@@ -389,7 +389,7 @@ export interface ClipAdjustments {
 export interface AutoAdjustments {
   trim_start: number;     // Début du trim (secondes) - basé sur speech_start
   trim_end: number;       // Fin du trim (secondes) - basé sur speech_end
-  speed: number;          // Vitesse suggérée (1.0, 1.1, 1.2) - basée sur words_per_second
+  speed: number;          // Vitesse suggérée (1.0, 1.1, 1.2) - basée sur syllables_per_second
   updated_at: string;     // ISO timestamp de la dernière mise à jour (génération/regénération)
 }
 

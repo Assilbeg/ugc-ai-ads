@@ -27,6 +27,7 @@
 15. [Règles de Modifications UI (Tous Composants)](#15-règles-de-modifications-ui-tous-composants)
 16. [Dashboard - Previews Vidéo](#16-dashboard---previews-vidéo)
 17. [Sous-titres Submagic](#17-sous-titres-submagic)
+18. [Indicateur de Débit (Syllabes/Seconde)](#18-indicateur-de-débit-syllabesseconde)
 
 ---
 
@@ -134,7 +135,7 @@ const clip = clips?.[0]
    └── Modèle: fal-ai/veo3.1/image-to-video
                     │
 3. Transcription (Whisper) ←──────────────────────────┘
-   └── Extrait speech_start, speech_end, words_per_second
+   └── Extrait speech_start, speech_end, syllables_per_second
    └── Calcule auto_adjustments (trim + speed suggérés)
                     │
 4. Voice Conversion (ChatterboxHD S2S) ←──────────────┘
@@ -182,7 +183,7 @@ const clip = clips?.[0]
 interface AutoAdjustments {
   trim_start: number;   // Basé sur speech_start
   trim_end: number;     // Basé sur speech_end
-  speed: number;        // Basé sur words_per_second
+  speed: number;        // Basé sur syllables_per_second (< 5 s/s → 1.2x, 5-6 → 1.1x, ≥ 6 → 1.0x)
   updated_at: string;   // ISO timestamp - CRITIQUE pour la priorité
 }
 
@@ -732,7 +733,7 @@ Whisper transcrit TOUT, même ces sons. Si on utilise les timestamps bruts, le t
 2. Claude (analyzeSpeechBoundaries)
    └── Compare transcription vs script ORIGINAL
    └── Identifie où le "vrai" script commence (ignore le gibberish)
-   └── Calcule words_per_second sur le SCRIPT, pas la transcription
+   └── Calcule syllables_per_second sur le SCRIPT, pas la transcription
    └── Output: { speech_start, speech_end, confidence, suggested_speed }
 ```
 
@@ -743,7 +744,8 @@ Whisper transcrit TOUT, même ces sons. Si on utilise les timestamps bruts, le t
 | **Gibberish = tout ce qui n'est pas dans le script** | Mots transcrits mais pas attendus |
 | **speech_start = début du 1er mot du script** | Pas le 1er mot transcrit |
 | **speech_end = fin du dernier mot du script** | Pas le dernier mot transcrit |
-| **words_per_second sur le script** | Le débit compte les mots VOULUS, pas le gibberish |
+| **syllables_per_second sur le script** | Le débit compte les SYLLABES du script, pas le gibberish |
+| **Seuils auto-speed : < 5 s/s → 1.2x, 5-6 → 1.1x, ≥ 6 → 1.0x** | Plus précis que les mots |
 | **Padding de 0.15s** | Ajouter un peu de marge pour ne pas couper serré |
 | **Confidence : high/medium/low** | Indique la fiabilité de l'analyse |
 
@@ -984,6 +986,9 @@ const getClipStatus = (clip: CampaignClip): ClipStatus => {
 
 | Date | Commit | Comportement ajouté |
 |------|--------|---------------------|
+| 9 Dec 2024 | - | Auto-speed par syllabes/seconde : Le calcul de suggested_speed utilise maintenant `syllables_per_second` au lieu de `words_per_second`. Seuils : < 5 s/s → 1.2x, 5-6 s/s → 1.1x, ≥ 6 s/s → 1.0x. Plus précis et cohérent multilingue. |
+| 8 Dec 2024 | - | Fix affichage version courante : Comparer dates `assemblies[0].created_at` vs `submagic_versions[0].created_at` pour afficher la PLUS RÉCENTE. Historique fusionné et trié par date décroissante (🎬 assemblages + 🔤 sous-titres mélangés). |
+| 9 Dec 2024 | - | Indicateur de débit syllabes/seconde : Pastille dynamique temps réel (🐢 Lent < 5 s/s, ✓ Bon 5-7 s/s, ⚡ Dynamique > 7 s/s). Multilingue, se recalcule à chaque changement trim/speed. |
 | 8 Dec 2024 | - | Fix navigation versions : NE PAS fusionner `clip_versions` avec `campaign_clips` pour l'affichage (causait doublons, ex: 1/3 au lieu de 1/2). Les versions navigables = clips dans `campaign_clips` uniquement. |
 | 8 Dec 2024 | - | Thumbnails dashboard permanentes : upload vers Supabase Storage (bucket: thumbnails) avec fallback first_frame du hook |
 | 5 Dec 2024 | - | Fix animation régénération : 1) `getClipStatus(clip)` au lieu de `getClipStatus(index)`, 2) Progress indexé par `clip-${order}` au lieu de `clip.id` (order est stable pour chaque tuile/beat) |
@@ -1418,6 +1423,7 @@ await supabase.from('campaigns').update({ thumbnail_url: permanentThumbnailUrl }
 | **NE JAMAIS supprimer une version existante** | User peut vouloir revenir en arrière |
 | **Webhook retourne 200 même si erreur** | Évite les retries intempestifs |
 | **Overlay sur vidéo pendant processing** | Feedback visuel clair |
+| **Afficher la version la PLUS RÉCENTE (avec ou sans sous-titres)** | Si user modifie la vidéo après ajout de sous-titres, c'est la vidéo modifiée qui s'affiche. Comparaison par `created_at` entre `assemblies[0]` et `submagic_versions[0]` (Fix 8 Dec 2024) |
 
 ### Format de `config` (JSONB)
 
@@ -1438,8 +1444,10 @@ await supabase.from('campaigns').update({ thumbnail_url: permanentThumbnailUrl }
 |-----------------|------------------|------------|
 | `none` | Originale | - |
 | `processing` | Originale + overlay | "⏳ En cours..." |
-| `completed` | Dernière version sous-titrée | Liste v1, v2, v3... |
+| `completed` | **LA PLUS RÉCENTE** (assemblage OU sous-titres selon `created_at`) | Liste v1, v2, v3... avec badge "Actuelle" sur la plus récente |
 | `failed` | Originale | - |
+
+> **Note (Fix 8 Dec 2024)** : Auparavant, `completed` affichait toujours la dernière version sous-titrée. Maintenant, on compare les dates du dernier assemblage (`assemblies[0].created_at`) et de la dernière version sous-titrée (`submagic_versions[0].created_at`) pour afficher la plus récente.
 
 ### Boutons page campagne
 
@@ -1470,6 +1478,89 @@ SUBMAGIC_API_KEY=sk-...  # Clé API Submagic
 
 ---
 
+## 18. Indicateur de Débit (Syllabes/Seconde)
+
+### Contexte
+> Ajout 9 Dec 2024 - Indicateur dynamique du rythme de parole pour UGC TikTok
+
+L'indicateur de débit affiche le **rythme de parole en syllabes par seconde (s/s)** de chaque clip dans l'étape 6 (Génération). Il permet à l'utilisateur de voir en un coup d'œil si le rythme de son clip est adapté au format UGC TikTok dynamique.
+
+### Comportement CRITIQUE
+
+| Règle | Description |
+|-------|-------------|
+| **Calcul dynamique en temps réel** | Le débit se recalcule INSTANTANÉMENT à chaque changement de trim ou de vitesse |
+| **Par syllabes, pas par mots** | Plus précis pour mesurer le rythme perçu, fonctionne dans toutes les langues |
+| **Multilingue** | Algorithme universel : FR, EN, ES, DE, IT, PT et autres langues latines/germaniques |
+| **Seuils UGC TikTok** | < 5 s/s = Lent (orange), 5-7 s/s = Bon (vert), > 7 s/s = Dynamique (bleu) |
+
+### Formule de calcul
+
+```typescript
+// lib/api/video-utils.ts
+export function calculateSyllablesPerSecond(
+  text: string,
+  trimStart: number,
+  trimEnd: number,
+  speed: number
+): number {
+  const syllables = countSyllables(text)
+  const adjustedDuration = (trimEnd - trimStart) / speed
+  
+  if (adjustedDuration <= 0 || syllables === 0) return 0
+  
+  // La vitesse accélère le débit perçu
+  return (syllables / adjustedDuration) * speed
+}
+```
+
+### Seuils de couleur (UGC TikTok)
+
+| Débit | Icône | Label | Couleur | Signification |
+|-------|-------|-------|---------|---------------|
+| < 5 s/s | 🐢 | **Lent** | 🟠 Orange | Contenu trop lent, risque d'ennuyer |
+| 5-7 s/s | ✓ | **Bon** | 🟢 Vert | Rythme idéal pour UGC TikTok |
+| > 7 s/s | ⚡ | **Dynamique** | 🔵 Bleu | Très énergique, excellent pour TikTok |
+
+> **Note** : Ces seuils sont calibrés pour du contenu UGC TikTok qui nécessite un rythme soutenu. Pour d'autres formats (podcast, formation), des seuils plus bas seraient acceptables.
+
+### Algorithme de comptage des syllabes
+
+L'algorithme `countSyllables()` utilise une approche basée sur les groupes vocaliques :
+
+1. **Nettoyage** : Retirer ponctuation, passer en minuscules (Unicode-aware)
+2. **Diphtongues** : Détecter les groupes vocaliques qui comptent comme 1 syllabe (eau, ai, ou, ea, ee, oo, etc.)
+3. **Comptage** : Compter les voyelles + diphtongues par mot
+4. **Règles spéciales** : 
+   - "e" muet en fin de mot (FR, EN, DE)
+   - "-ed" final souvent muet (EN)
+   - "-es" final souvent muet (EN, FR)
+5. **Minimum** : Chaque mot compte au moins 1 syllabe
+
+### Fichiers concernés
+
+| Fichier | Rôle |
+|---------|------|
+| `lib/api/video-utils.ts` | Fonctions `countSyllables()` et `calculateSyllablesPerSecond()` |
+| `components/steps/step6-generate.tsx` | Affichage de la pastille dans la section Ajustements |
+
+### Règles d'affichage UI
+
+```tsx
+// Dans step6-generate.tsx - Section Speed Buttons
+<div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full ${badgeConfig.bg}`}>
+  <span className="text-[9px]">{badgeConfig.icon}</span>
+  <span className={`text-[10px] font-semibold tabular-nums ${badgeConfig.text}`}>
+    {syllablesPerSecond.toFixed(1)}
+  </span>
+  <span className={`text-[9px] font-medium ${badgeConfig.text}`}>
+    {badgeConfig.label}
+  </span>
+</div>
+```
+
+---
+
 ## 📝 Comment mettre à jour ce document
 
 1. **Avant de modifier un comportement listé ici** → Discuter et documenter la raison
@@ -1482,4 +1573,4 @@ SUBMAGIC_API_KEY=sk-...  # Clé API Submagic
 
 ---
 
-*Dernière mise à jour : 9 décembre 2024*
+*Dernière mise à jour : 8 décembre 2024 (fix affichage version la plus récente assemblage/sous-titres)*

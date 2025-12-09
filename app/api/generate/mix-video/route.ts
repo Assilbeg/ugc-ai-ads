@@ -10,7 +10,7 @@ interface MixVideoInput {
   voiceUrl?: string          // URL de la voiceover (speech-to-speech)
   ambientUrl?: string        // URL de l'ambiance (ElevenLabs)
   voiceVolume?: number       // Volume voix (0-100, défaut 100)
-  ambientVolume?: number     // Volume ambiance (0-100, défaut 20)
+  ambientVolume?: number     // Volume ambiance (0-100, défaut 30)
   duration: number           // Durée en secondes
 }
 
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       voiceUrl, 
       ambientUrl, 
       voiceVolume = 100, 
-      ambientVolume = 20,
+      ambientVolume = 30, // Augmenté de 20% à 30% pour une ambiance plus présente
       duration 
     } = body as MixVideoInput
 

@@ -9,7 +9,7 @@ import { useActors } from '@/hooks/use-actors'
 import { useCampaignCreation } from '@/hooks/use-campaign-creation'
 import { getPresetById } from '@/lib/presets'
 import { createClient } from '@/lib/supabase/client'
-import { calculateAdjustedDuration } from '@/lib/api/video-utils'
+import { calculateAdjustedDuration, calculateSyllablesPerSecond } from '@/lib/api/video-utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -230,21 +230,22 @@ interface Step6GenerateProps {
 }
 
 const BEAT_LABELS: Record<string, string> = {
-  hook: 'HOOK',
-  problem: 'PROBLÈME',
-  agitation: 'AGITATION',
-  solution: 'SOLUTION',
-  proof: 'PREUVE',
+  hook: 'Hook',
+  problem: 'Problème',
+  agitation: 'Agitation',
+  solution: 'Solution',
+  proof: 'Preuve',
   cta: 'CTA',
 }
 
+// Palette plus sobre et professionnelle
 const BEAT_COLORS: Record<string, string> = {
-  hook: 'bg-amber-500',
-  problem: 'bg-red-500',
-  agitation: 'bg-orange-500',
-  solution: 'bg-emerald-500',
-  proof: 'bg-blue-500',
-  cta: 'bg-violet-500',
+  hook: 'bg-slate-800',
+  problem: 'bg-rose-600/90',
+  agitation: 'bg-amber-600/90',
+  solution: 'bg-emerald-600/90',
+  proof: 'bg-sky-600/90',
+  cta: 'bg-violet-600/90',
 }
 
 const STATUS_STEPS = [
@@ -1002,7 +1003,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
               chunks: result.chunks,
               speech_start: result.speech_start,
               speech_end: result.speech_end,
-              words_per_second: result.words_per_second,
+              syllables_per_second: result.syllables_per_second,
               suggested_speed: result.suggested_speed,
             },
             // Aussi mettre à jour auto_adjustments
@@ -2254,166 +2255,202 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
               return (
                 <div 
                   key={clip.id || index} 
-                  className={`rounded-2xl overflow-hidden border bg-card transition-all grid grid-cols-[160px_1fr] ${
-                    isCompleted ? 'ring-2 ring-green-500/30' : 
-                    isFailed ? 'ring-2 ring-red-500/30' : ''
+                  className={`rounded-xl overflow-hidden border border-border/60 bg-card/50 backdrop-blur-sm transition-all duration-200 shadow-sm hover:shadow-md ${
+                    isCompleted ? 'border-emerald-500/20' : 
+                    isFailed ? 'border-rose-500/30 bg-rose-500/5' : ''
                   }`}
                 >
-                  {/* Left: Video/Image - Collé aux bords, pas de padding */}
-                  <div className="relative group bg-black">
-                    {videoUrl ? (
-                      <>
-                        <video 
-                          key={videoUrl} // Force remount when URL changes (after regeneration)
-                          src={videoUrl} 
-                          className="w-full h-full object-cover"
-                          poster={firstFrameUrl}
-                          autoPlay
-                          muted
-                          loop
-                          playsInline
-                          ref={(video) => {
-                            const clipKey = getClipKey(generatedClip)
-                            if (video && clipKey) {
-                              const adj = adjustments[clipKey]
-                              if (adj) {
-                                // Appliquer la vitesse en temps réel
-                                video.playbackRate = adj.speed || 1
-                                // Gérer le trim (boucle entre trimStart et trimEnd)
-                                const videoDuration = generatedClip.video?.duration || clip.video.duration
-                                const handleTimeUpdate = () => {
-                                  const trimEnd = adj.trimEnd ?? videoDuration
-                                  const trimStart = adj.trimStart ?? 0
-                                  if (video.currentTime >= trimEnd || video.currentTime < trimStart) {
-                                    video.currentTime = trimStart
-                                  }
-                                }
-                                video.ontimeupdate = handleTimeUpdate
-                                // Démarrer au bon point si nécessaire
-                                if (adj.trimStart && video.currentTime < adj.trimStart) {
-                                  video.currentTime = adj.trimStart
-                                }
-                              }
-                            }
-                          }}
-                        />
-                        {/* Bouton plein écran au hover */}
-                        <button
-                          onClick={() => { setPreviewingClip(getClipKey(generatedClip) || null); setFullscreenVideo(videoUrl) }}
-                          className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/30 transition-colors"
-                        >
-                          <Play className="w-10 h-10 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </button>
-                      </>
-                    ) : firstFrameUrl ? (
-                      <>
-                        <img 
-                          src={firstFrameUrl} 
-                          alt={`Clip ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                        {isGenerating && (
-                          <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
-                            <Loader2 className="w-8 h-8 animate-spin text-white mb-2" />
-                            <span className="text-white text-xs font-medium">
-                              {currentStatus === 'generating_video' ? 'Vidéo...' : 
-                               currentStatus === 'generating_voice' ? 'Voix...' : 
-                               currentStatus === 'generating_ambient' ? 'Ambiance...' : ''}
-                            </span>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="w-full h-full min-h-[140px] flex items-center justify-center bg-muted">
-                        <Play className="w-8 h-8 text-muted-foreground" />
-                      </div>
-                    )}
-                    
-                    {/* Badge Completed */}
+                  {/* Header en haut de la carte */}
+                  <div className="px-4 py-3 border-b border-border/40 flex items-center gap-3">
+                    <span className="w-7 h-7 rounded-full bg-foreground text-background flex items-center justify-center font-bold text-sm">
+                      {index + 1}
+                    </span>
+                    <Badge className={`${BEAT_COLORS[clip.beat]} text-white text-xs px-2.5 py-0.5`}>
+                      {BEAT_LABELS[clip.beat]}
+                    </Badge>
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>{clip.video.duration}s</span>
+                    </div>
+                    {/* Pastilles status - compactes en haut à droite quand complété */}
                     {isCompleted && (
-                      <div className="absolute top-2 right-2 z-10 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                        <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
+                      <div className="flex items-center gap-1.5 ml-auto">
+                        <div className="flex items-center gap-1 text-emerald-600">
+                          <Check className="w-3 h-3" />
+                          <span className="text-[10px] font-medium">Prêt</span>
+                        </div>
                       </div>
                     )}
                   </div>
 
-                    {/* Right: Content */}
-                    <div className="p-4 flex flex-col">
-                      {/* Header */}
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="w-7 h-7 rounded-full bg-foreground text-background flex items-center justify-center font-bold text-sm">
-                              {index + 1}
-                            </span>
-                            <Badge className={`${BEAT_COLORS[clip.beat]} text-white text-xs px-2 py-0.5`}>
-                              {BEAT_LABELS[clip.beat]}
-                            </Badge>
-                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                              <Clock className="w-3.5 h-3.5" />
-                              <span>{clip.video.duration}s</span>
+                  {/* Layout principal : vidéo à gauche, contenu à droite */}
+                  <div className="flex">
+                    {/* Zone vidéo avec navigation - fond gris */}
+                    <div className="flex items-center gap-2 p-3 bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-900 dark:to-slate-800">
+                      {/* Flèche gauche */}
+                    {(() => {
+                      const versions = clipsByBeat.get(clip.order) || []
+                      const hasMultipleVersions = versions.length > 1
+                      const versionIndex = displayedVersionIndex[clip.order] || 0
+                      const canGoPrev = versionIndex > 0
+                      
+                      if (!hasMultipleVersions) return null
+                      
+                      return (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigateVersion(clip.order, 'prev') }}
+                          disabled={!canGoPrev}
+                          className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+                            canGoPrev 
+                              ? 'bg-white dark:bg-slate-700 shadow-md hover:shadow-lg text-slate-700 dark:text-slate-200 hover:scale-105' 
+                              : 'bg-slate-200/50 dark:bg-slate-700/30 text-slate-300 dark:text-slate-600'
+                          }`}
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+                      )
+                    })()}
+                    
+                    {/* Vidéo */}
+                    <div className="relative group w-[200px] shrink-0 rounded-lg overflow-hidden shadow-lg">
+                      {videoUrl ? (
+                        <>
+                          <video 
+                            key={videoUrl}
+                            src={videoUrl} 
+                            className="w-full h-auto object-cover"
+                            poster={firstFrameUrl}
+                            autoPlay
+                            muted
+                            loop
+                            playsInline
+                            ref={(video) => {
+                              const clipKey = getClipKey(generatedClip)
+                              if (video && clipKey) {
+                                const adj = adjustments[clipKey]
+                                if (adj) {
+                                  video.playbackRate = adj.speed || 1
+                                  const videoDuration = generatedClip.video?.duration || clip.video.duration
+                                  const handleTimeUpdate = () => {
+                                    const trimEnd = adj.trimEnd ?? videoDuration
+                                    const trimStart = adj.trimStart ?? 0
+                                    if (video.currentTime >= trimEnd || video.currentTime < trimStart) {
+                                      video.currentTime = trimStart
+                                    }
+                                  }
+                                  video.ontimeupdate = handleTimeUpdate
+                                  if (adj.trimStart && video.currentTime < adj.trimStart) {
+                                    video.currentTime = adj.trimStart
+                                  }
+                                }
+                              }
+                            }}
+                          />
+                          {/* Overlay preview - toujours légèrement visible */}
+                          <button
+                            onClick={() => { setPreviewingClip(getClipKey(generatedClip) || null); setFullscreenVideo(videoUrl) }}
+                            className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-t from-black/40 via-transparent to-transparent hover:from-black/60 transition-all cursor-pointer"
+                          >
+                            <div className="absolute bottom-3 left-3 flex items-center gap-1.5 text-white text-xs">
+                              <div className="w-6 h-6 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                                <Play className="w-3 h-3 fill-white text-white" />
+                              </div>
+                              <span className="opacity-80 group-hover:opacity-100 transition-opacity">Plein écran</span>
                             </div>
-                            {/* Indicateur de version */}
-                            {(() => {
-                              const version = generatedClip?.current_version || clip.current_version || 1
-                              return version > 1 ? (
-                                <Badge variant="outline" className="text-xs px-1.5 py-0 text-muted-foreground">
-                                  v{version}
-                                </Badge>
-                              ) : null
-                            })()}
-                            
-                            {/* ══════════════════════════════════════════════════════════════ */}
-                            {/* VERSIONING: Navigation entre versions */}
-                            {/* ══════════════════════════════════════════════════════════════ */}
-                            {(() => {
-                              const versions = clipsByBeat.get(clip.order) || []
-                              const hasMultipleVersions = versions.length > 1
-                              
-                              if (!hasMultipleVersions) return null
-                              
-                              const versionIndex = displayedVersionIndex[clip.order] || 0
-                              const displayedClip = versions[versionIndex] || generatedClip
-                              
-                              return (
-                                <div className="flex items-center gap-2 ml-auto">
-                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); navigateVersion(clip.order, 'prev') }}
-                                    className="p-1 rounded hover:bg-muted transition-colors"
-                                    title="Version précédente"
-                                  >
-                                    <ChevronLeft className="w-4 h-4" />
-                                  </button>
-                                  <span className="text-xs text-muted-foreground font-medium min-w-[40px] text-center">
-                                    {versionIndex + 1}/{versions.length}
-                                  </span>
-                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); navigateVersion(clip.order, 'next') }}
-                                    className="p-1 rounded hover:bg-muted transition-colors"
-                                    title="Version suivante"
-                                  >
-                                    <ChevronRight className="w-4 h-4" />
-                                  </button>
-                                  {!displayedClip?.is_selected && (
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); selectVersion(displayedClip?.id || '', clip.order) }}
-                                      className="text-xs px-2 py-1 rounded bg-violet-500 text-white hover:bg-violet-600 transition-colors font-medium"
-                                    >
-                                      Utiliser
-                                    </button>
-                                  )}
-                                  {displayedClip?.is_selected && (
-                                    <span className="text-xs text-green-500 flex items-center gap-1 font-medium">
-                                      <Check className="w-3 h-3" /> Sélectionnée
-                                    </span>
-                                  )}
-                                </div>
-                              )
-                            })()}
+                          </button>
+                        </>
+                      ) : firstFrameUrl ? (
+                        <>
+                          <img src={firstFrameUrl} alt={`Clip ${index + 1}`} className="w-full h-auto object-cover" />
+                          {isGenerating && (
+                            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
+                              <Loader2 className="w-8 h-8 animate-spin text-white mb-2" />
+                              <span className="text-white text-xs font-medium">
+                                {currentStatus === 'generating_video' ? 'Vidéo...' : 
+                                 currentStatus === 'generating_voice' ? 'Voix...' : 
+                                 currentStatus === 'generating_ambient' ? 'Ambiance...' : ''}
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="w-full min-h-[120px] flex items-center justify-center bg-slate-200 dark:bg-slate-700">
+                          <Play className="w-8 h-8 text-slate-400" />
+                        </div>
+                      )}
+                      
+                      {/* Badge check */}
+                      {isCompleted && (
+                        <div className="absolute top-2 right-2 z-10 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center shadow-md">
+                          <Check className="w-3 h-3 text-white" />
+                        </div>
+                      )}
+                      
+                      {/* Indicateur version en haut à gauche */}
+                      {(() => {
+                        const versions = clipsByBeat.get(clip.order) || []
+                        if (versions.length <= 1) return null
+                        const versionIndex = displayedVersionIndex[clip.order] || 0
+                        
+                        return (
+                          <div className="absolute top-2 left-2 z-10">
+                            <span className="text-white text-xs font-semibold bg-black/60 backdrop-blur-sm px-2 py-1 rounded-md">
+                              {versionIndex + 1} / {versions.length}
+                            </span>
                           </div>
-                          {/* Script éditable - seulement si clip complété */}
+                        )
+                      })()}
+                      
+                      {/* Bouton utiliser si pas sélectionné */}
+                      {(() => {
+                        const versions = clipsByBeat.get(clip.order) || []
+                        if (versions.length <= 1) return null
+                        const versionIndex = displayedVersionIndex[clip.order] || 0
+                        const displayedClipForSelect = versions[versionIndex] || generatedClip
+                        
+                        if (displayedClipForSelect?.is_selected) return null
+                        
+                        return (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); selectVersion(displayedClipForSelect?.id || '', clip.order) }}
+                            className="absolute bottom-3 right-3 z-10 text-xs px-3 py-1.5 rounded-md bg-white text-slate-800 font-semibold shadow-lg hover:bg-slate-50 transition-colors"
+                          >
+                            Utiliser
+                          </button>
+                        )
+                      })()}
+                    </div>
+                    
+                    {/* Flèche droite */}
+                    {(() => {
+                      const versions = clipsByBeat.get(clip.order) || []
+                      const hasMultipleVersions = versions.length > 1
+                      const versionIndex = displayedVersionIndex[clip.order] || 0
+                      const canGoNext = versionIndex < versions.length - 1
+                      
+                      if (!hasMultipleVersions) return null
+                      
+                      return (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigateVersion(clip.order, 'next') }}
+                          disabled={!canGoNext}
+                          className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+                            canGoNext 
+                              ? 'bg-white dark:bg-slate-700 shadow-md hover:shadow-lg text-slate-700 dark:text-slate-200 hover:scale-105' 
+                              : 'bg-slate-200/50 dark:bg-slate-700/30 text-slate-300 dark:text-slate-600'
+                          }`}
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      )
+                    })()}
+                    </div>
+                    {/* Fin zone vidéo grise */}
+
+                    {/* Right: Content - fond blanc */}
+                    <div className="flex-1 p-4 flex flex-col bg-card">
+                      {/* Script éditable - seulement si clip complété */}
+                      <div className="mb-4">
                           {isCompleted && editingScript === clip.order ? (
                             <div className="space-y-2">
                               <textarea
@@ -2481,49 +2518,51 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                             </div>
                           ) : (
                             <div className="group/script">
-                              <p className="text-sm text-foreground leading-relaxed">
-                                "{generatedClip?.script?.text || clip.script.text}"
+                              <div className="flex items-start gap-3 p-3.5 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-800/50 dark:to-slate-900/30 border border-slate-200/60 dark:border-slate-700/40 shadow-sm hover:shadow transition-all">
+                                <p className="text-sm text-foreground leading-relaxed flex-1">
+                                  "{generatedClip?.script?.text || clip.script.text}"
+                                </p>
                                 {isCompleted && (
                                   <button
                                     onClick={() => startEditingScript(clip.order, generatedClip?.script?.text || clip.script.text)}
-                                    className="ml-2 text-xs text-primary opacity-0 group-hover/script:opacity-100 transition-opacity hover:underline"
+                                    className="shrink-0 w-8 h-8 rounded-lg bg-white dark:bg-slate-700 shadow-sm hover:shadow flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-primary transition-all"
+                                    title="Modifier le script"
                                   >
-                                    Modifier
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
                                   </button>
                                 )}
-                              </p>
+                              </div>
                             </div>
                           )}
-                        </div>
                       </div>
 
-                      {/* Generation steps indicator */}
-                      {(isGenerating || isCompleted) && (
-                        <div className="flex items-center gap-4 mb-4">
+                      {/* Generation steps indicator - seulement pendant la génération */}
+                      {isGenerating && (
+                        <div className="flex items-center gap-3 mb-4">
                           {STATUS_STEPS.map((step, stepIndex) => {
                             const StepIcon = step.icon
                             const isActive = stepIndex === currentStep
-                            const isDone = stepIndex < currentStep || isCompleted
+                            const isDone = stepIndex < currentStep
                             
                             return (
-                              <div key={step.status} className="flex items-center gap-2">
-                                <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
-                                  isDone ? 'bg-green-500' : 
+                              <div key={step.status} className="flex items-center gap-1.5">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
+                                  isDone ? 'bg-emerald-500/20' : 
                                   isActive ? 'bg-foreground' : 
                                   'bg-muted'
                                 }`}>
                                   {isDone ? (
-                                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                    </svg>
+                                    <Check className="w-3.5 h-3.5 text-emerald-600" />
                                   ) : isActive ? (
-                                    <Loader2 className="w-4 h-4 text-background animate-spin" />
+                                    <Loader2 className="w-3.5 h-3.5 text-background animate-spin" />
                                   ) : (
-                                    <StepIcon className="w-4 h-4 text-muted-foreground" />
+                                    <StepIcon className="w-3.5 h-3.5 text-muted-foreground" />
                                   )}
                                 </div>
-                                <span className={`text-sm font-medium ${
-                                  isDone ? 'text-green-600' : 
+                                <span className={`text-xs font-medium ${
+                                  isDone ? 'text-emerald-600' : 
                                   isActive ? 'text-foreground' : 
                                   'text-muted-foreground'
                                 }`}>
@@ -2612,53 +2651,41 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                       {/* Completed: Sections Ajuster + Régénérer */}
                       {isCompleted && generatedClip && (
                         <div className="mt-auto pt-3 space-y-3">
-                          {/* Section AJUSTER (gratuit) */}
-                          <div className="p-3 rounded-lg border border-border bg-muted/30">
-                            <div className="flex items-center gap-2 mb-3">
-                              <Scissors className="w-4 h-4 text-muted-foreground" />
-                              <span className="text-sm font-medium">Ajuster ce clip</span>
-                              <Badge variant="outline" className="text-xs ml-auto">gratuit</Badge>
-                            </div>
-                            
-                            {/* Bouton Analyser (si pas de transcription pour CE clip) */}
-                            {(() => {
-                              const clipKey = getClipKey(generatedClip)
-                              // Afficher le bouton seulement si :
-                              // 1. Pas de transcription avec speech_start
-                              // 2. On a une clé valide (id ou temp)
-                              // 3. Le clip a un vrai ID (pour pouvoir sauvegarder en BDD)
-                              if (generatedClip?.transcription?.speech_start || !generatedClip?.id) return null
-                              return (
+                          {/* Section Ajustements */}
+                          <div className="rounded-xl border border-slate-200/60 dark:border-slate-700/40 bg-gradient-to-br from-white to-slate-50/50 dark:from-slate-800/30 dark:to-slate-900/20 shadow-sm overflow-hidden">
+                            <div className="px-3 py-2.5 bg-slate-100/50 dark:bg-slate-800/30 border-b border-slate-200/40 dark:border-slate-700/30 flex items-center gap-2">
+                              <Scissors className="w-3.5 h-3.5 text-muted-foreground" />
+                              <span className="text-xs font-medium">Ajustements</span>
+                              {/* Bouton Auto-détecter - toujours visible */}
+                              {generatedClip?.id && (
                                 <button
                                   onClick={() => analyzeClip(generatedClip.id)}
-                                  disabled={analyzingClips.has(clipKey)}
-                                  className="w-full mb-3 px-3 py-2 text-xs rounded-lg border border-dashed border-primary/50 bg-primary/5 hover:bg-primary/10 transition-colors flex items-center justify-center gap-2 text-primary disabled:opacity-50"
+                                  disabled={analyzingClips.has(getClipKey(generatedClip))}
+                                  className="ml-auto px-2 py-1 text-[10px] font-medium text-foreground bg-foreground/5 hover:bg-foreground/10 rounded-md flex items-center gap-1 transition-colors disabled:opacity-50"
                                 >
-                                  {analyzingClips.has(clipKey) ? (
-                                    <>
-                                      <Loader2 className="w-3 h-3 animate-spin" />
-                                      Analyse en cours...
-                                    </>
+                                  {analyzingClips.has(getClipKey(generatedClip)) ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
                                   ) : (
                                     <>
                                       <Sparkles className="w-3 h-3" />
-                                      Auto-détecter trim & vitesse
+                                      Auto
                                     </>
                                   )}
                                 </button>
-                              )
-                            })()}
+                              )}
+                            </div>
+                            <div className="p-3 space-y-3">
                             
-                            {/* Trim Slider - utilise la durée de la vidéo GÉNÉRÉE */}
+                            {/* Trim Slider */}
                             {(() => {
                               const clipKey = getClipKey(generatedClip)
                               const videoDuration = generatedClip?.video?.duration || clip.video.duration
                               const adj = clipKey ? adjustments[clipKey] : undefined
                               return (
-                                <div className="mb-3">
-                                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                                    <span>Trim</span>
-                                    <span>
+                                <div>
+                                  <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1.5">
+                                    <span className="font-medium">Trim</span>
+                                    <span className="tabular-nums">
                                       {adj?.trimStart?.toFixed(2) || '0.00'}s → {adj?.trimEnd?.toFixed(2) || videoDuration.toFixed(2)}s
                                     </span>
                                   </div>
@@ -2686,73 +2713,79 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                               const clipKey = getClipKey(generatedClip)
                               const adj = clipKey ? adjustments[clipKey] : undefined
                               return (
-                                <div className="mb-3">
-                                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                                    <Gauge className="w-3 h-3" />
-                                    <span>Vitesse</span>
-                                    {/* Indicateur de débit de parole */}
-                                    {generatedClip?.transcription?.words_per_second && (
-                                      <span className={`ml-auto px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                        generatedClip.transcription.words_per_second < 2.5 
-                                          ? 'bg-orange-500/20 text-orange-600' 
-                                          : generatedClip.transcription.words_per_second > 4.0 
-                                            ? 'bg-blue-500/20 text-blue-600'
-                                            : 'bg-green-500/20 text-green-600'
-                                      }`}>
-                                        {generatedClip.transcription.words_per_second.toFixed(1)} mots/s
-                                        {generatedClip.transcription.words_per_second < 2.5 && ' (lent)'}
-                                        {generatedClip.transcription.words_per_second > 4.0 && ' (rapide)'}
-                                      </span>
-                                    )}
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[11px] font-medium text-muted-foreground">Vitesse</span>
+                                    <div className="flex items-center bg-muted/50 rounded-lg p-0.5">
+                                      {SPEED_OPTIONS.map((opt) => {
+                                        const isSuggested = generatedClip?.transcription?.suggested_speed === opt.value
+                                        const isSelected = (adj?.speed || 1.0) === opt.value
+                                        const saveKey = generatedClip?.id || clipKey
+                                        return (
+                                          <button
+                                            key={opt.value}
+                                            onClick={() => saveKey && updateAdjustment(saveKey, { speed: opt.value })}
+                                            className={`px-2.5 py-1 text-[11px] rounded-md transition-all relative ${
+                                              isSelected
+                                                ? 'bg-foreground text-background font-semibold shadow-sm'
+                                                : isSuggested
+                                                  ? 'text-primary font-medium hover:bg-muted'
+                                                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                                            }`}
+                                          >
+                                            {opt.label}
+                                            {isSuggested && !isSelected && (
+                                              <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-primary rounded-full" />
+                                            )}
+                                          </button>
+                                        )
+                                      })}
+                                    </div>
                                   </div>
-                                  <div className="flex items-center gap-1">
-                                    {SPEED_OPTIONS.map((opt) => {
-                                      const isSuggested = generatedClip?.transcription?.suggested_speed === opt.value
-                                      const isSelected = (adj?.speed || 1.0) === opt.value
-                                      const saveKey = generatedClip?.id || clipKey
-                                      return (
-                                        <button
-                                          key={opt.value}
-                                          onClick={() => saveKey && updateAdjustment(saveKey, { speed: opt.value })}
-                                          className={`px-2 py-1 text-xs rounded-md transition-colors relative ${
-                                            isSelected
-                                              ? 'bg-foreground text-background font-medium'
-                                              : isSuggested
-                                                ? 'bg-primary/20 ring-1 ring-primary/50 hover:bg-primary/30'
-                                                : 'bg-muted hover:bg-muted/80'
-                                          }`}
-                                        >
-                                          {opt.label}
-                                          {isSuggested && !isSelected && (
-                                            <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />
-                                          )}
-                                        </button>
-                                      )
-                                    })}
-                                  </div>
+                                  {/* Indicateur débit dynamique (syllabes/seconde) */}
+                                  {(() => {
+                                    // Calculer le débit en temps réel avec les ajustements actuels
+                                    const scriptText = generatedClip?.script?.text || clip.script?.text || ''
+                                    const trimStart = adj?.trimStart || 0
+                                    const trimEnd = adj?.trimEnd || (generatedClip?.video?.duration || clip.video?.duration || 6)
+                                    const speed = adj?.speed || 1.0
+                                    
+                                    if (!scriptText) return null
+                                    
+                                    const syllablesPerSecond = calculateSyllablesPerSecond(scriptText, trimStart, trimEnd, speed)
+                                    
+                                    if (syllablesPerSecond <= 0) return null
+                                    
+                                    // Seuils pour UGC TikTok DYNAMIQUE (débit rapide requis)
+                                    // < 5 s/s = trop lent, ennuyeux
+                                    // 5-7 s/s = bon rythme UGC
+                                    // > 7 s/s = très dynamique, excellent pour TikTok
+                                    const isSlow = syllablesPerSecond < 5
+                                    const isFast = syllablesPerSecond > 7
+                                    
+                                    const badgeConfig = isSlow 
+                                      ? { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-600 dark:text-orange-400', label: 'Lent', icon: '🐢' }
+                                      : isFast 
+                                        ? { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-600 dark:text-blue-400', label: 'Dynamique', icon: '⚡' }
+                                        : { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-600 dark:text-emerald-400', label: 'Bon', icon: '✓' }
+                                    
+                                    return (
+                                      <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full ${badgeConfig.bg}`}>
+                                        <span className="text-[9px]">{badgeConfig.icon}</span>
+                                        <span className={`text-[10px] font-semibold tabular-nums ${badgeConfig.text}`}>
+                                          {syllablesPerSecond.toFixed(1)}
+                                        </span>
+                                        <span className={`text-[9px] font-medium ${badgeConfig.text}`}>
+                                          {badgeConfig.label}
+                                        </span>
+                                      </div>
+                                    )
+                                  })()}
                                 </div>
                               )
                             })()}
                             
-                            {/* Durée ajustée */}
-                            {(() => {
-                              const clipKey = getClipKey(generatedClip)
-                              const videoDuration = generatedClip?.video?.duration || clip.video.duration
-                              const adj = clipKey ? adjustments[clipKey] : undefined
-                              if (!adj) return null
-                              return (
-                                <div className="text-xs text-muted-foreground mb-3">
-                                  Durée finale : {calculateAdjustedDuration(
-                                    videoDuration,
-                                    adj.trimStart,
-                                    adj.trimEnd,
-                                    adj.speed
-                                  ).toFixed(2)}s
-                                </div>
-                              )
-                            })()}
-                            
-                            {/* Reset Button - seulement si modifié */}
+                            {/* Durée + Reset */}
                             {(() => {
                               const clipKey = getClipKey(generatedClip)
                               const videoDuration = generatedClip?.video?.duration || clip.video.duration
@@ -2762,65 +2795,72 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                 adj.trimEnd !== videoDuration ||
                                 adj.speed !== 1.0
                               )
-                              // Reset nécessite un vrai ID pour sauvegarder en BDD
-                              if (!isModified || !generatedClip?.id) return null
+                              if (!adj) return null
                               return (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 text-xs rounded-lg text-muted-foreground"
-                                  onClick={() => resetAdjustments(generatedClip.id)}
-                                >
-                                  <RefreshCw className="w-3 h-3 mr-1" />
-                                  Reset
-                              </Button>
+                                <div className="flex items-center justify-between pt-2 border-t border-border/30">
+                                  <span className="text-[11px] text-muted-foreground">
+                                    Durée finale : <span className="font-semibold text-foreground tabular-nums">{calculateAdjustedDuration(
+                                      videoDuration,
+                                      adj.trimStart,
+                                      adj.trimEnd,
+                                      adj.speed
+                                    ).toFixed(2)}s</span>
+                                  </span>
+                                  {isModified && generatedClip?.id && (
+                                    <button
+                                      onClick={() => resetAdjustments(generatedClip.id)}
+                                      className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                                    >
+                                      <RefreshCw className="w-3 h-3" />
+                                      Reset
+                                    </button>
+                                  )}
+                                </div>
                               )
                             })()}
+                            </div>
                           </div>
                           
-                          {/* Section RÉGÉNÉRER (coûteux) */}
-                          <div className="p-3 rounded-lg border border-orange-500/30 bg-orange-500/5">
-                            <div className="flex items-center gap-2 mb-2">
-                              <RefreshCw className="w-4 h-4 text-orange-500" />
-                              <span className="text-sm font-medium text-orange-600">Régénérer</span>
-                              <Badge variant="outline" className="text-xs ml-auto border-orange-500/50 text-orange-600">~1-2€</Badge>
+                          {/* Section RÉGÉNÉRER (coûteux) - design amélioré */}
+                          <div className="rounded-xl border border-orange-200/40 dark:border-orange-900/30 bg-gradient-to-br from-orange-50/50 to-amber-50/30 dark:from-orange-950/20 dark:to-amber-950/10 shadow-sm overflow-hidden">
+                            <div className="px-3 py-2 bg-orange-100/30 dark:bg-orange-900/20 border-b border-orange-200/30 dark:border-orange-800/20 flex items-center gap-2">
+                              <RefreshCw className="w-3.5 h-3.5 text-orange-600/70" />
+                              <span className="text-xs font-medium text-orange-700 dark:text-orange-400">Régénérer</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                className="h-8 text-xs rounded-lg border-orange-500/40 text-orange-600 hover:bg-orange-50 hover:border-orange-500"
+                            <div className="p-2.5 flex items-center gap-2">
+                              <button 
                                 onClick={() => askRegenerate(clip.order, 'video')}
                                 disabled={isClipRegenerating(`clip-${clip.order}`)}
+                                className="flex-1 flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-xl bg-white/60 dark:bg-slate-800/40 border border-orange-200/50 dark:border-orange-800/30 hover:border-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:shadow-sm transition-all disabled:opacity-50 disabled:pointer-events-none group"
                               >
-                                <Video className="w-3 h-3 mr-1" />
-                                Vidéo
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                className="h-8 text-xs rounded-lg"
+                                <Video className="w-4 h-4 text-orange-500/70 group-hover:text-orange-600 transition-colors" />
+                                <span className="text-xs font-medium text-slate-600 dark:text-slate-300 group-hover:text-orange-700">Vidéo</span>
+                                <span className="text-[10px] text-slate-400">~150 cr</span>
+                              </button>
+                              <button 
                                 onClick={() => askRegenerate(clip.order, 'voice')}
                                 disabled={isClipRegenerating(`clip-${clip.order}`)}
+                                className="flex-1 flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-xl bg-white/60 dark:bg-slate-800/40 border border-orange-200/50 dark:border-orange-800/30 hover:border-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 hover:shadow-sm transition-all disabled:opacity-50 disabled:pointer-events-none group"
                               >
-                                <Mic className="w-3 h-3 mr-1" />
-                                Voix
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                className="h-8 text-xs rounded-lg"
+                                <Mic className="w-4 h-4 text-violet-500/70 group-hover:text-violet-600 transition-colors" />
+                                <span className="text-xs font-medium text-slate-600 dark:text-slate-300 group-hover:text-violet-700">Voix</span>
+                                <span className="text-[10px] text-slate-400">20 cr</span>
+                              </button>
+                              <button 
                                 onClick={() => askRegenerate(clip.order, 'ambient')}
                                 disabled={isClipRegenerating(`clip-${clip.order}`)}
+                                className="flex-1 flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-xl bg-white/60 dark:bg-slate-800/40 border border-orange-200/50 dark:border-orange-800/30 hover:border-fuchsia-400 hover:bg-fuchsia-50 dark:hover:bg-fuchsia-900/20 hover:shadow-sm transition-all disabled:opacity-50 disabled:pointer-events-none group"
                               >
-                                <Music className="w-3 h-3 mr-1" />
-                                Ambiance
-                              </Button>
+                                <Music className="w-4 h-4 text-fuchsia-500/70 group-hover:text-fuchsia-600 transition-colors" />
+                                <span className="text-xs font-medium text-slate-600 dark:text-slate-300 group-hover:text-fuchsia-700">Ambiance</span>
+                                <span className="text-[10px] text-slate-400">15 cr</span>
+                              </button>
                             </div>
                           </div>
                         </div>
                       )}
                     </div>
+                  </div>
                 </div>
               )
             })}
