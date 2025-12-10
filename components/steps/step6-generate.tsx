@@ -29,6 +29,24 @@ const ASSEMBLY_MESSAGES = [
   "Finalisation de l'assemblage...",
 ]
 
+// Helper: un seul clip par beat (is_selected prioritaire, sinon le plus récent)
+function getPrimaryClips(clips: CampaignClip[] = []): CampaignClip[] {
+  const byBeat = new Map<number, CampaignClip[]>()
+  clips.forEach(c => {
+    const list = byBeat.get(c.order) || []
+    list.push(c)
+    byBeat.set(c.order, list)
+  })
+  return Array.from(byBeat.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([_, list]) => {
+      const selected = list.find(c => c.is_selected)
+      if (selected) return selected
+      return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+    })
+    .filter(Boolean) as CampaignClip[]
+}
+
 // Composant Modale d'assemblage
 function AssemblyModal({ isOpen, clipCount }: { isOpen: boolean; clipCount: number }) {
   const [messageIndex, setMessageIndex] = useState(0)
@@ -1480,8 +1498,11 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   const handleStartGeneration = async () => {
     if (!actor || !preset || clips.length === 0) return
 
-    // Enrichir les clips avec les first frames générées à l'étape Plan
-    const clipsWithFirstFrames = clips.map((clip, index) => {
+    // Un seul clip par beat : sélectionné prioritaire, sinon plus récent
+    const primaryClips = getPrimaryClips(clips)
+
+    // Enrichir avec les first frames générées à l'étape Plan (indexées par beat)
+    const clipsWithFirstFrames = primaryClips.map((clip, index) => {
       const generatedFrame = state.generated_first_frames?.[index]
       if (generatedFrame?.url) {
         return {
@@ -1495,7 +1516,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       return clip
     })
 
-    // Filtrer les clips qui n'ont pas encore de vidéo générée
+    // Filtrer les clips qui n'ont pas encore de vidéo générée (une vidéo par beat)
     const clipsWithoutVideo = clipsWithFirstFrames.filter(c => !c.video?.raw_url)
     const clipsToGenerate = clipsWithoutVideo
 
@@ -1569,7 +1590,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       dbCampaignId || `temp-${Date.now()}`,
       preset.ambient_audio.prompt,
       preset.id,
-      videoQuality
+      videoQuality,
+      state.product
     )
 
     // Marquer qu'on a de nouveaux clips générés (pour déclencher la sauvegarde)
@@ -1673,7 +1695,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       preset.ambient_audio.prompt,
       what,
       preset.id,
-      videoQuality
+      videoQuality,
+      state.product
     )
 
     if (result) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
 import { NewCampaignState, CampaignClip, CampaignBrief, Actor } from '@/types'
@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
-import { ArrowLeft, ArrowRight, RefreshCw, Sparkles, Clock, Film, ImageIcon, Pencil, Check, X, Loader2, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, ArrowRight, RefreshCw, Sparkles, Clock, Film, ImageIcon, Pencil, Check, X, Loader2, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react'
 
 // Type for first frame generation status
 interface FirstFrameStatus {
@@ -323,6 +323,8 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
   const [presetLoading, setPresetLoading] = useState(true)
   const [firstFrames, setFirstFrames] = useState<FirstFrameStatus>({})
   const [generatingFrames, setGeneratingFrames] = useState(false)
+  // Index de frame affichée par beat (carousel)
+  const [displayedFrameIndex, setDisplayedFrameIndex] = useState<Record<number, number>>({})
   const [hasRestoredFirstFrames, setHasRestoredFirstFrames] = useState(false)
   
   // Crédits insuffisants
@@ -387,6 +389,85 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
     }
   }, [state.generated_clips, state.generated_first_frames, clips.length, hasRestoredClips, setClips, state.campaign_id])
 
+  // Une seule tuile par beat : clip sélectionné prioritaire, sinon le plus récent
+  const displayClips = useMemo(() => {
+    const byOrder = new Map<number, CampaignClip[]>()
+    clips.forEach(c => {
+      const list = byOrder.get(c.order) || []
+      list.push(c)
+      byOrder.set(c.order, list)
+    })
+    return Array.from(byOrder.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([_, list]) => {
+        const selected = list.find(c => c.is_selected)
+        if (selected) return selected
+        return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+      })
+      .filter(Boolean) as CampaignClip[]
+  }, [clips])
+
+  // Normaliser firstFrames pour n'avoir qu'une entrée par tuile affichée
+  useEffect(() => {
+    if (displayClips.length === 0) return
+
+    const normalized: FirstFrameStatus = {}
+    displayClips.forEach((clip, idx) => {
+      const direct = firstFrames[idx]
+      if (direct) {
+        normalized[idx] = direct
+        return
+      }
+      // Chercher une frame qui correspond au même order dans le reste de firstFrames
+      const foundEntry = Object.entries(firstFrames).find(([i, frame]) => {
+        const sourceClip = clips[parseInt(i)]
+        return sourceClip?.order === clip.order && (frame.url || frame.loading || frame.error)
+      })
+      if (foundEntry) {
+        normalized[idx] = foundEntry[1]
+      }
+    })
+
+    // Si la normalisation diffère (plus d'entrées que displayClips ou indices décalés), on met à jour
+    const sameLength = Object.keys(normalized).length === Object.keys(firstFrames).length
+    const sameKeys =
+      sameLength &&
+      Object.keys(normalized).every(k => firstFrames[k as unknown as number] !== undefined)
+
+    if (!sameLength || !sameKeys) {
+      setFirstFrames(normalized)
+    }
+  }, [displayClips, clips, firstFrames])
+
+  // Frames disponibles par beat (versions du même beat ayant une first_frame)
+  const framesByBeat = useMemo(() => {
+    const map = new Map<number, string[]>()
+    clips.forEach(c => {
+      if (c.first_frame?.image_url) {
+        const list = map.get(c.order) || []
+        // Éviter doublons exacts
+        if (!list.includes(c.first_frame.image_url)) {
+          list.push(c.first_frame.image_url)
+        }
+        map.set(c.order, list)
+      }
+    })
+    return map
+  }, [clips])
+
+  // Init/normalize index affiché pour chaque beat selon frames disponibles
+  useEffect(() => {
+    if (framesByBeat.size === 0) return
+    setDisplayedFrameIndex(prev => {
+      const next: Record<number, number> = { ...prev }
+      framesByBeat.forEach((list, beat) => {
+        const current = prev[beat] ?? 0
+        next[beat] = list.length === 0 ? 0 : Math.min(current, list.length - 1)
+      })
+      return next
+    })
+  }, [framesByBeat])
+
   // Generate first frame for a single clip
   // invalidateVideo = true quand c'est une régénération manuelle (pas la génération initiale)
   const generateFirstFrame = useCallback(async (clipIndex: number, clip: CampaignClip, previousFrameUrl?: string, invalidateVideo = false) => {
@@ -415,22 +496,27 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
     // Utiliser functional updater pour éviter race conditions
     if (invalidateVideo) {
       setClips(prevClips => {
-        if (!prevClips[clipIndex]?.video?.raw_url) return prevClips
-        const updatedClips = [...prevClips]
-        updatedClips[clipIndex] = {
-          ...updatedClips[clipIndex],
-          video: {
-            ...updatedClips[clipIndex].video,
-            raw_url: undefined,
-            final_url: undefined,
-          },
-          status: 'pending',
-        }
-        return updatedClips
+        if (!clip.id) return prevClips
+        return prevClips.map(c => {
+          if (c.id !== clip.id) return c
+          if (!c.video?.raw_url) return c
+          return {
+            ...c,
+            video: {
+              ...c.video,
+              raw_url: undefined,
+              final_url: undefined,
+            },
+            status: 'pending',
+          }
+        })
       })
     }
 
     try {
+      const productImageUrl = state.product?.image_url
+      const isHttpImage = productImageUrl?.startsWith('http')
+
       const response = await fetch('/api/generate/first-frame', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -439,6 +525,10 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
           prompt: clip.first_frame.prompt,
           previousFrameUrl, // Utiliser l'image du clip précédent pour continuité
           actorId: actor.id, // Pour le cache des assets
+          productImageUrl: isHttpImage ? productImageUrl : undefined,
+          holdingType: state.product?.holding_type,
+          beat: clip.beat,
+          order: clip.order,
         }),
       })
 
@@ -499,50 +589,83 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
     }
   }, [actor, setClips])
 
+  // Sélection manuelle d'une frame existante (autre version du même beat)
+  const handleSelectExistingFrame = useCallback((displayIndex: number, url: string) => {
+    setFirstFrames(prev => ({
+      ...prev,
+      [displayIndex]: { loading: false, url },
+    }))
+
+    // Mettre à jour l'index affiché pour ce beat (calculé via displayClips)
+    const beat = displayClips[displayIndex]?.order
+    if (beat !== undefined) {
+      const list = framesByBeat.get(beat) || []
+      const idx = list.findIndex(f => f === url)
+      if (idx >= 0) {
+        setDisplayedFrameIndex(prev => ({ ...prev, [beat]: idx }))
+      }
+    }
+  }, [displayClips, framesByBeat])
+
+  const navigateFrame = useCallback((beat: number, direction: 'prev' | 'next') => {
+    const list = framesByBeat.get(beat) || []
+    if (list.length <= 1) return
+    const current = displayedFrameIndex[beat] ?? 0
+    const nextIndex = direction === 'prev'
+      ? (current > 0 ? current - 1 : list.length - 1)
+      : (current < list.length - 1 ? current + 1 : 0)
+    setDisplayedFrameIndex(prev => ({ ...prev, [beat]: nextIndex }))
+
+    // Mettre à jour la frame sélectionnée pour le beat (persistance)
+    const selectedUrl = list[nextIndex]
+    const displayIndex = displayClips.findIndex(c => c.order === beat)
+    if (displayIndex >= 0 && selectedUrl) {
+      setFirstFrames(prev => ({
+        ...prev,
+        [displayIndex]: { loading: false, url: selectedUrl },
+      }))
+    }
+  }, [displayedFrameIndex, framesByBeat, displayClips])
+
   // Generate all first frames after plan is ready (séquentiel avec chaînage)
   const generateAllFirstFrames = useCallback(async () => {
-    if (!actor?.soul_image_url || clips.length === 0 || generatingFrames || hasInsufficientCredits) return
+    if (!actor?.soul_image_url || displayClips.length === 0 || generatingFrames || hasInsufficientCredits) return
     
     setGeneratingFrames(true)
     
     let previousUrl: string | undefined = undefined
     
-    for (let i = 0; i < clips.length; i++) {
-      // Arrêter si on a détecté un problème de crédits
+    for (let i = 0; i < displayClips.length; i++) {
       if (hasInsufficientCredits) {
         console.log('[Step5] Stopping frame generation - insufficient credits')
         break
       }
       
-      // Vérifier si ce clip a déjà une image générée
+      const clip = displayClips[i]
       const existingFrame = firstFrames[i]
       if (existingFrame?.url) {
-        // Utiliser l'image existante comme référence pour le prochain clip
         previousUrl = existingFrame.url
         continue
       }
       
-      // Passer l'URL du clip précédent pour continuité visuelle
-      const generatedUrl = await generateFirstFrame(i, clips[i], previousUrl)
+      const generatedUrl = await generateFirstFrame(i, clip, previousUrl)
       
-      // Si la génération a échoué par manque de crédits, arrêter
       if (!generatedUrl && hasInsufficientCredits) {
         console.log('[Step5] First frame failed due to credits, stopping')
         break
       }
       
-      // Utiliser cette URL comme référence pour le prochain clip
       if (generatedUrl) {
         previousUrl = generatedUrl
       }
       
-      if (i < clips.length - 1) {
+      if (i < displayClips.length - 1) {
         await new Promise(resolve => setTimeout(resolve, 500)) // Réduit car déjà séquentiel
       }
     }
     
     setGeneratingFrames(false)
-  }, [actor, clips, generatingFrames, generateFirstFrame, firstFrames, hasInsufficientCredits])
+  }, [actor, displayClips, generatingFrames, generateFirstFrame, firstFrames, hasInsufficientCredits])
 
   // Auto-generate first frames when clips are ready (seulement si toutes les images ne sont pas déjà là)
   useEffect(() => {
@@ -560,12 +683,12 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
     }
     
     const existingFrameCount = Object.values(firstFrames).filter(f => f.url).length
-    const needsGeneration = clips.length > 0 && existingFrameCount < clips.length
+    const needsGeneration = displayClips.length > 0 && existingFrameCount < displayClips.length
     
     if (needsGeneration && actor && !generatingFrames) {
       generateAllFirstFrames()
     }
-  }, [clips, actor, firstFrames, generatingFrames, generateAllFirstFrames, hasInsufficientCredits, hasRestoredClips, hasRestoredFirstFrames, state.generated_first_frames, state.generated_clips])
+  }, [displayClips.length, actor, firstFrames, generatingFrames, generateAllFirstFrames, hasInsufficientCredits, hasRestoredClips, hasRestoredFirstFrames, state.generated_first_frames, state.generated_clips])
 
   // Sauvegarder les first frames dans le state parent pour persistance
   useEffect(() => {
@@ -1013,7 +1136,7 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
   }
 
   const handleContinue = () => {
-    if (clips.length > 0) {
+    if (displayClips.length > 0) {
       onNext()
     }
   }
@@ -1024,7 +1147,7 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
     handleGeneratePlan()
   }
 
-  const totalDuration = clips.reduce((sum, c) => sum + c.video.duration, 0)
+  const totalDuration = displayClips.reduce((sum, c) => sum + c.video.duration, 0)
   const generatedFrames = Object.values(firstFrames).filter(f => f.url).length
 
   // Helper pour vérifier si le script est trop long
@@ -1099,14 +1222,14 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
       )}
 
       {/* Clips preview */}
-      {!loading && clips.length > 0 && (
+      {!loading && displayClips.length > 0 && (
         <div className="space-y-6">
           {/* Summary bar */}
           <div className="flex items-center justify-between p-4 bg-foreground text-background rounded-2xl">
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">
                 <Film className="w-4 h-4" />
-                <span className="font-medium">{clips.length} clips</span>
+                <span className="font-medium">{displayClips.length} clips</span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4" />
@@ -1120,8 +1243,8 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
                     Génération...
                   </span>
                 ) : (
-                  <span className={generatedFrames === clips.length ? 'text-emerald-300' : ''}>
-                    {generatedFrames}/{clips.length} images
+                  <span className={generatedFrames === displayClips.length ? 'text-emerald-300' : ''}>
+                    {generatedFrames}/{displayClips.length} images
                   </span>
                 )}
               </div>
@@ -1152,9 +1275,9 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
             </div>
           </div>
 
-          {/* Clips list */}
+          {/* Clips list - une tuile par beat (clip sélectionné ou plus récent) */}
           <div className="space-y-4">
-            {clips.map((clip, index) => (
+            {displayClips.map((clip, index) => (
               <Card 
                 key={clip.id || index} 
                 className="rounded-2xl border-border p-0 gap-0 overflow-hidden hover:shadow-lg transition-shadow"
@@ -1168,53 +1291,96 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
                           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                           <span className="text-[10px] text-muted-foreground mt-2">Génération...</span>
                         </div>
-                      ) : firstFrames[index]?.url ? (
-                        <img 
-                          src={firstFrames[index].url} 
-                          alt={`Clip ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : firstFrames[index]?.error ? (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted p-2">
-                          <span className="text-[10px] text-destructive text-center">{firstFrames[index].error}</span>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="mt-2 h-6 text-[10px]"
-                            onClick={() => generateFirstFrame(index, clip, index > 0 ? firstFrames[index - 1]?.url : undefined, true)}
-                          >
-                            Réessayer
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center bg-muted">
-                          <span className="text-3xl">{BEAT_EMOJIS[clip.beat]}</span>
-                        </div>
-                      )}
+                      ) : (() => {
+                        const beat = clip.order
+                        const frameList = framesByBeat.get(beat) || []
+                        const selectedIdx = displayedFrameIndex[beat] ?? 0
+                        const selectedUrl = frameList[selectedIdx] || firstFrames[index]?.url
+
+                        if (selectedUrl) {
+                          return (
+                            <img 
+                              src={selectedUrl} 
+                              alt={`Clip ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          )
+                        }
+
+                        if (firstFrames[index]?.error) {
+                          return (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted p-2">
+                              <span className="text-[10px] text-destructive text-center">{firstFrames[index].error}</span>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="mt-2 h-6 text-[10px]"
+                                onClick={() => generateFirstFrame(index, clip, index > 0 ? firstFrames[index - 1]?.url : undefined, true)}
+                              >
+                                Réessayer
+                              </Button>
+                            </div>
+                          )
+                        }
+
+                        return (
+                          <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                            <span className="text-3xl">{BEAT_EMOJIS[clip.beat]}</span>
+                          </div>
+                        )
+                      })()}
                     </div>
-                    {/* Regenerate button overlay */}
-                    {firstFrames[index]?.url && (() => {
-                      // Compter les frames suivantes déjà générées
-                      const followingFramesCount = Object.entries(firstFrames)
-                        .filter(([i, f]) => parseInt(i) > index && f.url)
-                        .length
-                      
+                    {/* Carousel overlay for first frames */}
+                    {(() => {
+                      const beat = clip.order
+                      const frameList = framesByBeat.get(beat) || []
+                      const selectedIdx = displayedFrameIndex[beat] ?? 0
+                      const countLabel = frameList.length > 1 ? `${selectedIdx + 1}/${frameList.length}` : undefined
+                      const showNav = frameList.length > 1
+
                       return (
-                        <div className="absolute bottom-2 left-2 right-2 space-y-1">
-                          {followingFramesCount > 0 && (
-                            <div className="text-[9px] text-amber-200 bg-black/60 rounded px-1.5 py-0.5 text-center backdrop-blur-sm">
-                              {followingFramesCount} image{followingFramesCount > 1 ? 's' : ''} après
+                        <div className="absolute inset-0 pointer-events-none">
+                          {/* Badge */}
+                          {countLabel && (
+                            <div className="absolute top-2 left-2 text-[10px] text-white bg-black/70 rounded px-2 py-1 pointer-events-none">
+                              {countLabel}
                             </div>
                           )}
-                          <Button 
-                            variant="secondary" 
-                            size="sm" 
-                            className="w-full h-7 text-[10px] bg-background/80 hover:bg-background backdrop-blur-sm rounded-lg"
-                            onClick={() => generateFirstFrame(index, clip, index > 0 ? firstFrames[index - 1]?.url : undefined, true)}
-                          >
-                            <RefreshCw className="w-3 h-3 mr-1" />
-                            Regénérer
-                          </Button>
+
+                          {/* Prev */}
+                          {showNav && (
+                            <button
+                              className="pointer-events-auto h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition shadow-md absolute top-1/2 -translate-y-1/2 left-2"
+                              onClick={() => navigateFrame(beat, 'prev')}
+                              aria-label="Frame précédente"
+                            >
+                              <ChevronLeft className="w-4 h-4" />
+                            </button>
+                          )}
+
+                          {/* Next */}
+                          {showNav && (
+                            <button
+                              className="pointer-events-auto h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition shadow-md absolute top-1/2 -translate-y-1/2 right-2"
+                              onClick={() => navigateFrame(beat, 'next')}
+                              aria-label="Frame suivante"
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          )}
+
+                          {/* Bottom actions */}
+                          <div className="pointer-events-auto absolute bottom-2 left-2 right-2 space-y-1">
+                            <Button 
+                              variant="secondary" 
+                              size="sm" 
+                              className="w-full h-7 text-[10px] bg-background/80 hover:bg-background backdrop-blur-sm rounded-lg"
+                              onClick={() => generateFirstFrame(index, clip, index > 0 ? firstFrames[index - 1]?.url : undefined, true)}
+                            >
+                              <RefreshCw className="w-3 h-3 mr-1" />
+                              Regénérer
+                            </Button>
+                          </div>
                         </div>
                       )
                     })()}
@@ -1363,7 +1529,7 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
         </Button>
         <Button
           onClick={handleContinue}
-          disabled={clips.length === 0 || loading || (generatingFrames && !hasInsufficientCredits)}
+          disabled={displayClips.length === 0 || loading || (generatingFrames && !hasInsufficientCredits)}
           className="h-11 px-6 rounded-xl font-medium group"
         >
           {generatingFrames && !hasInsufficientCredits ? (
@@ -1376,9 +1542,9 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
               Continuer sans images
               <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
             </>
-          ) : generatedFrames < clips.length && !hasInsufficientCredits ? (
+          ) : generatedFrames < displayClips.length && !hasInsufficientCredits ? (
             <>
-              Images {generatedFrames}/{clips.length}
+              Images {generatedFrames}/{displayClips.length}
               <Loader2 className="w-4 h-4 ml-2 animate-spin" />
             </>
           ) : (
@@ -1397,7 +1563,7 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
           onClose={() => setShowUpgradeModal(false)}
           requiredCredits={creditsNeeded?.required}
           currentBalance={creditsNeeded?.current}
-          clipCount={clips.length}
+          clipCount={displayClips.length}
           onSuccess={() => {
             setShowUpgradeModal(false)
             setHasInsufficientCredits(false)

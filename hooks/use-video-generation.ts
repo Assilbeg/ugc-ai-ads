@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
-import { CampaignClip, ClipStatus, Actor } from '@/types'
+import { CampaignClip, ClipStatus, Actor, ProductConfig } from '@/types'
 
 export interface GenerationProgress {
   clipId: string
@@ -46,7 +46,8 @@ export function useVideoGeneration() {
     campaignId: string,
     ambientPrompt: string,
     presetId?: string,
-    videoQuality: VideoQuality = 'standard'
+    videoQuality: VideoQuality = 'standard',
+    product?: ProductConfig
   ): Promise<CampaignClip | null> => {
     // FIX: Toujours utiliser clip.order comme clé (pas clip.id)
     // Car dans l'UI, on itère sur uniqueBeats (clips du plan) mais on régénère 
@@ -77,6 +78,9 @@ export function useVideoGeneration() {
         const intentionMedia = presetId ? actor.intention_media?.[presetId] : undefined
         const intentionImageUrl = intentionMedia && typeof intentionMedia === 'object' ? intentionMedia.image_url : undefined
         
+        const productImageUrl = product?.image_url
+        const isHttpImage = productImageUrl?.startsWith('http')
+
         const frameResponse = await fetch('/api/generate/first-frame', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -86,6 +90,10 @@ export function useVideoGeneration() {
             presetId: presetId,
             intentionImageUrl: intentionImageUrl,
             actorId: actor.id,
+            productImageUrl: isHttpImage ? productImageUrl : undefined,
+            holdingType: product?.holding_type,
+            beat: clip.beat,
+            order: clip.order,
           }),
           signal: abortControllerRef.current?.signal,
         })
@@ -478,7 +486,8 @@ export function useVideoGeneration() {
     what: RegenerateWhat,
     ambientPrompt: string,
     presetId?: string,
-    videoQuality: VideoQuality = 'standard'
+    videoQuality: VideoQuality = 'standard',
+    product?: ProductConfig
   ): Promise<CampaignClip | null> => {
     // FIX: Toujours utiliser clip.order comme clé (pas clip.id)
     // Car dans l'UI, on itère sur uniqueBeats (clips du plan) mais on régénère 
@@ -501,6 +510,9 @@ export function useVideoGeneration() {
         
         const intentionMedia = presetId ? actor.intention_media?.[presetId] : undefined
         const intentionImageUrl = intentionMedia && typeof intentionMedia === 'object' ? intentionMedia.image_url : undefined
+        const productImageUrl = product?.image_url
+        const isHttpImage = productImageUrl?.startsWith('http')
+
         const frameResponse = await fetch('/api/generate/first-frame', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -511,6 +523,10 @@ export function useVideoGeneration() {
             intentionImageUrl,
             actorId: actor.id,
             skipCache: true, // Forcer régénération
+            productImageUrl: isHttpImage ? productImageUrl : undefined,
+            holdingType: product?.holding_type,
+            beat: clip.beat,
+            order: clip.order,
           }),
           signal: abortControllerRef.current?.signal,
         })
@@ -842,7 +858,8 @@ export function useVideoGeneration() {
     campaignId: string,
     ambientPrompt: string,
     presetId?: string,
-    videoQuality: VideoQuality = 'standard'
+    videoQuality: VideoQuality = 'standard',
+    product?: ProductConfig
   ): Promise<CampaignClip[]> => {
     setGenerating(true)
     setError(null)
@@ -850,7 +867,7 @@ export function useVideoGeneration() {
 
     // Génération parallèle de tous les clips
     const promises = clips.map(clip => 
-      generateClipAssets(clip, actor, campaignId, ambientPrompt, presetId, videoQuality)
+      generateClipAssets(clip, actor, campaignId, ambientPrompt, presetId, videoQuality, product)
         .then(result => result || { 
           ...clip, 
           status: 'failed' as const,
@@ -875,7 +892,8 @@ export function useVideoGeneration() {
     ambientPrompt: string,
     what: RegenerateWhat,
     presetId?: string,
-    videoQuality: VideoQuality = 'standard'
+    videoQuality: VideoQuality = 'standard',
+    product?: ProductConfig
   ): Promise<CampaignClip | null> => {
     // FIX: Toujours utiliser clip.order comme clé (pas clip.id)
     // Car dans l'UI, on itère sur uniqueBeats (clips du plan) mais on régénère 
@@ -895,9 +913,9 @@ export function useVideoGeneration() {
 
     try {
       if (what === 'all') {
-        result = await generateClipAssets(clip, actor, campaignId, ambientPrompt, presetId, videoQuality)
+        result = await generateClipAssets(clip, actor, campaignId, ambientPrompt, presetId, videoQuality, product)
       } else {
-        result = await regenerateAsset(clip, actor, what, ambientPrompt, presetId, videoQuality)
+        result = await regenerateAsset(clip, actor, what, ambientPrompt, presetId, videoQuality, product)
       }
     } finally {
       // Retirer ce clip de la liste des régénérations en cours

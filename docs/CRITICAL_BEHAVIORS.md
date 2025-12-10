@@ -390,10 +390,11 @@ CAS 3 : Voix ✅, Ambiance ✅ (cas nominal)
     → Audio Veo IGNORÉ. Output = voix humaine + ambiance.
 ```
 
-### Architecture Transloadit (Fix 9 déc 2024)
+### Architecture Transloadit (Fix 10 déc 2024)
 
-> **IMPORTANT** : On utilise `/audio/merge` + `/video/encode` en deux étapes car Transloadit
-> ne permet pas de passer plusieurs fichiers audio comme inputs séparés à FFmpeg avec `/video/encode` seul.
+> **IMPORTANT** : `/video/encode` avec `as: 'video'` et `as: 'audio'` **NE REMPLACE PAS l'audio**.
+> FFmpeg ne reçoit qu'un seul fichier d'entrée (la vidéo avec son audio original).
+> Solution : créer une vidéo **muette** d'abord, puis combiner avec l'audio fusionné via `/video/merge`.
 
 ```
 CAS 1 : Voix seule
@@ -407,40 +408,79 @@ CAS 2 : Ambiance seule (garde audio Veo)
 2. /audio/merge : Mixer audio extrait + ambiance
 3. /video/encode : Remplacer par audio fusionné
 
-CAS 3 : Voix + Ambiance (cas nominal)
-═════════════════════════════════════
-1. /audio/merge : Mixer voix + ambiance
-   └── filter_complex: [0:a]volume=1.0...[1:a]volume=0.2...amix
-2. /video/encode : Remplacer audio de la vidéo par l'audio fusionné
+CAS 3 : Voix + Ambiance (cas nominal) - FIX 10 déc 2024
+═══════════════════════════════════════════════════════
+1. /audio/encode : Encoder voix avec volume + padding → voice_encoded
+2. /audio/encode : Encoder ambiance avec volume + padding → ambient_encoded
+3. /audio/merge : Fusionner les deux audios → merge_audio
+4. /video/encode : Créer vidéo MUETTE (sans audio, -an) → video_muted
+5. /video/merge : Combiner vidéo muette + audio fusionné → mixed
 ```
 
 ### Steps Transloadit pour Cas 3 (le plus courant)
 
 ```typescript
-// ÉTAPE 1: Fusionner voix + ambiance
+// ÉTAPE 1: Encoder la voix avec volume + padding
+steps['voice_encoded'] = {
+  robot: '/audio/encode',
+  use: 'import_voice',
+  preset: 'mp3',
+  ffmpeg: {
+    'af': `volume=${voiceVol},apad=pad_dur=${duration}`,
+    'ar': 48000,
+    'ac': 2,
+    't': duration
+  }
+}
+
+// ÉTAPE 2: Encoder l'ambiance avec volume + padding
+steps['ambient_encoded'] = {
+  robot: '/audio/encode',
+  use: 'import_ambient',
+  preset: 'mp3',
+  ffmpeg: {
+    'af': `volume=${ambientVol},apad=pad_dur=${duration}`,
+    'ar': 48000,
+    'ac': 2,
+    't': duration
+  }
+}
+
+// ÉTAPE 3: Fusionner voix + ambiance
 steps['merge_audio'] = {
   robot: '/audio/merge',
   use: {
     steps: [
-      { name: 'import_voice', as: 'audio' },
-      { name: 'import_ambient', as: 'audio' }
+      { name: 'voice_encoded', as: 'audio' },
+      { name: 'ambient_encoded', as: 'audio' }
     ]
   },
   ffmpeg: {
-    'filter_complex': `[0:a]volume=${voiceVol},apad=pad_dur=${duration}[voice];[1:a]volume=${ambientVol},apad=pad_dur=${duration}[ambient];[voice][ambient]amix=inputs=2:duration=first:dropout_transition=2[aout]`,
+    'filter_complex': '[0:a][1:a]amix=inputs=2:duration=first:dropout_transition=2[aout]',
     'map': '[aout]'
   }
 }
 
-// ÉTAPE 2: Remplacer l'audio de la vidéo
-steps['mixed'] = {
+// ÉTAPE 4: Créer vidéo SANS audio
+steps['video_muted'] = {
   robot: '/video/encode',
+  use: 'import_video',
+  ffmpeg: {
+    'an': '',  // Supprimer l'audio
+    'c:v': 'copy'
+  }
+}
+
+// ÉTAPE 5: Combiner vidéo muette + audio fusionné
+steps['mixed'] = {
+  robot: '/video/merge',
   use: {
     steps: [
-      { name: 'import_video', as: 'video' },
+      { name: 'video_muted', as: 'video' },
       { name: 'merge_audio', as: 'audio' }
     ]
-  }
+  },
+  preset: 'ipad-high'
 }
 ```
 
@@ -451,6 +491,8 @@ steps['mixed'] = {
 | `/video/encode` avec 3 inputs | FFmpeg ne reçoit qu'1 fichier → `Invalid file index 1` |
 | `as: 'audio1'`, `as: 'audio2'` | Types invalides, Transloadit attend `audio` |
 | `[1:a]`, `[2:a]` direct | Pas de fichiers d'entrée multiples passés à FFmpeg |
+| `/video/encode` avec `as: 'video'` + `as: 'audio'` | **NE REMPLACE PAS l'audio** (fix 10 déc 2024) |
+| `map: ['0:v:0', '1:a:0']` explicite | `Invalid file index 1` - FFmpeg ne reçoit qu'1 fichier |
 
 ### Règles CRITIQUES
 
@@ -464,8 +506,7 @@ steps['mixed'] = {
 | **`apad=pad_dur=${duration}`** | Assure que l'audio a la bonne durée (évite coupures) |
 | **`duration` DOIT être un nombre** | Défaut à 6 si undefined (fix 9 déc 2024) |
 | **Utiliser /audio/merge pour mixer** | /video/encode seul ne gère pas plusieurs audios |
-| **Passer 2 inputs à /video/encode** | `use: ['import_video','merge_audio']` + map pour garantir la piste audio |
-| **`map` explicite si 2 inputs** | `['0:v:0','1:a:0']` quand on fournit vidéo + audio séparés |
+| **Vidéo muette avant combinaison** | Forcer Transloadit à utiliser l'audio externe (fix 10 déc 2024) |
 | **Pas de fallback silencieux si mix échoue** | Si Transloadit ne renvoie pas `mixed=true` + `videoUrl`, on DOIT échouer (ne jamais réutiliser un ancien `final_url`) |
 
 ### Quand les cas se produisent
@@ -1041,6 +1082,7 @@ const getClipStatus = (clip: CampaignClip): ClipStatus => {
 
 | Date | Commit | Comportement ajouté |
 |------|--------|---------------------|
+| 10 Dec 2024 | - | **Fix mix audio Transloadit (vidéo muette)** : `/video/encode` avec `as: 'audio'` ne remplace PAS l'audio de la vidéo. Nouvelle architecture en 5 étapes : 1) encoder voix, 2) encoder ambiance, 3) fusionner audios, 4) créer vidéo MUETTE (`-an`), 5) combiner via `/video/merge`. |
 | 9 Dec 2024 | - | **Fix mix audio Transloadit** : Refactoring complet du mixage voix+ambiance. Utilisation de `/audio/merge` pour fusionner les pistes audio AVANT `/video/encode`. L'ancienne approche avec `/video/encode` et plusieurs inputs échouait car FFmpeg ne recevait qu'un seul fichier (erreur `Invalid file index 1`). Ajout aussi d'une valeur par défaut pour `duration` (6s) si undefined. |
 | 9 Dec 2024 | - | Auto-speed par syllabes/seconde : Le calcul de suggested_speed utilise maintenant `syllables_per_second` au lieu de `words_per_second`. Seuils : < 5 s/s → 1.2x, 5-6 s/s → 1.1x, ≥ 6 s/s → 1.0x. Plus précis et cohérent multilingue. |
 | 8 Dec 2024 | - | Fix affichage version courante : Comparer dates `assemblies[0].created_at` vs `submagic_versions[0].created_at` pour afficher la PLUS RÉCENTE. Historique fusionné et trié par date décroissante (🎬 assemblages + 🔤 sous-titres mélangés). |
@@ -1659,4 +1701,4 @@ L'algorithme `countSyllables()` utilise une approche basée sur les groupes voca
 
 ---
 
-*Dernière mise à jour : 9 décembre 2024 (fix mix audio Transloadit - architecture /audio/merge + /video/encode)*
+*Dernière mise à jour : 10 décembre 2024 (fix mix audio Transloadit - vidéo muette + /video/merge car as:'audio' ne remplace pas l'audio)*

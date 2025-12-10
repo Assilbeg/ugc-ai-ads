@@ -133,7 +133,8 @@ export interface FalGenerationResult<T> {
 
 export async function generateFirstFrame(
   soulImageUrl: string,
-  prompt: string // Full prompt (template already applied by API route)
+  prompt: string, // Full prompt (template already applied by API route)
+  productImageUrl?: string
 ): Promise<string> {
   const FAL_KEY = process.env.FAL_KEY
   
@@ -148,6 +149,8 @@ export async function generateFirstFrame(
 
   // Using Nano Banana Pro edit endpoint (synchronous)
   // Docs: https://fal.ai/models/fal-ai/nano-banana-pro/edit
+  const imageUrls = [soulImageUrl, ...(productImageUrl ? [productImageUrl] : [])]
+
   const response = await fetch('https://fal.run/fal-ai/nano-banana-pro/edit', {
     method: 'POST',
     headers: {
@@ -156,7 +159,7 @@ export async function generateFirstFrame(
     },
     body: JSON.stringify({
       prompt: prompt, // Full prompt from API route (template already applied)
-      image_urls: [soulImageUrl], // Array of image URLs
+      image_urls: imageUrls, // Array of image URLs (soul + optional product screenshot)
       aspect_ratio: '9:16', // Vertical portrait
       num_images: 1,
       output_format: 'jpeg',

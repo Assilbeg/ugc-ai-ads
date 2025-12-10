@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { soulImageUrl, prompt, presetId, intentionImageUrl, previousFrameUrl, actorId, skipCache, campaignId, clipId, skipCredits } = body as {
+    const { soulImageUrl, prompt, presetId, intentionImageUrl, previousFrameUrl, actorId, skipCache, campaignId, clipId, skipCredits, productImageUrl, holdingType, beat, order } = body as {
       soulImageUrl: string
       prompt: string
       presetId?: string
@@ -51,6 +51,10 @@ export async function POST(request: NextRequest) {
       campaignId?: string
       clipId?: string
       skipCredits?: boolean
+      productImageUrl?: string
+      holdingType?: string
+      beat?: string
+      order?: number
     }
 
     console.log('First frame request:', { 
@@ -69,6 +73,10 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const isHttpImage = (url?: string) => !!url && /^https?:\/\//.test(url) && !url.startsWith('data:')
+    const allowedProductBeats = new Set(['solution', 'proof', 'cta'])
+    const showProduct = holdingType === 'showing_phone_screen' && isHttpImage(productImageUrl) && !!beat && allowedProductBeats.has(beat)
 
     // Choisir l'image de référence et le template approprié
     // Priorité : previousFrameUrl > intentionImageUrl > soulImageUrl
@@ -99,9 +107,13 @@ export async function POST(request: NextRequest) {
 
     template = promptData?.prompt || template
     
+    const promptWithProduct = showProduct
+      ? `${prompt}\nPhone screen shows the provided app landing page screenshot.`
+      : prompt
+
     // Replace {PROMPT} placeholder with actual prompt
-    const fullPrompt = template.replace('{PROMPT}', prompt)
-    const promptHash = hashPrompt(fullPrompt)
+    const fullPrompt = template.replace('{PROMPT}', promptWithProduct)
+    const promptHash = hashPrompt(fullPrompt + (showProduct && productImageUrl ? `|product:${productImageUrl}` : ''))
 
     // ══════════════════════════════════════════════════════════════
     // VÉRIFIER SI UN ASSET EXISTE DÉJÀ (sauf si previousFrame ou skipCache)
@@ -164,6 +176,7 @@ export async function POST(request: NextRequest) {
         presetId,
         usedIntentionImage: !!intentionImageUrl && !previousFrameUrl,
         usedPreviousFrame: !!previousFrameUrl,
+        productImageUrl: showProduct ? productImageUrl?.slice(0, 200) : undefined,
       },
       campaignId,
       clipId,
@@ -176,7 +189,7 @@ export async function POST(request: NextRequest) {
     let url: string
     
     try {
-      url = await generateFirstFrame(referenceImageUrl, fullPrompt)
+      url = await generateFirstFrame(referenceImageUrl, fullPrompt, showProduct ? productImageUrl : undefined)
     } catch (error) {
       // Mark log as failed
       if (logId) {
