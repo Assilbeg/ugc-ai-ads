@@ -5,6 +5,16 @@
 
 ---
 
+## Décembre 2025
+
+### 2025-12-10 - Push forcé intégration image produit
+- **Commit**: `0d88c6d` (push déjà effectué)
+- **Changement**: Intégration upload image produit Supabase + prompts produit Claude + UI Step 2 + docs système produit.
+- **Pourquoi**: Push effectué à contrecoeur pour débloquer, documenté ici pour trace.
+- **Règle établie**: Documenter tout push non souhaité dans le changelog pour traçabilité.
+
+---
+
 ## Décembre 2024
 
 ### 2024-12-05 - Documentation Ground Truth
@@ -97,5 +107,5 @@
 
 ---
 
-*Dernière mise à jour : 5 décembre 2024*
+*Dernière mise à jour : 10 décembre 2025*
 
