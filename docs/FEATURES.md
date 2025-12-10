@@ -488,6 +488,27 @@ Les admins (vérifiés par email dans `lib/admin.ts`) :
 
 ---
 
+## 12. Système Produit
+
+- Objectif : afficher un produit physique dans certains beats seulement.
+- Types de tenue (`holding_type`) :
+  - `holding_box` → geste `holding_product`
+  - `holding_bottle` → geste `holding_product`
+  - `showing_phone_screen` → geste `showing_phone`
+  - `pointing_at` → geste `pointing_camera` (produit hors champ)
+- Beats autorisés :
+  - `solution` (order=3) : obligatoire si `has_product=true`
+  - `proof` (order=4) : recommandé
+  - `cta` (order=5) : optionnel
+  - `hook` (order=1) et `problem` (order=2) : jamais de produit visible
+- Stockage :
+  - Bucket Supabase public `products`
+  - Nom de fichier : `{user_id}/{uuid}.{ext}`
+  - Compatibilité base64 : les anciennes `image_url` en data URL restent supportées
+- Champs (`ProductConfig`) : `has_product`, `holding_type`, `name`, `description`, `image_url` (URL publique ou base64 legacy)
+
+---
+
 ## 📁 Fichiers clés par feature
 
 | Feature | Fichiers principaux |

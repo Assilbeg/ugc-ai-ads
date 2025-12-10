@@ -343,7 +343,31 @@ EXEMPLE : "pointing at camera with one finger, looking excited"
 EXEMPLE : "hand on chest in sincere gesture, looking vulnerable"
 
 ══════════════════════════════════════════════════════════════════
-5.2 MODE DE SCÈNE : SINGLE vs MULTI LOCATION
+5.2 INTÉGRATION PRODUIT VISIBLE (si has_product = true)
+══════════════════════════════════════════════════════════════════
+
+Quand le brief indique un produit visible, tu DOIS :
+
+1. GESTE OBLIGATOIRE selon le type de tenue :
+   - holding_box / holding_bottle → geste "holding_product"
+   - showing_phone_screen → geste "showing_phone"
+   - pointing_at → geste "pointing_camera" (vers le produit hors champ)
+
+2. BEATS OU MONTRER LE PRODUIT :
+   - Solution (order=3) : OBLIGATOIRE - c'est la révélation du produit
+   - Proof (order=4) : RECOMMANDÉ - montrer le résultat/utilisation
+   - CTA (order=5) : OPTIONNEL - rappel visuel
+   - Hook (order=1) et Problem (order=2) : JAMAIS de produit visible
+
+3. DESCRIPTION VISUELLE dans first_frame.prompt :
+   - Décrire comment l'acteur tient/montre le produit
+   - Inclure le nom du produit si fourni
+   - Ex: "holding a white skincare box in her hands, showing it to camera"
+
+4. COHÉRENCE : Le produit doit être le MÊME dans tous les clips où il apparaît.
+
+══════════════════════════════════════════════════════════════════
+5.3 MODE DE SCÈNE : SINGLE vs MULTI LOCATION
 ══════════════════════════════════════════════════════════════════
 
 Le preset définit un "scene_mode" :
@@ -509,8 +533,28 @@ RAPPEL HOOK : Le hook doit être la VOIX INTÉRIEURE de la cible, pas une intro 
 PRODUIT VISIBLE
 ════════════════════════════════════════
 ${product.has_product 
-  ? `Oui - Type de tenue : ${product.holding_type} - Nom : ${product.name || 'produit'} - Description : ${product.description || 'N/A'}`
-  : 'Non - Talking head sans produit visible'
+  ? `OUI - L'acteur doit montrer/tenir un produit physique
+
+TYPE DE PRODUIT : ${
+    product.holding_type === 'holding_box' ? 'Boite/Packaging (l\'acteur tient une boite)' 
+    : product.holding_type === 'holding_bottle' ? 'Bouteille/Tube (l\'acteur tient un contenant)' 
+    : product.holding_type === 'showing_phone_screen' ? 'Application mobile (l\'acteur montre son ecran de telephone)' 
+    : 'Produit pose (l\'acteur pointe du doigt vers le produit)'
+  }
+
+NOM DU PRODUIT : ${product.name || 'Non specifie'}
+DESCRIPTION : ${product.description || 'Non specifiee'}
+
+GESTE A UTILISER : ${
+    product.holding_type === 'showing_phone_screen' ? 'showing_phone' : 'holding_product'
+  }
+
+INSTRUCTIONS :
+- Beat "solution" (order=3) : DOIT montrer le produit avec le geste ci-dessus
+- Beat "proof" (order=4) : PEUT montrer le produit
+- Beats "hook" et "problem" : PAS de produit visible
+- Decrire le produit dans first_frame.prompt des clips concernes`
+  : 'Non - Talking head simple sans produit visible'
 }
 
 ════════════════════════════════════════
@@ -541,6 +585,9 @@ INSTRUCTIONS FINALES
 8. Chaque first_frame DOIT inclure : prompt, expression, gesture, location
 9. Chaque video DOIT inclure : engine, duration, prompt, camera_style
 10. CAMERA STYLE : Utilise "${preset.first_frame.camera_style || 'handheld_subtle'}" par défaut.
+11. ${product.has_product 
+  ? `PRODUIT OBLIGATOIRE : Le clip "solution" (order=3) DOIT utiliser le geste "${product.holding_type === 'showing_phone_screen' ? 'showing_phone' : 'holding_product'}" et décrire le produit dans first_frame.prompt`
+  : ''}
 
 ⚠️⚠️⚠️ RÈGLE CRITIQUE LIEU ⚠️⚠️⚠️
 ${preset.first_frame.scene_mode === 'multi_location' 

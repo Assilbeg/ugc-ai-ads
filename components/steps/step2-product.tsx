@@ -37,21 +37,48 @@ export function Step2Product({ product, onChange, onNext, onBack }: Step2Product
     onChange({ ...product, holding_type: holdingType })
   }
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string
-        setImagePreview(dataUrl)
+    if (!file) return
+
+    const previewReader = new FileReader()
+    previewReader.onload = (event) => {
+      const dataUrl = event.target?.result as string
+      setImagePreview(dataUrl)
+    }
+    previewReader.readAsDataURL(file)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/upload/product-image', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) throw new Error('Upload failed')
+
+      const { url } = await response.json()
+      onChange({ ...product, image_url: url })
+    } catch (err) {
+      console.error('Failed to upload product image:', err)
+
+      const fallbackReader = new FileReader()
+      fallbackReader.onload = (event) => {
+        const dataUrl = event.target?.result as string
         onChange({ ...product, image_url: dataUrl })
       }
-      reader.readAsDataURL(file)
+      fallbackReader.readAsDataURL(file)
     }
   }
 
   const handleNameChange = (name: string) => {
     onChange({ ...product, name })
+  }
+
+  const handleDescriptionChange = (description: string) => {
+    onChange({ ...product, description })
   }
 
   return (
@@ -180,6 +207,20 @@ export function Step2Product({ product, onChange, onNext, onBack }: Step2Product
                 </p>
               </div>
             </div>
+          </div>
+
+          {/* Product description */}
+          <div className="space-y-3 mt-4">
+            <Label className="text-sm font-medium">Description du produit (optionnel)</Label>
+            <textarea
+              placeholder="Décris ton produit : couleur, forme, texte visible sur le packaging..."
+              value={product.description || ''}
+              onChange={(e) => handleDescriptionChange(e.target.value)}
+              className="w-full h-20 px-3 py-2 rounded-xl bg-muted/50 border-transparent focus:border-foreground resize-none text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              Plus la description est précise, meilleur sera le rendu dans la vidéo
+            </p>
           </div>
         </div>
       )}

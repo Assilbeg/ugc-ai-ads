@@ -1615,6 +1615,36 @@ L'algorithme `countSyllables()` utilise une approche basée sur les groupes voca
 
 ---
 
+## 16. Système Produit
+
+### Règles d'intégration
+
+| Type de tenue | Geste à utiliser | Description |
+|---------------|------------------|-------------|
+| holding_box | holding_product | L'acteur tient une boîte/packaging |
+| holding_bottle | holding_product | L'acteur tient une bouteille/tube |
+| showing_phone_screen | showing_phone | L'acteur montre son écran |
+| pointing_at | pointing_camera | L'acteur pointe vers le produit |
+
+### Beats et produit
+
+| Beat | Order | Produit visible |
+|------|-------|-----------------|
+| hook | 1 | JAMAIS |
+| problem | 2 | JAMAIS |
+| solution | 3 | OBLIGATOIRE si has_product=true |
+| proof | 4 | RECOMMANDÉ |
+| cta | 5 | OPTIONNEL |
+
+### Stockage image produit
+
+- Bucket Supabase public : `products`
+- Nom de fichier : `{user_id}/{uuid}.{ext}`
+- Compatibilité : conserver les `image_url` existantes en base64 (data URL)
+- Description produit optionnelle → toujours fallback sur `''`
+
+---
+
 ## 📝 Comment mettre à jour ce document
 
 1. **Avant de modifier un comportement listé ici** → Discuter et documenter la raison
