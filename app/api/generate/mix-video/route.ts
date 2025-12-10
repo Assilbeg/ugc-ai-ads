@@ -201,19 +201,48 @@ export async function POST(request: NextRequest) {
         url: ambientUrl
       }
       
-      // Étape 1: Merger les deux audios avec volumes + padding (architecture doc 9 déc 2024)
+      // Étape 1: Encoder la voix avec volume et padding
+      steps['voice_encoded'] = {
+        robot: '/audio/encode',
+        use: 'import_voice',
+        preset: 'mp3',
+        ffmpeg_stack: 'v6.0.0',
+        ffmpeg: {
+          'af': `volume=${voiceVol},apad=pad_dur=${duration}`,
+          'ar': 48000,
+          'ac': 2,
+          't': duration
+        }
+      }
+      
+      // Étape 2: Encoder l'ambiance avec volume et padding
+      steps['ambient_encoded'] = {
+        robot: '/audio/encode',
+        use: 'import_ambient',
+        preset: 'mp3',
+        ffmpeg_stack: 'v6.0.0',
+        ffmpeg: {
+          'af': `volume=${ambientVol},apad=pad_dur=${duration}`,
+          'ar': 48000,
+          'ac': 2,
+          't': duration
+        }
+      }
+      
+      // Étape 3: Fusionner voix + ambiance
       steps['merge_audio'] = {
         robot: '/audio/merge',
         use: {
           steps: [
-            { name: 'import_voice', as: 'audio' },
-            { name: 'import_ambient', as: 'audio' }
+            { name: 'voice_encoded', as: 'audio' },
+            { name: 'ambient_encoded', as: 'audio' }
           ]
         },
         preset: 'mp3',
         ffmpeg_stack: 'v6.0.0',
+        result: true, // DEBUG: voir le fichier audio fusionné
         ffmpeg: {
-          'filter_complex': `[0:a]volume=${voiceVol},apad=pad_dur=${duration}[voice];[1:a]volume=${ambientVol},apad=pad_dur=${duration}[ambient];[voice][ambient]amix=inputs=2:duration=first:dropout_transition=2[aout]`,
+          'filter_complex': '[0:a][1:a]amix=inputs=2:duration=first:dropout_transition=2[aout]',
           'map': '[aout]',
           'ar': 48000,
           'ac': 2,
@@ -221,30 +250,32 @@ export async function POST(request: NextRequest) {
         }
       }
       
-      // Étape 2: Remplacer l'audio de la vidéo par l'audio fusionné
-      // /video/encode gère le remplacement proprement (conformément à l'architecture Transloadit documentée)
-      steps['mixed'] = {
+      // Étape 4: Extraire vidéo SANS audio (muette)
+      steps['video_muted'] = {
         robot: '/video/encode',
+        use: 'import_video',
+        preset: 'empty',
+        ffmpeg_stack: 'v6.0.0',
+        ffmpeg: {
+          'an': '',  // Supprimer l'audio
+          'c:v': 'copy',  // Copier la vidéo sans ré-encoder
+          't': duration
+        }
+      }
+      
+      // Étape 5: Combiner vidéo muette + audio fusionné via /video/merge
+      // /video/merge peut combiner vidéo et audio quand l'un est muet
+      steps['mixed'] = {
+        robot: '/video/merge',
         use: {
           steps: [
-            { name: 'import_video', as: 'video' },
+            { name: 'video_muted', as: 'video' },
             { name: 'merge_audio', as: 'audio' }
           ]
         },
         result: true,
-        preset: 'empty',
-        ffmpeg_stack: 'v6.0.0',
-        ffmpeg: {
-          'c:v': 'libx264',
-          'preset': 'fast',
-          'crf': 23,
-          'c:a': 'aac',
-          'b:a': '128k',
-          'ar': 48000,
-          'ac': 2,
-          'movflags': '+faststart',
-          't': duration
-        }
+        preset: 'ipad-high',
+        ffmpeg_stack: 'v6.0.0'
       }
     }
 
