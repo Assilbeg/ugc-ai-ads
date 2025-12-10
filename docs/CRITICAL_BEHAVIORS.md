@@ -413,8 +413,9 @@ CAS 3 : Voix + Ambiance (cas nominal) - FIX 10 déc 2024
 1. /audio/encode : Encoder voix avec volume + padding → voice_encoded
 2. /audio/encode : Encoder ambiance avec volume + padding → ambient_encoded
 3. /audio/merge : Fusionner les deux audios → merge_audio
-4. /video/encode : Créer vidéo MUETTE (sans audio, -an) → video_muted
-5. /video/merge : Combiner vidéo muette + audio fusionné → mixed
+4. /video/merge : Combiner vidéo originale + audio fusionné → mixed
+   └── preset: 'ipad-high' (OBLIGATOIRE, sinon erreur format)
+   └── as: 'video' + as: 'audio' REMPLACE l'audio original
 ```
 
 ### Steps Transloadit pour Cas 3 (le plus courant)
@@ -461,26 +462,16 @@ steps['merge_audio'] = {
   }
 }
 
-// ÉTAPE 4: Créer vidéo SANS audio
-steps['video_muted'] = {
-  robot: '/video/encode',
-  use: 'import_video',
-  ffmpeg: {
-    'an': '',  // Supprimer l'audio
-    'c:v': 'copy'
-  }
-}
-
-// ÉTAPE 5: Combiner vidéo muette + audio fusionné
+// ÉTAPE 4: Combiner vidéo + audio fusionné (REMPLACE l'audio original)
 steps['mixed'] = {
   robot: '/video/merge',
   use: {
     steps: [
-      { name: 'video_muted', as: 'video' },
+      { name: 'import_video', as: 'video' },
       { name: 'merge_audio', as: 'audio' }
     ]
   },
-  preset: 'ipad-high'
+  preset: 'ipad-high'  // CRITIQUE: 'empty' cause "Unable to choose output format"
 }
 ```
 
@@ -506,7 +497,8 @@ steps['mixed'] = {
 | **`apad=pad_dur=${duration}`** | Assure que l'audio a la bonne durée (évite coupures) |
 | **`duration` DOIT être un nombre** | Défaut à 6 si undefined (fix 9 déc 2024) |
 | **Utiliser /audio/merge pour mixer** | /video/encode seul ne gère pas plusieurs audios |
-| **Vidéo muette avant combinaison** | Forcer Transloadit à utiliser l'audio externe (fix 10 déc 2024) |
+| **Utiliser /video/merge pour remplacer audio** | /video/encode avec as:'audio' ne remplace PAS l'audio (fix 10 déc 2024) |
+| **Preset 'ipad-high' pour /video/merge** | 'empty' cause "Unable to choose output format" |
 | **Pas de fallback silencieux si mix échoue** | Si Transloadit ne renvoie pas `mixed=true` + `videoUrl`, on DOIT échouer (ne jamais réutiliser un ancien `final_url`) |
 
 ### Quand les cas se produisent
@@ -1082,7 +1074,7 @@ const getClipStatus = (clip: CampaignClip): ClipStatus => {
 
 | Date | Commit | Comportement ajouté |
 |------|--------|---------------------|
-| 10 Dec 2024 | - | **Fix mix audio Transloadit (vidéo muette)** : `/video/encode` avec `as: 'audio'` ne remplace PAS l'audio de la vidéo. Nouvelle architecture en 5 étapes : 1) encoder voix, 2) encoder ambiance, 3) fusionner audios, 4) créer vidéo MUETTE (`-an`), 5) combiner via `/video/merge`. |
+| 10 Dec 2024 | 641c621 | **Fix mix audio Transloadit (/video/merge)** : `/video/encode` avec `as: 'audio'` ne remplace PAS l'audio. Solution : utiliser `/video/merge` avec `as: 'video'` + `as: 'audio'` et `preset: 'ipad-high'` (obligatoire, sinon erreur format). Pipeline final : 1) encoder voix, 2) encoder ambiance, 3) fusionner audios, 4) /video/merge. |
 | 9 Dec 2024 | - | **Fix mix audio Transloadit** : Refactoring complet du mixage voix+ambiance. Utilisation de `/audio/merge` pour fusionner les pistes audio AVANT `/video/encode`. L'ancienne approche avec `/video/encode` et plusieurs inputs échouait car FFmpeg ne recevait qu'un seul fichier (erreur `Invalid file index 1`). Ajout aussi d'une valeur par défaut pour `duration` (6s) si undefined. |
 | 9 Dec 2024 | - | Auto-speed par syllabes/seconde : Le calcul de suggested_speed utilise maintenant `syllables_per_second` au lieu de `words_per_second`. Seuils : < 5 s/s → 1.2x, 5-6 s/s → 1.1x, ≥ 6 s/s → 1.0x. Plus précis et cohérent multilingue. |
 | 8 Dec 2024 | - | Fix affichage version courante : Comparer dates `assemblies[0].created_at` vs `submagic_versions[0].created_at` pour afficher la PLUS RÉCENTE. Historique fusionné et trié par date décroissante (🎬 assemblages + 🔤 sous-titres mélangés). |
@@ -1701,4 +1693,4 @@ L'algorithme `countSyllables()` utilise une approche basée sur les groupes voca
 
 ---
 
-*Dernière mise à jour : 10 décembre 2024 (fix mix audio Transloadit - vidéo muette + /video/merge car as:'audio' ne remplace pas l'audio)*
+*Dernière mise à jour : 10 décembre 2024 (fix mix audio Transloadit - /video/merge + preset ipad-high remplace l'audio correctement)*
