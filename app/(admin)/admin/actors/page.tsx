@@ -217,6 +217,24 @@ export default function AdminActorsPage() {
   const [savingPrompt, setSavingPrompt] = useState(false)
   const supabase = createClient()
 
+  const sendActorRequest = async (
+    method: 'POST' | 'PUT' | 'DELETE',
+    payload: Record<string, any>
+  ) => {
+    const response = await fetch('/api/admin/actors', {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.error || 'Requête admin acteur échouée')
+    }
+
+    return data
+  }
+
   // Form state
   const [form, setForm] = useState({
     name: '',
@@ -313,53 +331,34 @@ export default function AdminActorsPage() {
       is_custom: false, // Admin-created actors are not "custom" (they're preset)
     }
 
-    if (isNew) {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { data: newActor, error } = await (supabase
-        .from('actors') as any)
-        .insert({ ...actorData, user_id: user?.id })
-        .select()
-        .single()
-
-      if (error) {
-        alert('Erreur: ' + error.message)
-      } else if (newActor) {
-        // Auto-générer les intention_media pour toutes les intentions
+    try {
+      if (isNew) {
+        const { actor: newActor } = await sendActorRequest('POST', { actor: actorData })
         await loadActors()
         cancelEdit()
-        
-        // Lancer la génération en arrière-plan
-        autoGenerateIntentionMedia(newActor.id, form.soul_image_url, form.name)
-      }
-    } else if (editing) {
-      const { error } = await (supabase
-        .from('actors') as any)
-        .update(actorData)
-        .eq('id', editing.id)
-
-      if (error) {
-        alert('Erreur: ' + error.message)
-      } else {
+        if (newActor?.id) {
+          autoGenerateIntentionMedia(newActor.id, form.soul_image_url, form.name)
+        }
+      } else if (editing) {
+        await sendActorRequest('PUT', { id: editing.id, updates: actorData })
         await loadActors()
         cancelEdit()
       }
+    } catch (error) {
+      alert('Erreur: ' + (error instanceof Error ? error.message : 'Mise à jour acteur impossible'))
+    } finally {
+      setSaving(false)
     }
-
-    setSaving(false)
   }
 
   const handleDelete = async (actor: Actor) => {
     if (!confirm(`Supprimer l'acteur "${actor.name}" ?`)) return
 
-    const { error } = await (supabase
-      .from('actors') as any)
-      .delete()
-      .eq('id', actor.id)
-
-    if (error) {
-      alert('Erreur: ' + error.message)
-    } else {
+    try {
+      await sendActorRequest('DELETE', { id: actor.id })
       await loadActors()
+    } catch (error) {
+      alert('Erreur: ' + (error instanceof Error ? error.message : 'Suppression impossible'))
     }
   }
 
@@ -495,14 +494,8 @@ export default function AdminActorsPage() {
       }
     }
 
-    const { error } = await (supabase
-      .from('actors') as any)
-      .update({ intention_media: updatedMedia })
-      .eq('id', actor.id)
-
-    if (error) {
-      alert('Erreur: ' + error.message)
-    } else {
+    try {
+      await sendActorRequest('PUT', { id: actor.id, updates: { intention_media: updatedMedia } })
       await loadActors()
       // Nettoyer le state local pour ce prompt
       setCustomPrompts(prev => {
@@ -513,9 +506,11 @@ export default function AdminActorsPage() {
         return newState
       })
       setEditingPrompt(null)
+    } catch (error) {
+      alert('Erreur: ' + (error instanceof Error ? error.message : 'Enregistrement du prompt impossible'))
+    } finally {
+      setSavingPrompt(false)
     }
-
-    setSavingPrompt(false)
   }
 
   // Réinitialiser au prompt par défaut
@@ -531,14 +526,8 @@ export default function AdminActorsPage() {
       }
     }
 
-    const { error } = await (supabase
-      .from('actors') as any)
-      .update({ intention_media: updatedMedia })
-      .eq('id', actor.id)
-
-    if (error) {
-      alert('Erreur: ' + error.message)
-    } else {
+    try {
+      await sendActorRequest('PUT', { id: actor.id, updates: { intention_media: updatedMedia } })
       await loadActors()
       // Nettoyer le state local
       setCustomPrompts(prev => {
@@ -549,9 +538,11 @@ export default function AdminActorsPage() {
         return newState
       })
       setEditingPrompt(null)
+    } catch (error) {
+      alert('Erreur: ' + (error instanceof Error ? error.message : 'Réinitialisation impossible'))
+    } finally {
+      setSavingPrompt(false)
     }
-
-    setSavingPrompt(false)
   }
 
   // Vérifier si un prompt est personnalisé

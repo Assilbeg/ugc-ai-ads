@@ -20,3 +20,5 @@ export function TemplateImage({ templateName, className = "h-5 w-auto rounded" }
   )
 }
 
+
+

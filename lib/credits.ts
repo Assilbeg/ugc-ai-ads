@@ -121,7 +121,17 @@ export async function getGenerationCost(
     throw new Error(`Prix non configuré pour ${generationType}. Configurer dans Admin > Billing.`)
   }
   
-  return (data as { cost_cents: number }).cost_cents
+  const cost = Number((data as { cost_cents: number | string }).cost_cents)
+  if (Number.isNaN(cost)) {
+    throw new Error(`Prix invalide pour ${generationType} (non numérique)`)
+  }
+  if (generationType === 'submagic_subtitles' && cost > 100) {
+    // Sécurité : certains env stockent 25 crédits comme 2500 (cents)
+    const adjusted = Math.round(cost / 100)
+    console.warn(`[Credits] Prix submagic_subtitles trop élevé (${cost}), ajusté à ${adjusted}`)
+    return adjusted
+  }
+  return cost
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -143,8 +153,12 @@ export async function getAllGenerationCosts(): Promise<Record<string, number>> {
   }
   
   const costs: Record<string, number> = {}
-  for (const item of data as { id: string; cost_cents: number }[]) {
-    costs[item.id] = item.cost_cents
+  for (const item of data as { id: string; cost_cents: number | string }[]) {
+    const numericCost = Number(item.cost_cents)
+    if (Number.isNaN(numericCost)) {
+      throw new Error(`Prix invalide pour ${item.id} (non numérique)`)
+    }
+    costs[item.id] = numericCost
   }
   
   return costs
@@ -187,8 +201,10 @@ export async function checkCredits(
     }
   }
   
-  const hasEnough = userCredits.balance >= cost
-  const missingAmount = hasEnough ? 0 : cost - userCredits.balance
+  const balance = Number(userCredits.balance ?? 0)
+  const numericCost = Number(cost)
+  const hasEnough = balance >= numericCost
+  const missingAmount = hasEnough ? 0 : numericCost - balance
   
   // Check Early Bird eligibility
   const now = new Date()
@@ -201,8 +217,8 @@ export async function checkCredits(
   
   return {
     hasEnough,
-    currentBalance: userCredits.balance,
-    requiredAmount: cost,
+    currentBalance: balance,
+    requiredAmount: numericCost,
     missingAmount,
     isEarlyBirdEligible,
     earlyBirdUsed: userCredits.early_bird_used,
@@ -237,7 +253,8 @@ export async function checkCreditsForMultiple(
   
   // Calculate total required
   const totalRequired = generations.reduce((sum, gen) => {
-    return sum + (costs[gen.type] * gen.count)
+    const cost = Number(costs[gen.type] ?? 0)
+    return sum + (cost * gen.count)
   }, 0)
   
   if (!userCredits) {
@@ -251,8 +268,9 @@ export async function checkCreditsForMultiple(
     }
   }
   
-  const hasEnough = userCredits.balance >= totalRequired
-  const missingAmount = hasEnough ? 0 : totalRequired - userCredits.balance
+  const balance = Number(userCredits.balance ?? 0)
+  const hasEnough = balance >= totalRequired
+  const missingAmount = hasEnough ? 0 : totalRequired - balance
   
   // Check Early Bird eligibility
   const now = new Date()
@@ -265,7 +283,7 @@ export async function checkCreditsForMultiple(
   
   return {
     hasEnough,
-    currentBalance: userCredits.balance,
+    currentBalance: balance,
     requiredAmount: totalRequired,
     missingAmount,
     isEarlyBirdEligible,

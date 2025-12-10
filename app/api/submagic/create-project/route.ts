@@ -37,15 +37,15 @@ export async function POST(request: Request) {
 
     // Vérifier crédits (sauf admin)
     const isAdmin = isAdminEmail(user.email)
-    if (!isAdmin) {
-      const creditsCheck = await checkCredits(user.id, 'submagic_subtitles', user.email)
-      if (!creditsCheck.hasEnough) {
-        return NextResponse.json({ 
-          error: 'Crédits insuffisants',
-          required: SUBMAGIC_COST,
-          current: creditsCheck.currentBalance
-        }, { status: 402 })
-      }
+    const creditsCheck = isAdmin 
+      ? null 
+      : await checkCredits(user.id, 'submagic_subtitles', user.email)
+    if (!isAdmin && creditsCheck && !creditsCheck.hasEnough) {
+      return NextResponse.json({ 
+        error: 'Crédits insuffisants',
+        required: creditsCheck.requiredAmount,
+        current: creditsCheck.currentBalance
+      }, { status: 402 })
     }
 
     // Récupérer la campagne avec clips

@@ -16,6 +16,25 @@ import { useActors } from '@/hooks/use-actors'
 import { getPresetById } from '@/lib/presets'
 import { Loader2 } from 'lucide-react'
 
+// Sélectionner un seul clip par beat : is_selected prioritaire, sinon le plus récent
+const getPrimaryClips = (clips: CampaignClip[] = []) => {
+  const byOrder = new Map<number, CampaignClip[]>()
+  clips.forEach(c => {
+    const list = byOrder.get(c.order) || []
+    list.push(c)
+    byOrder.set(c.order, list)
+  })
+
+  return Array.from(byOrder.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([_, list]) => {
+      const selected = list.find(c => c.is_selected)
+      if (selected) return selected
+      return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+    })
+    .filter(Boolean) as CampaignClip[]
+}
+
 const STEPS = [
   { number: 1, title: 'Acteur', description: 'Choisis ton créateur IA' },
   { number: 2, title: 'Produit', description: 'Avec ou sans produit' },
@@ -176,9 +195,11 @@ export default function ExistingCampaignPage() {
           }
         }
 
-        // Reconstruire les first frames depuis les clips
+      const primaryClips = getPrimaryClips(clips as CampaignClip[])
+
+        // Reconstruire les first frames depuis les clips principaux (une tuile par beat)
         const generatedFirstFrames: GeneratedFirstFrames = {}
-        clips?.forEach((clip: any, index: number) => {
+        primaryClips.forEach((clip: any, index: number) => {
           if (clip.first_frame?.image_url) {
             generatedFirstFrames[index] = {
               url: clip.first_frame.image_url,
@@ -187,7 +208,7 @@ export default function ExistingCampaignPage() {
           }
         })
 
-        // Reconstituer le state
+      // Reconstituer le state
         setState({
           step,
           campaign_id: campaignId,
@@ -196,8 +217,8 @@ export default function ExistingCampaignPage() {
           preset_id: presetId,
           product: campaign.product || { has_product: false },
           brief: campaign.brief || {},
-          generated_clips: clips as CampaignClip[] || [],
-          generated_first_frames: Object.keys(generatedFirstFrames).length > 0 ? generatedFirstFrames : undefined,
+        generated_clips: clips as CampaignClip[] || [],
+        generated_first_frames: Object.keys(generatedFirstFrames).length > 0 ? generatedFirstFrames : undefined,
         })
 
         console.log('✓ Campagne chargée:', campaignId, 'step:', step, 'clips:', clips?.length || 0)
@@ -256,9 +277,69 @@ export default function ExistingCampaignPage() {
     setState(prev => ({ ...prev, generated_clips: clips }))
   }, [])
   
+  // Persistance immédiate des first frames en BDD pour éviter les régénérations doublons
+  const persistFirstFrames = useCallback(async (frames: GeneratedFirstFrames) => {
+    if (!campaignId || !state.generated_clips?.length) return
+    
+    try {
+      const updates: { id: string; firstFrame: any }[] = []
+      const primaryClips = getPrimaryClips(state.generated_clips)
+      
+      Object.entries(frames || {}).forEach(([indexStr, frame]) => {
+        const index = parseInt(indexStr)
+        const clip = primaryClips[index]
+        if (!clip?.id || !frame?.url) return
+        
+        updates.push({
+          id: clip.id,
+          firstFrame: { ...(clip.first_frame || {}), image_url: frame.url },
+        })
+      })
+      
+      for (const { id, firstFrame } of updates) {
+        const { error } = await (supabase
+          .from('campaign_clips') as any)
+          .update({ first_frame: firstFrame })
+          .eq('id', id)
+        
+        if (error) {
+          console.warn('[/new/[id]] Persist first frame failed for clip', id, error)
+        }
+      }
+    } catch (err) {
+      console.warn('[/new/[id]] Unexpected error persisting first frames:', err)
+    }
+  }, [campaignId, state.generated_clips, supabase])
+  
   const handleFirstFramesUpdate = useCallback((frames: GeneratedFirstFrames) => {
-    setState(prev => ({ ...prev, generated_first_frames: frames }))
-  }, [])
+    // Mettre à jour l'état local + hydrater les clips principaux pour la détection d'étape
+    setState(prev => {
+      const primaryClips = getPrimaryClips(prev.generated_clips || [])
+      const updatedClips = (prev.generated_clips || []).map(clip => {
+        const primaryIndex = primaryClips.findIndex(c => c.id === clip.id)
+        const frame = primaryIndex >= 0 ? frames?.[primaryIndex] : undefined
+        if (frame?.url && clip?.first_frame?.image_url !== frame.url) {
+          return {
+            ...clip,
+            first_frame: {
+              ...(clip.first_frame || {}),
+              image_url: frame.url,
+            },
+          }
+        }
+        return clip
+      })
+      
+      return { 
+        ...prev, 
+        generated_first_frames: frames,
+        generated_clips: updatedClips,
+      }
+    })
+    
+    // Persister en base (fire-and-forget)
+    void persistFirstFrames(frames)
+  }, [persistFirstFrames])
 
   const nextStep = () => {
     if (state.step < 6) {

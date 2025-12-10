@@ -171,6 +171,11 @@ export function SubmagicModal({
         fetch('/api/submagic/hook-templates'),
       ])
 
+      if (templatesRes.status === 402 || hookTemplatesRes.status === 402) {
+        setError("Crédits Submagic épuisés côté fournisseur. Réessaie plus tard ou recharge Submagic.")
+        return
+      }
+
       if (templatesRes.ok) {
         const data = await templatesRes.json()
         if (data.templates?.length > 0) {
@@ -273,9 +278,15 @@ export function SubmagicModal({
 
       if (!response.ok) {
         if (response.status === 402) {
-          setError(`Crédits insuffisants. Vous avez ${currentBalance} crédits, il en faut ${SUBMAGIC_COST}.`)
+          if (data?.error === 'INSUFFICIENT_CREDITS') {
+            setError("Crédits Submagic épuisés côté fournisseur. Réessaie plus tard ou recharge Submagic.")
+          } else {
+            const required = data?.required ?? SUBMAGIC_COST
+            const current = data?.current ?? currentBalance
+            setError(`Crédits insuffisants. Vous avez ${current} crédits, il en faut ${required}.`)
+          }
         } else {
-          setError(data.error || 'Une erreur est survenue')
+          setError(data?.error || 'Une erreur est survenue')
         }
         return
       }
