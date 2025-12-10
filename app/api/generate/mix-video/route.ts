@@ -117,7 +117,6 @@ export async function POST(request: NextRequest) {
         preset: 'empty',
         ffmpeg_stack: 'v6.0.0',
         ffmpeg: {
-          'map': ['0:v:0', '1:a:0'],
           'c:v': 'libx264',
           'preset': 'fast',
           'crf': 23,
@@ -179,7 +178,6 @@ export async function POST(request: NextRequest) {
         preset: 'empty',
         ffmpeg_stack: 'v6.0.0',
         ffmpeg: {
-          'map': ['0:v:0', '1:a:0'],
           'c:v': 'libx264',
           'preset': 'fast',
           'crf': 23,
@@ -237,7 +235,6 @@ export async function POST(request: NextRequest) {
         preset: 'empty',
         ffmpeg_stack: 'v6.0.0',
         ffmpeg: {
-          'map': ['0:v:0', '1:a:0'],
           'c:v': 'libx264',
           'preset': 'fast',
           'crf': 23,
