@@ -117,6 +117,7 @@ export async function POST(request: NextRequest) {
         preset: 'empty',
         ffmpeg_stack: 'v6.0.0',
         ffmpeg: {
+          'map': ['0:v:0', '1:a:0'],
           'c:v': 'libx264',
           'preset': 'fast',
           'crf': 23,
@@ -178,6 +179,7 @@ export async function POST(request: NextRequest) {
         preset: 'empty',
         ffmpeg_stack: 'v6.0.0',
         ffmpeg: {
+          'map': ['0:v:0', '1:a:0'],
           'c:v': 'libx264',
           'preset': 'fast',
           'crf': 23,
@@ -201,50 +203,19 @@ export async function POST(request: NextRequest) {
         url: ambientUrl
       }
       
-      // SOLUTION: Encoder chaque audio séparément avec son volume AVANT le merge
-      // Ainsi on est sûr que chaque fichier a le bon volume peu importe l'ordre du merge
-      
-      // Étape 1: Encoder la voix avec son volume
-      steps['voice_with_volume'] = {
-        robot: '/audio/encode',
-        use: 'import_voice',
-        preset: 'mp3',
-        ffmpeg_stack: 'v6.0.0',
-        ffmpeg: {
-          'af': `volume=${voiceVol},apad=pad_dur=${duration}`,
-          'ar': 48000,
-          'ac': 2,
-          't': duration
-        }
-      }
-      
-      // Étape 2: Encoder l'ambiance avec son volume
-      steps['ambient_with_volume'] = {
-        robot: '/audio/encode',
-        use: 'import_ambient',
-        preset: 'mp3',
-        ffmpeg_stack: 'v6.0.0',
-        ffmpeg: {
-          'af': `volume=${ambientVol},apad=pad_dur=${duration}`,
-          'ar': 48000,
-          'ac': 2,
-          't': duration
-        }
-      }
-      
-      // Étape 3: Merger les deux audios (ordre n'a plus d'importance car volumes déjà appliqués)
+      // Étape 1: Merger les deux audios avec volumes + padding (architecture doc 9 déc 2024)
       steps['merge_audio'] = {
         robot: '/audio/merge',
         use: {
           steps: [
-            { name: 'voice_with_volume', as: 'audio' },
-            { name: 'ambient_with_volume', as: 'audio' }
+            { name: 'import_voice', as: 'audio' },
+            { name: 'import_ambient', as: 'audio' }
           ]
         },
         preset: 'mp3',
         ffmpeg_stack: 'v6.0.0',
         ffmpeg: {
-          'filter_complex': '[0:a][1:a]amix=inputs=2:duration=first:dropout_transition=2[aout]',
+          'filter_complex': `[0:a]volume=${voiceVol},apad=pad_dur=${duration}[voice];[1:a]volume=${ambientVol},apad=pad_dur=${duration}[ambient];[voice][ambient]amix=inputs=2:duration=first:dropout_transition=2[aout]`,
           'map': '[aout]',
           'ar': 48000,
           'ac': 2,
@@ -252,7 +223,7 @@ export async function POST(request: NextRequest) {
         }
       }
       
-      // Étape 4: Remplacer l'audio de la vidéo par l'audio fusionné
+      // Étape 2: Remplacer l'audio de la vidéo par l'audio fusionné
       // /video/encode gère le remplacement proprement (conformément à l'architecture Transloadit documentée)
       steps['mixed'] = {
         robot: '/video/encode',
@@ -266,6 +237,7 @@ export async function POST(request: NextRequest) {
         preset: 'empty',
         ffmpeg_stack: 'v6.0.0',
         ffmpeg: {
+          'map': ['0:v:0', '1:a:0'],
           'c:v': 'libx264',
           'preset': 'fast',
           'crf': 23,

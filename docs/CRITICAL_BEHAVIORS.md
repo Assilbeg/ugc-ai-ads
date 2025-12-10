@@ -464,6 +464,7 @@ steps['mixed'] = {
 | **`apad=pad_dur=${duration}`** | Assure que l'audio a la bonne durée (évite coupures) |
 | **`duration` DOIT être un nombre** | Défaut à 6 si undefined (fix 9 déc 2024) |
 | **Utiliser /audio/merge pour mixer** | /video/encode seul ne gère pas plusieurs audios |
+| **`map` explicite dans /video/encode** | Forcer `['0:v:0','1:a:0']` pour éviter fallback sur l'audio Veo |
 | **Pas de fallback silencieux si mix échoue** | Si Transloadit ne renvoie pas `mixed=true` + `videoUrl`, on DOIT échouer (ne jamais réutiliser un ancien `final_url`) |
 
 ### Quand les cas se produisent
