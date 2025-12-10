@@ -261,7 +261,7 @@ export async function POST(request: NextRequest) {
           ]
         },
         result: true,
-        preset: 'empty',
+        preset: 'ipad-high',  // Définit le format MP4
         ffmpeg_stack: 'v6.0.0'
       }
     }
