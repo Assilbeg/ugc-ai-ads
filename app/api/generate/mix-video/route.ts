@@ -29,9 +29,20 @@ export async function POST(request: NextRequest) {
       voiceUrl, 
       ambientUrl, 
       voiceVolume = 100, 
-      ambientVolume = 30, // Augmenté de 20% à 30% pour une ambiance plus présente
-      duration 
+      ambientVolume = 20, // Par défaut 20% pour ne pas couvrir la voix
+      duration: rawDuration 
     } = body as MixVideoInput
+
+    // CRITIQUE: duration doit être un nombre valide pour FFmpeg apad filter
+    // Défaut à 6 secondes si non fourni ou invalide
+    const duration = (typeof rawDuration === 'number' && rawDuration > 0) ? rawDuration : 6
+    
+    if (duration !== rawDuration) {
+      console.warn('[Mix] ⚠️ Duration invalide ou manquante, utilisation de la valeur par défaut:', {
+        received: rawDuration,
+        using: duration
+      })
+    }
 
     if (!videoUrl) {
       return NextResponse.json(
@@ -59,7 +70,7 @@ export async function POST(request: NextRequest) {
 
     console.log('[Mix] Starting video mix with Transloadit:', {
       videoUrl: videoUrl.slice(0, 50),
-      voiceUrl: voiceUrl?.slice(0, 50),
+      voiceUrl: voiceUrl,  // URL COMPLÈTE pour debug
       ambientUrl: ambientUrl?.slice(0, 50),
       voiceVolume,
       ambientVolume,
@@ -92,7 +103,8 @@ export async function POST(request: NextRequest) {
         url: voiceUrl
       }
       
-      // Remplacer l'audio de la vidéo par la voix clonée (avec volume ajusté)
+      // Remplacer l'audio de la vidéo par la voix clonée
+      // Transloadit /video/encode avec as:'video' et as:'audio' fait automatiquement le remplacement
       steps['mixed'] = {
         robot: '/video/encode',
         use: {
@@ -105,10 +117,6 @@ export async function POST(request: NextRequest) {
         preset: 'empty',
         ffmpeg_stack: 'v6.0.0',
         ffmpeg: {
-          // REMPLACER l'audio original : on prend uniquement la voix (1:a)
-          // On n'utilise PAS l'audio original (0:a) car c'est la voix IA qu'on veut remplacer
-          'filter_complex': `[1:a]volume=${voiceVol},apad=pad_dur=${duration}[aout]`,
-          'map': ['0:v', '[aout]'],
           'c:v': 'libx264',
           'preset': 'fast',
           'crf': 23,
@@ -129,21 +137,47 @@ export async function POST(request: NextRequest) {
       }
       
       // Ici on garde l'audio original (voix IA) et on ajoute l'ambiance
+      // ÉTAPE 1: Extraire l'audio de la vidéo
+      steps['extract_audio'] = {
+        robot: '/audio/encode',
+        use: 'import_video',
+        preset: 'mp3',
+        ffmpeg_stack: 'v6.0.0'
+      }
+      
+      // ÉTAPE 2: Fusionner l'audio extrait avec l'ambiance
+      steps['merge_audio'] = {
+        robot: '/audio/merge',
+        use: {
+          steps: [
+            { name: 'extract_audio', as: 'audio' },
+            { name: 'import_ambient', as: 'audio' }
+          ]
+        },
+        preset: 'mp3',
+        ffmpeg_stack: 'v6.0.0',
+        ffmpeg: {
+          'filter_complex': `[0:a]volume=1.0[orig];[1:a]volume=${ambientVol},apad=pad_dur=${duration}[ambient];[orig][ambient]amix=inputs=2:duration=first:dropout_transition=2[aout]`,
+          'map': '[aout]',
+          'ar': 48000,
+          'ac': 2,
+          't': duration
+        }
+      }
+      
+      // ÉTAPE 3: Remplacer l'audio de la vidéo par l'audio fusionné
       steps['mixed'] = {
         robot: '/video/encode',
         use: {
           steps: [
             { name: 'import_video', as: 'video' },
-            { name: 'import_ambient', as: 'audio' }
+            { name: 'merge_audio', as: 'audio' }
           ]
         },
         result: true,
         preset: 'empty',
         ffmpeg_stack: 'v6.0.0',
         ffmpeg: {
-          // Mixer l'audio original (0:a) avec l'ambiance (1:a)
-          'filter_complex': `[0:a]volume=1.0[orig];[1:a]volume=${ambientVol},apad=pad_dur=${duration}[ambient];[orig][ambient]amix=inputs=2:duration=first:dropout_transition=2[aout]`,
-          'map': ['0:v', '[aout]'],
           'c:v': 'libx264',
           'preset': 'fast',
           'crf': 23,
@@ -167,25 +201,71 @@ export async function POST(request: NextRequest) {
         url: ambientUrl
       }
       
-      // REMPLACER l'audio original par voix clonée + ambiance
-      // On n'utilise PAS l'audio original (0:a) - la voix IA est remplacée par la voix clonée
+      // SOLUTION: Encoder chaque audio séparément avec son volume AVANT le merge
+      // Ainsi on est sûr que chaque fichier a le bon volume peu importe l'ordre du merge
+      
+      // Étape 1: Encoder la voix avec son volume
+      steps['voice_with_volume'] = {
+        robot: '/audio/encode',
+        use: 'import_voice',
+        preset: 'mp3',
+        ffmpeg_stack: 'v6.0.0',
+        ffmpeg: {
+          'af': `volume=${voiceVol},apad=pad_dur=${duration}`,
+          'ar': 48000,
+          'ac': 2,
+          't': duration
+        }
+      }
+      
+      // Étape 2: Encoder l'ambiance avec son volume
+      steps['ambient_with_volume'] = {
+        robot: '/audio/encode',
+        use: 'import_ambient',
+        preset: 'mp3',
+        ffmpeg_stack: 'v6.0.0',
+        ffmpeg: {
+          'af': `volume=${ambientVol},apad=pad_dur=${duration}`,
+          'ar': 48000,
+          'ac': 2,
+          't': duration
+        }
+      }
+      
+      // Étape 3: Merger les deux audios (ordre n'a plus d'importance car volumes déjà appliqués)
+      steps['merge_audio'] = {
+        robot: '/audio/merge',
+        use: {
+          steps: [
+            { name: 'voice_with_volume', as: 'audio' },
+            { name: 'ambient_with_volume', as: 'audio' }
+          ]
+        },
+        preset: 'mp3',
+        ffmpeg_stack: 'v6.0.0',
+        ffmpeg: {
+          'filter_complex': '[0:a][1:a]amix=inputs=2:duration=first:dropout_transition=2[aout]',
+          'map': '[aout]',
+          'ar': 48000,
+          'ac': 2,
+          't': duration
+        }
+      }
+      
+      // Étape 4: Remplacer l'audio de la vidéo par l'audio fusionné
+      // /video/encode gère le remplacement proprement (conformément à l'architecture Transloadit documentée)
       steps['mixed'] = {
         robot: '/video/encode',
         use: {
           steps: [
             { name: 'import_video', as: 'video' },
-            { name: 'import_voice', as: 'audio1' },
-            { name: 'import_ambient', as: 'audio2' }
+            { name: 'merge_audio', as: 'audio' }
           ]
         },
         result: true,
         preset: 'empty',
         ffmpeg_stack: 'v6.0.0',
         ffmpeg: {
-          // Mixer voix clonée + ambiance (ignorer l'audio original)
-          // apad assure que les pistes audio sont paddées à la bonne durée
-          'filter_complex': `[1:a]volume=${voiceVol},apad=pad_dur=${duration}[voice];[2:a]volume=${ambientVol},apad=pad_dur=${duration}[ambient];[voice][ambient]amix=inputs=2:duration=first:dropout_transition=2[aout]`,
-          'map': ['0:v', '[aout]'],
           'c:v': 'libx264',
           'preset': 'fast',
           'crf': 23,
