@@ -171,6 +171,10 @@ const clip = clips?.[0]
 | **Process-clip APRÈS mix** | Le trim/speed s'applique sur la vidéo finale mixée | - |
 | **Régénérer voix quand on régénère vidéo** | L'audio source change → la voix clonée doit être refaite | `99ca0c1` |
 | **Re-mixer quand on régénère vidéo** | Préserver voix et ambiance avec la nouvelle vidéo | `c4d90bc` |
+| **Persister les first frames dès step5** | Sauvegarder `first_frame.image_url` dans `campaign_clips` dès génération pour éviter les régénérations doublons et permettre le retour direct à l'étape 6 après reload | Dec 2025 |
+| **Une seule tuile par beat pour les first frames** | Affichage et logique basés sur le clip sélectionné (ou le plus récent) par beat ; navigation des frames via carousel/flèches | Dec 2025 |
+| **Frame sélectionnée = frame utilisée en génération vidéo** | La frame choisie dans le carousel est propagée au state parent et persistée pour être utilisée comme `first_frame` lors de la génération vidéo | Dec 2025 |
+| **Une vidéo générée par beat (step6)** | À la génération, on ne garde qu’un clip par beat (is_selected prioritaire sinon plus récent) avant d’appeler Veo, pour éviter les rafales multiples | Dec 2025 |
 
 ---
 
@@ -386,21 +390,67 @@ CAS 3 : Voix ✅, Ambiance ✅ (cas nominal)
     → Audio Veo IGNORÉ. Output = voix humaine + ambiance.
 ```
 
-### Code FFmpeg correspondant
+### Architecture Transloadit (Fix 9 déc 2024)
+
+> **IMPORTANT** : On utilise `/audio/merge` + `/video/encode` en deux étapes car Transloadit
+> ne permet pas de passer plusieurs fichiers audio comme inputs séparés à FFmpeg avec `/video/encode` seul.
+
+```
+CAS 1 : Voix seule
+══════════════════
+1. /video/encode avec as:'video' + as:'audio'
+   → Transloadit remplace automatiquement l'audio
+
+CAS 2 : Ambiance seule (garde audio Veo)
+════════════════════════════════════════
+1. /audio/encode : Extraire audio de la vidéo
+2. /audio/merge : Mixer audio extrait + ambiance
+3. /video/encode : Remplacer par audio fusionné
+
+CAS 3 : Voix + Ambiance (cas nominal)
+═════════════════════════════════════
+1. /audio/merge : Mixer voix + ambiance
+   └── filter_complex: [0:a]volume=1.0...[1:a]volume=0.2...amix
+2. /video/encode : Remplacer audio de la vidéo par l'audio fusionné
+```
+
+### Steps Transloadit pour Cas 3 (le plus courant)
 
 ```typescript
-// CAS 1 : Voix seule - REMPLACE l'audio
-'filter_complex': `[1:a]volume=${voiceVol},apad=pad_dur=${duration}[aout]`,
-'map': ['0:v', '[aout]'],  // 0:v = vidéo Veo, [aout] = voix clonée
+// ÉTAPE 1: Fusionner voix + ambiance
+steps['merge_audio'] = {
+  robot: '/audio/merge',
+  use: {
+    steps: [
+      { name: 'import_voice', as: 'audio' },
+      { name: 'import_ambient', as: 'audio' }
+    ]
+  },
+  ffmpeg: {
+    'filter_complex': `[0:a]volume=${voiceVol},apad=pad_dur=${duration}[voice];[1:a]volume=${ambientVol},apad=pad_dur=${duration}[ambient];[voice][ambient]amix=inputs=2:duration=first:dropout_transition=2[aout]`,
+    'map': '[aout]'
+  }
+}
 
-// CAS 2 : Ambiance seule - GARDE l'audio Veo
-'filter_complex': `[0:a]volume=1.0[orig];[1:a]volume=${ambientVol},...[aout]`,
-'map': ['0:v', '[aout]'],  // [0:a] = audio Veo original (GARDÉ)
-
-// CAS 3 : Les deux - REMPLACE l'audio
-'filter_complex': `[1:a]volume=${voiceVol},...[voice];[2:a]volume=${ambientVol},...[ambient];[voice][ambient]amix=...`,
-'map': ['0:v', '[aout]'],  // Pas de 0:a = audio Veo IGNORÉ
+// ÉTAPE 2: Remplacer l'audio de la vidéo
+steps['mixed'] = {
+  robot: '/video/encode',
+  use: {
+    steps: [
+      { name: 'import_video', as: 'video' },
+      { name: 'merge_audio', as: 'audio' }
+    ]
+  }
+}
 ```
+
+### Ce qui NE MARCHE PAS avec Transloadit
+
+| Approche | Problème | 
+|----------|----------|
+| `/video/encode` avec 3 inputs | FFmpeg ne reçoit qu'1 fichier → `Invalid file index 1` |
+| `as: 'audio1'`, `as: 'audio2'` | Types invalides, Transloadit attend `audio` |
+| `[1:a]`, `[2:a]` direct | Pas de fichiers d'entrée multiples passés à FFmpeg |
 
 ### Règles CRITIQUES
 
@@ -408,10 +458,13 @@ CAS 3 : Voix ✅, Ambiance ✅ (cas nominal)
 |-------|----------|
 | **L'audio Veo est SUPPRIMÉ (cas 1 et 3)** | On le remplace entièrement par voix clonée + ambiance |
 | **L'audio Veo est GARDÉ (cas 2 seulement)** | Si voix échoue, on mixe l'original avec l'ambiance |
-| **Volumes : voix 100%, ambiance 20%** | L'ambiance ne doit pas couvrir la voix |
+| **Volumes : voix 100%, ambiance 20-30%** | L'ambiance ne doit pas couvrir la voix |
 | **L'ambiance dure toute la vidéo** | Elle est générée à la durée de la vidéo, pas du speech |
 | **Source audio = vidéo Veo raw** | Jamais depuis TTS, toujours depuis la vidéo générée |
 | **`apad=pad_dur=${duration}`** | Assure que l'audio a la bonne durée (évite coupures) |
+| **`duration` DOIT être un nombre** | Défaut à 6 si undefined (fix 9 déc 2024) |
+| **Utiliser /audio/merge pour mixer** | /video/encode seul ne gère pas plusieurs audios |
+| **Pas de fallback silencieux si mix échoue** | Si Transloadit ne renvoie pas `mixed=true` + `videoUrl`, on DOIT échouer (ne jamais réutiliser un ancien `final_url`) |
 
 ### Quand les cas se produisent
 
@@ -986,6 +1039,7 @@ const getClipStatus = (clip: CampaignClip): ClipStatus => {
 
 | Date | Commit | Comportement ajouté |
 |------|--------|---------------------|
+| 9 Dec 2024 | - | **Fix mix audio Transloadit** : Refactoring complet du mixage voix+ambiance. Utilisation de `/audio/merge` pour fusionner les pistes audio AVANT `/video/encode`. L'ancienne approche avec `/video/encode` et plusieurs inputs échouait car FFmpeg ne recevait qu'un seul fichier (erreur `Invalid file index 1`). Ajout aussi d'une valeur par défaut pour `duration` (6s) si undefined. |
 | 9 Dec 2024 | - | Auto-speed par syllabes/seconde : Le calcul de suggested_speed utilise maintenant `syllables_per_second` au lieu de `words_per_second`. Seuils : < 5 s/s → 1.2x, 5-6 s/s → 1.1x, ≥ 6 s/s → 1.0x. Plus précis et cohérent multilingue. |
 | 8 Dec 2024 | - | Fix affichage version courante : Comparer dates `assemblies[0].created_at` vs `submagic_versions[0].created_at` pour afficher la PLUS RÉCENTE. Historique fusionné et trié par date décroissante (🎬 assemblages + 🔤 sous-titres mélangés). |
 | 9 Dec 2024 | - | Indicateur de débit syllabes/seconde : Pastille dynamique temps réel (🐢 Lent < 5 s/s, ✓ Bon 5-7 s/s, ⚡ Dynamique > 7 s/s). Multilingue, se recalcule à chaque changement trim/speed. |
@@ -1573,4 +1627,4 @@ L'algorithme `countSyllables()` utilise une approche basée sur les groupes voca
 
 ---
 
-*Dernière mise à jour : 8 décembre 2024 (fix affichage version la plus récente assemblage/sous-titres)*
+*Dernière mise à jour : 9 décembre 2024 (fix mix audio Transloadit - architecture /audio/merge + /video/encode)*

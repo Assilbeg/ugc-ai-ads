@@ -392,6 +392,10 @@ export function useVideoGeneration() {
       
       if (hasVoice || hasAmbient) {
         updateProgress('generating_ambient', 92, 'Mixage audio...')
+
+        // Éviter de réutiliser un ancien mix en cas d'échec : on nettoie avant de mixer
+        updatedClip.video = { ...updatedClip.video, final_url: undefined }
+        updatedClip.audio = { ...updatedClip.audio, final_audio_url: undefined }
         
         try {
           const mixResponse = await fetch('/api/generate/mix-video', {
@@ -414,20 +418,23 @@ export function useVideoGeneration() {
           }
           
           const mixData = await mixResponse.json()
-          if (mixData.mixed && mixData.videoUrl) {
-            console.log('[Generation] Video mixed successfully:', mixData.videoUrl.slice(0, 50))
-            updatedClip.video = { 
-              ...updatedClip.video, 
-              final_url: mixData.videoUrl 
-            }
-            updatedClip.audio = { 
-              ...updatedClip.audio, 
-              final_audio_url: mixData.videoUrl // La vidéo contient maintenant l'audio mixé
-            }
+          if (!mixData.mixed || !mixData.videoUrl) {
+            throw new Error('Mixage audio incomplet (vidéo non générée)')
+          }
+
+          console.log('[Generation] Video mixed successfully:', mixData.videoUrl.slice(0, 50))
+          updatedClip.video = { 
+            ...updatedClip.video, 
+            final_url: mixData.videoUrl 
+          }
+          updatedClip.audio = { 
+            ...updatedClip.audio, 
+            final_audio_url: mixData.videoUrl // La vidéo contient maintenant l'audio mixé
           }
         } catch (mixErr) {
-          console.warn('[Generation] Mix failed, using raw video:', mixErr)
-          // On continue avec la vidéo brute si le mixage échoue
+          console.warn('[Generation] Mix failed:', mixErr)
+          updateProgress('failed', 0, mixErr instanceof Error ? mixErr.message : 'Erreur mixage audio')
+          throw mixErr
         }
       }
 
@@ -766,6 +773,10 @@ export function useVideoGeneration() {
         
         if (rawVideoUrl && (voiceUrl || ambientUrl)) {
           updateProgress('generating_ambient', 92, 'Mixage audio...')
+
+          // Éviter de réutiliser un ancien mix si la requête échoue
+          updatedClip.video = { ...updatedClip.video, final_url: undefined }
+          updatedClip.audio = { ...updatedClip.audio, final_audio_url: undefined }
           
           try {
             const mixResponse = await fetch('/api/generate/mix-video', {
@@ -782,22 +793,29 @@ export function useVideoGeneration() {
               signal: abortControllerRef.current?.signal,
             })
 
-            if (mixResponse.ok) {
-              const mixData = await mixResponse.json()
-              if (mixData.mixed && mixData.videoUrl) {
-                console.log('[Regenerate] Video mixed successfully:', mixData.videoUrl.slice(0, 50))
-                updatedClip.video = { 
-                  ...updatedClip.video, 
-                  final_url: mixData.videoUrl 
-                }
-                updatedClip.audio = { 
-                  ...updatedClip.audio, 
-                  final_audio_url: mixData.videoUrl
-                }
-              }
+            if (!mixResponse.ok) {
+              const err = await mixResponse.json()
+              throw new Error(err.error || 'Erreur mixage vidéo')
+            }
+
+            const mixData = await mixResponse.json()
+            if (!mixData.mixed || !mixData.videoUrl) {
+              throw new Error('Mixage audio incomplet (vidéo non générée)')
+            }
+
+            console.log('[Regenerate] Video mixed successfully:', mixData.videoUrl.slice(0, 50))
+            updatedClip.video = { 
+              ...updatedClip.video, 
+              final_url: mixData.videoUrl 
+            }
+            updatedClip.audio = { 
+              ...updatedClip.audio, 
+              final_audio_url: mixData.videoUrl
             }
           } catch (mixErr) {
             console.warn('[Regenerate] Mix failed:', mixErr)
+            updateProgress('failed', 0, mixErr instanceof Error ? mixErr.message : 'Erreur mixage audio')
+            throw mixErr
           }
         }
       }
