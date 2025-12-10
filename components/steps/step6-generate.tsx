@@ -300,6 +300,8 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   // Resynchroniser generatedClips quand state.generated_clips change
   // (ex: quand on revient de step5 avec des first frames modifiées)
   // Note: On fusionne par ID et beat, PAS par index (car on a plusieurs versions par beat)
+  // CRITIQUE: Si le plan a invalidé la vidéo (raw_url = undefined), on prend le clip du plan
+  // pour utiliser le nouveau video.prompt. Voir CRITICAL_BEHAVIORS.md §8.2
   useEffect(() => {
     if (clips.length > 0) {
       // Créer une map des clips existants par ID pour une fusion rapide
@@ -308,13 +310,28 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       // Fusionner les nouvelles données avec les vidéos générées existantes
       const mergedClips = clips.map(clip => {
         const existingGenerated = existingById.get(clip.id)
-        // Si on a une vidéo générée (raw_url OU final_url), garder les données de génération
-        // mais mettre à jour la first frame si elle a changé
+        
+        // ══════════════════════════════════════════════════════════════
+        // FIX: Si le plan a invalidé la vidéo (raw_url = undefined),
+        // NE PAS garder l'ancienne vidéo du state local. Cela arrive quand
+        // le script ou le prompt visuel a été modifié en step5.
+        // On doit prendre le clip du plan avec son nouveau video.prompt.
+        // ══════════════════════════════════════════════════════════════
+        if (!clip.video?.raw_url && !clip.video?.final_url) {
+          return clip
+        }
+        
+        // Si on a une vidéo générée existante, garder les données de génération
+        // mais mettre à jour first_frame, script ET video.prompt
         if (existingGenerated?.video?.raw_url || existingGenerated?.video?.final_url) {
           return {
             ...existingGenerated,
             first_frame: clip.first_frame, // Toujours prendre la first frame la plus récente
             script: clip.script, // Prendre le script mis à jour aussi
+            video: {
+              ...existingGenerated.video,
+              prompt: clip.video?.prompt || existingGenerated.video?.prompt, // Prendre le prompt du plan si mis à jour
+            },
           }
         }
         return clip
@@ -383,10 +400,32 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   // ══════════════════════════════════════════════════════════════
   const [displayedVersionIndex, setDisplayedVersionIndex] = useState<Record<number, number>>({})
   
+  // Source d'affichage robuste : garder le state local mais réinjecter
+  // les beats générés du parent s'ils disparaissent du state local (race React)
+  const clipsForDisplay = useMemo(() => {
+    if (generatedClips.length === 0) return clips
+
+    const ordersWithVideo = new Set<number>()
+    generatedClips.forEach(c => {
+      if (c?.order !== undefined && (c.video?.raw_url || c.video?.final_url)) {
+        ordersWithVideo.add(c.order)
+      }
+    })
+
+    const missingWithVideo = clips.filter(c => {
+      if (c?.order === undefined) return false
+      if (!c.video?.raw_url && !c.video?.final_url) return false
+      return !ordersWithVideo.has(c.order)
+    })
+
+    if (missingWithVideo.length === 0) return generatedClips
+    return [...generatedClips, ...missingWithVideo]
+  }, [generatedClips, clips])
+
   // Grouper les clips par beat (pour afficher toutes les versions)
   const clipsByBeat = useMemo(() => {
     const map = new Map<number, CampaignClip[]>()
-    generatedClips.forEach(c => {
+    clipsForDisplay.forEach(c => {
       if (!c?.video?.raw_url && !c?.video?.final_url) return // Ignorer clips sans vidéo
       const list = map.get(c.order) || []
       list.push(c)
@@ -401,7 +440,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       }))
     })
     return map
-  }, [generatedClips])
+  }, [clipsForDisplay])
   
   // Liste des beats UNIQUES pour l'affichage (un par order)
   // On prend le clip le plus représentatif par beat (selected ou plus récent)
@@ -1989,7 +2028,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   // VERSIONING: Compter les beats qui ont AU MOINS UN clip avec vidéo
   // (pas le nombre total de versions)
   const beatsWithVideo = new Set(
-    generatedClips
+    clipsForDisplay
       .filter(c => c.video?.raw_url || c.video?.final_url)
       .map(c => c.order)
   ).size
@@ -2002,7 +2041,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   
   // VERSIONING: Tous les beats sont complétés si chaque beat a au moins un clip completed
   const beatsCompleted = new Set<number>()
-  generatedClips.forEach(c => {
+  clipsForDisplay.forEach(c => {
     if (c.status === 'completed' && (c.video?.raw_url || c.video?.final_url)) {
       beatsCompleted.add(c.order)
     }
@@ -2011,7 +2050,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   // Note: ne PAS utiliser generatedClips.every() car ça inclut les clips "squelettes" sans vidéo
   const allCompleted = totalBeats > 0 && beatsCompleted.size === totalBeats
 
-  const hasFailures = generatedClips.some(c => c.status === 'failed')
+  const hasFailures = clipsForDisplay.some(c => c.status === 'failed')
   
   // Beats restants à générer (sans aucune version avec vidéo)
   const remainingClips = totalBeats - beatsWithVideo

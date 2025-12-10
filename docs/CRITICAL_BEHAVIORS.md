@@ -623,6 +623,31 @@ const videoCost = costPerSecond * videoDuration
 | **Step 5 (Plan)** | script, first_frame, beat, order | `step5-plan.tsx` |
 | **Step 6 (Generate)** | video, audio, transcription, adjustments | `step6-generate.tsx` |
 
+### Règle CRITIQUE : Ne pas “perdre” les beats déjà générés en Step 6
+
+> **Fix Dec 2025** : L’UI de Step 6 ne doit pas recalculer les beats restants uniquement avec le state local `generatedClips`. Après une régénération ciblée, React peut transitoirement omettre d’autres clips générés → le bouton “Générer les clips restants” réapparaît à tort.
+
+```typescript
+// ✅ CORRECT - Utiliser l’union des clips locaux ET du parent
+const clipsForDisplay = useMemo(() => {
+  if (generatedClips.length === 0) return clips
+  const ordersWithVideo = new Set<number>()
+  generatedClips.forEach(c => {
+    if (c?.order !== undefined && (c.video?.raw_url || c.video?.final_url)) {
+      ordersWithVideo.add(c.order)
+    }
+  })
+  const missingWithVideo = clips.filter(c =>
+    c?.order !== undefined &&
+    (c.video?.raw_url || c.video?.final_url) &&
+    !ordersWithVideo.has(c.order)
+  )
+  return missingWithVideo.length === 0 ? generatedClips : [...generatedClips, ...missingWithVideo]
+}, [generatedClips, clips])
+```
+
+**À ne jamais faire** : compter `remainingClips` ou `allCompleted` uniquement à partir de `generatedClips` après une régénération.
+
 ### Règle CRITIQUE : Préserver les vidéos existantes en Step 5
 
 > **Commit `7390684`** : Quand l'utilisateur retourne à Step 5 (plan) et re-sauvegarde,
@@ -781,6 +806,58 @@ if (originalPrompt.includes(newScript)) {
 ```
 Speech/Dialogue: speaks in standard metropolitan French accent, Parisian pronunciation, clear and neutral: "[nouveau script]"
 ```
+
+---
+
+## 8.2 Fusion clips step5 → step6 (Resync)
+
+### Le problème
+
+Quand l'utilisateur modifie le script en step5, le clip du plan est mis à jour avec :
+- `script.text` = nouveau texte
+- `video.prompt` = prompt mis à jour via `replaceScriptInPrompt`
+- `video.raw_url` = `undefined` (invalidé)
+
+Mais en step6, le state local `generatedClips` conserve l'ancienne version avec `raw_url` existant.
+Le useEffect de resync fusionne les deux : si `existingGenerated.video.raw_url` existe, on gardait `video` de l'ancien clip → l'ancien prompt était envoyé à Veo.
+
+### Solution
+
+> **Fix Jan 2025** : Dans le useEffect de resync (`step6-generate.tsx`), vérifier si le plan a invalidé la vidéo (`clip.video?.raw_url = undefined`). Si oui, prendre le clip du plan directement (pas de fusion avec l'ancien).
+
+```typescript
+// ❌ BUG - On gardait l'ancien video (avec ancien prompt)
+if (existingGenerated?.video?.raw_url || existingGenerated?.video?.final_url) {
+  return {
+    ...existingGenerated,  // video avec ancien prompt !
+    first_frame: clip.first_frame,
+    script: clip.script,
+  }
+}
+
+// ✅ CORRECT - Vérifier si le plan a invalidé la vidéo
+if (!clip.video?.raw_url && !clip.video?.final_url) {
+  return clip  // Prendre le clip du plan avec le nouveau prompt
+}
+if (existingGenerated?.video?.raw_url || existingGenerated?.video?.final_url) {
+  return {
+    ...existingGenerated,
+    first_frame: clip.first_frame,
+    script: clip.script,
+    video: {
+      ...existingGenerated.video,
+      prompt: clip.video?.prompt || existingGenerated.video?.prompt,  // Toujours prendre le prompt du plan
+    },
+  }
+}
+```
+
+### Règle CRITIQUE
+
+| Règle | Pourquoi |
+|-------|----------|
+| **Si `clip.video.raw_url = undefined`, prendre le clip du plan** | La vidéo a été invalidée (script/prompt changé), on doit utiliser le nouveau `video.prompt` |
+| **Toujours prendre `video.prompt` du plan si défini** | Même si on garde les URLs existantes, le prompt peut avoir été mis à jour |
 
 ---
 
@@ -1075,6 +1152,8 @@ const getClipStatus = (clip: CampaignClip): ClipStatus => {
 
 | Date | Commit | Comportement ajouté |
 |------|--------|---------------------|
+| Jan 2025 | - | **Fix resync step5→step6** : Si le plan a invalidé la vidéo (`raw_url = undefined`), prendre le clip du plan (pas de fusion avec l'ancien). Sinon le `video.prompt` mis à jour en step5 était écrasé par l'ancien prompt du state local step6. Voir §8.2. |
+| Jan 2025 | - | **Fix script step5→step6** : `saveEdit` en step5 appelle `replaceScriptInPrompt` pour injecter le script édité dans `video.prompt` et le pousser en BDD avant navigation vers step6. Voir §8.1. |
 | 10 Dec 2024 | 641c621 | **Fix mix audio Transloadit (/video/merge)** : `/video/encode` avec `as: 'audio'` ne remplace PAS l'audio. Solution : utiliser `/video/merge` avec `as: 'video'` + `as: 'audio'` et `preset: 'ipad-high'` (obligatoire, sinon erreur format). Pipeline final : 1) encoder voix, 2) encoder ambiance, 3) fusionner audios, 4) /video/merge. |
 | 9 Dec 2024 | - | **Fix mix audio Transloadit** : Refactoring complet du mixage voix+ambiance. Utilisation de `/audio/merge` pour fusionner les pistes audio AVANT `/video/encode`. L'ancienne approche avec `/video/encode` et plusieurs inputs échouait car FFmpeg ne recevait qu'un seul fichier (erreur `Invalid file index 1`). Ajout aussi d'une valeur par défaut pour `duration` (6s) si undefined. |
 | 9 Dec 2024 | - | Auto-speed par syllabes/seconde : Le calcul de suggested_speed utilise maintenant `syllables_per_second` au lieu de `words_per_second`. Seuils : < 5 s/s → 1.2x, 5-6 s/s → 1.1x, ≥ 6 s/s → 1.0x. Plus précis et cohérent multilingue. |
@@ -1694,4 +1773,4 @@ L'algorithme `countSyllables()` utilise une approche basée sur les groupes voca
 
 ---
 
-*Dernière mise à jour : 10 décembre 2024 (fix mix audio Transloadit - /video/merge + preset ipad-high remplace l'audio correctement)*
+*Dernière mise à jour : Janvier 2025 (fix resync step5→step6 - video.prompt du plan priorisé sur l'ancien state local)*
