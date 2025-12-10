@@ -251,13 +251,14 @@ export async function POST(request: NextRequest) {
       }
       
       // Étape 4: Extraire vidéo SANS audio (muette)
+      // Utiliser map: '0:v' pour ne garder que le stream vidéo
       steps['video_muted'] = {
         robot: '/video/encode',
         use: 'import_video',
         preset: 'empty',
         ffmpeg_stack: 'v6.0.0',
         ffmpeg: {
-          'an': '',  // Supprimer l'audio
+          'map': '0:v',  // Ne garder que la vidéo, pas l'audio
           'c:v': 'copy',  // Copier la vidéo sans ré-encoder
           't': duration
         }
