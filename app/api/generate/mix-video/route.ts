@@ -250,32 +250,18 @@ export async function POST(request: NextRequest) {
         }
       }
       
-      // Étape 4: Extraire vidéo SANS audio (muette)
-      // Utiliser map: '0:v' pour ne garder que le stream vidéo
-      steps['video_muted'] = {
-        robot: '/video/encode',
-        use: 'import_video',
-        preset: 'empty',
-        ffmpeg_stack: 'v6.0.0',
-        ffmpeg: {
-          'map': '0:v',  // Ne garder que la vidéo, pas l'audio
-          'c:v': 'copy',  // Copier la vidéo sans ré-encoder
-          't': duration
-        }
-      }
-      
-      // Étape 5: Combiner vidéo muette + audio fusionné via /video/merge
-      // /video/merge peut combiner vidéo et audio quand l'un est muet
+      // Étape 4: Remplacer l'audio de la vidéo par l'audio fusionné
+      // /video/merge avec as:'video' + as:'audio' remplace l'audio (doc Transloadit)
       steps['mixed'] = {
         robot: '/video/merge',
         use: {
           steps: [
-            { name: 'video_muted', as: 'video' },
+            { name: 'import_video', as: 'video' },
             { name: 'merge_audio', as: 'audio' }
           ]
         },
         result: true,
-        preset: 'ipad-high',
+        preset: 'empty',
         ffmpeg_stack: 'v6.0.0'
       }
     }
