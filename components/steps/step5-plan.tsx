@@ -61,6 +61,54 @@ const BEAT_EMOJIS: Record<string, string> = {
   cta: '🚀',
 }
 
+// Helper: injecter le script dans le prompt vidéo (aligné avec CRITICAL_BEHAVIORS §8.1)
+function replaceScriptInPrompt(originalPrompt: string, oldScript: string, newScript: string): string {
+  if (!originalPrompt) {
+    console.warn('[replaceScriptInPrompt] No original prompt, creating minimal prompt with script')
+    return `speaks in standard metropolitan French accent, Parisian pronunciation, clear and neutral: ${newScript}`
+  }
+  if (originalPrompt.includes(newScript)) {
+    console.log('[replaceScriptInPrompt] ✓ Prompt already contains the new script')
+    return originalPrompt
+  }
+  if (oldScript && oldScript !== newScript && originalPrompt.includes(oldScript)) {
+    const updatedPrompt = originalPrompt.replace(oldScript, newScript)
+    console.log('[replaceScriptInPrompt] ✓ Direct replace succeeded')
+    return updatedPrompt
+  }
+  console.warn('[replaceScriptInPrompt] Direct replace failed, trying regex pattern...')
+  const accentPattern = /(speaks in[^:]+:)\s*/g
+  const matches = [...originalPrompt.matchAll(accentPattern)]
+  if (matches.length > 0) {
+    const lastMatch = matches[matches.length - 1]
+    const accentEndIndex = lastMatch.index! + lastMatch[0].length
+    const afterAccent = originalPrompt.substring(accentEndIndex)
+    const beforeAccent = originalPrompt.substring(0, accentEndIndex)
+    const endMarkers = ['NEGATIVES:', '\n\n', 'Sound:', 'Background:', '\n7.', '\n8.']
+    let scriptEndIndex = afterAccent.length
+    for (const marker of endMarkers) {
+      const markerIndex = afterAccent.indexOf(marker)
+      if (markerIndex !== -1 && markerIndex < scriptEndIndex) {
+        scriptEndIndex = markerIndex
+      }
+    }
+    const afterScript = afterAccent.substring(scriptEndIndex)
+    const updatedPrompt = beforeAccent + newScript + afterScript
+    console.log('[replaceScriptInPrompt] ✓ Replaced using accent pattern method')
+    return updatedPrompt
+  }
+  console.warn('[replaceScriptInPrompt] No accent pattern found, ADDING script with standard format')
+  const negativesIndex = originalPrompt.indexOf('NEGATIVES:')
+  const negativePromptIndex = originalPrompt.indexOf('Negative prompt:')
+  const insertIndex = negativesIndex !== -1 ? negativesIndex : 
+                      negativePromptIndex !== -1 ? negativePromptIndex : 
+                      originalPrompt.length
+  const beforeInsert = originalPrompt.substring(0, insertIndex).trimEnd()
+  const afterInsert = originalPrompt.substring(insertIndex)
+  const scriptSection = `\n\nSpeech/Dialogue: speaks in standard metropolitan French accent, Parisian pronunciation, clear and neutral: "${newScript}"\n\n`
+  return beforeInsert + scriptSection + afterInsert
+}
+
 // Configuration des étapes de chargement - toutes démarrent ensemble avec des vitesses différentes
 const LOADING_STEPS = [
   { beat: 'hook', label: 'HOOK', emoji: '🎣' },
@@ -975,6 +1023,9 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
       const newText = editText
       const currentClip = clips[clipIndex]
       const scriptChanged = currentClip?.script.text !== newText
+      const oldPrompt = currentClip?.video?.prompt || ''
+      const oldScript = currentClip?.script?.text || ''
+      const updatedVideoPrompt = replaceScriptInPrompt(oldPrompt, oldScript, newText)
       
       // ══════════════════════════════════════════════════════════════
       // FIX: Calculer les nouveaux clips PUIS synchroniser immédiatement
@@ -989,15 +1040,17 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
             text: newText,
             word_count: newText.split(/\s+/).filter(Boolean).length
           },
-          // Invalider la vidéo existante si le script a changé
-          ...(scriptChanged && updatedClips[clipIndex].video?.raw_url ? {
-            video: {
-              ...updatedClips[clipIndex].video,
+          // Mettre à jour le prompt vidéo avec le nouveau script
+          // et invalider la vidéo si le script a changé
+          video: {
+            ...(updatedClips[clipIndex].video || {}),
+            prompt: updatedVideoPrompt,
+            ...(scriptChanged && updatedClips[clipIndex].video?.raw_url ? {
               raw_url: undefined,
               final_url: undefined,
-            },
-            status: 'pending' as const,
-          } : {}),
+            } : {}),
+          },
+          ...(scriptChanged && updatedClips[clipIndex].video?.raw_url ? { status: 'pending' as const } : {}),
         }
       }
       
@@ -1026,9 +1079,14 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
             const updateData: Record<string, unknown> = {
               script: clipToSave.script,
             }
+            // Toujours pousser le prompt vidéo mis à jour
+            updateData.video = {
+              ...(found.video || {}),
+              prompt: updatedVideoPrompt,
+              ...(scriptChanged && found.video?.raw_url ? { raw_url: null, final_url: null } : {}),
+            }
             // Invalider la vidéo si le script a changé
             if (scriptChanged && found.video?.raw_url) {
-              updateData.video = { ...found.video, raw_url: null, final_url: null }
               updateData.status = 'pending'
             }
             

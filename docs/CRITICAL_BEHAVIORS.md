@@ -722,6 +722,7 @@ Quand l'utilisateur modifie le script à l'étape 6 et clique sur "Sauvegarder &
 ### Solution : Fonction `replaceScriptInPrompt`
 
 > **Fix Dec 2024** : Utiliser la fonction helper robuste `replaceScriptInPrompt()` dans `step6-generate.tsx`
+> **MAJ Jan 2025** : `step5-plan.tsx/saveEdit` appelle aussi `replaceScriptInPrompt` pour injecter le script édité dans `video.prompt`, invalider la vidéo si nécessaire et pousser le prompt mis à jour en BDD avant de passer à l’étape 6.
 
 ```typescript
 // ❌ PROBLÈME - Le replace direct peut échouer silencieusement
