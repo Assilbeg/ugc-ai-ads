@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Loader2, CreditCard, Settings, Sparkles, Shield } from 'lucide-react'
@@ -13,6 +14,8 @@ interface BillingActionsProps {
 }
 
 export function BillingActions({ hasStripeCustomer, showEarlyBird, isAdmin = false }: BillingActionsProps) {
+  const t = useTranslations('billing.actions')
+  const tEarlyBird = useTranslations('billing.earlyBird')
   const [isLoadingPortal, setIsLoadingPortal] = useState(false)
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false)
   const [customAmount, setCustomAmount] = useState('')
@@ -38,7 +41,7 @@ export function BillingActions({ hasStripeCustomer, showEarlyBird, isAdmin = fal
       }
     } catch (error) {
       console.error('Error opening portal:', error)
-      alert('Erreur lors de l\'ouverture du portail')
+      alert(t('portalError'))
     } finally {
       setIsLoadingPortal(false)
     }
@@ -47,7 +50,7 @@ export function BillingActions({ hasStripeCustomer, showEarlyBird, isAdmin = fal
   const handleCustomPayment = async () => {
     const amount = parseFloat(customAmount)
     if (isNaN(amount) || amount < 1) {
-      alert('Montant minimum: 1€')
+      alert(t('minAmount'))
       return
     }
 
@@ -72,7 +75,7 @@ export function BillingActions({ hasStripeCustomer, showEarlyBird, isAdmin = fal
       }
     } catch (error) {
       console.error('Error creating custom checkout:', error)
-      alert('Erreur lors de la création du paiement')
+      alert(t('paymentError'))
     } finally {
       setIsLoadingCustom(false)
     }
@@ -86,7 +89,7 @@ export function BillingActions({ hasStripeCustomer, showEarlyBird, isAdmin = fal
           className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
         >
           <Sparkles className="w-4 h-4 mr-2" />
-          Profiter de l'offre
+          {tEarlyBird('cta')}
         </Button>
         <UpgradeModal
           isOpen={isUpgradeModalOpen}
@@ -103,7 +106,7 @@ export function BillingActions({ hasStripeCustomer, showEarlyBird, isAdmin = fal
         className="h-11 rounded-xl"
       >
         <CreditCard className="w-4 h-4 mr-2" />
-        Recharger des crédits
+        {t('recharge')}
       </Button>
       
       {hasStripeCustomer && (
@@ -118,7 +121,7 @@ export function BillingActions({ hasStripeCustomer, showEarlyBird, isAdmin = fal
           ) : (
             <Settings className="w-4 h-4 mr-2" />
           )}
-          Gérer l'abonnement
+          {t('manage')}
         </Button>
       )}
 
@@ -128,7 +131,7 @@ export function BillingActions({ hasStripeCustomer, showEarlyBird, isAdmin = fal
           <Shield className="w-5 h-5 text-violet-500" />
           <Input
             type="number"
-            placeholder="Montant €"
+            placeholder={t('amountPlaceholder')}
             value={customAmount}
             onChange={(e) => setCustomAmount(e.target.value)}
             className="w-24 h-9"
@@ -144,7 +147,7 @@ export function BillingActions({ hasStripeCustomer, showEarlyBird, isAdmin = fal
             {isLoadingCustom ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              'Payer'
+              t('pay')
             )}
           </Button>
         </div>

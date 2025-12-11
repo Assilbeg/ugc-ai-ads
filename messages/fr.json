@@ -354,7 +354,65 @@
     }
   },
   "campaign": {},
-  "billing": {},
+  "billing": {
+    "header": {
+      "title": "Facturation",
+      "subtitle": "Gérez vos crédits et votre abonnement"
+    },
+    "negativeBalance": {
+      "title": "Solde négatif : {amount}",
+      "description": "Votre compte a un solde négatif. Rechargez vos crédits pour continuer à générer du contenu."
+    },
+    "earlyBird": {
+      "title": "Offre Early Bird disponible !",
+      "description": "Profitez d'un prix réduit pour votre première campagne. Offre limitée dans le temps.",
+      "cta": "Profiter de l'offre"
+    },
+    "balance": {
+      "title": "Solde actuel",
+      "available": "disponibles",
+      "rechargeRequired": "Rechargement requis"
+    },
+    "subscription": {
+      "title": "Abonnement",
+      "renewalDate": "Renouvellement le {date}"
+    },
+    "remaining": {
+      "title": "Générations restantes",
+      "campaigns": "{count} campagnes",
+      "details": "ou {videos} vidéos ou {images} images"
+    },
+    "tiers": {
+      "free": "Gratuit",
+      "early_bird": "Early Bird",
+      "starter": "Starter",
+      "pro": "Pro",
+      "business": "Business"
+    },
+    "costs": {
+      "title": "Coûts par génération",
+      "subtitle": "Tarifs actuels pour chaque type de génération",
+      "firstFrame": "First Frame",
+      "video": "Vidéo Veo 3.1",
+      "voice": "Voice",
+      "ambient": "Ambient"
+    },
+    "transactions": {
+      "title": "Historique des transactions",
+      "subtitle": "Vos 20 dernières transactions",
+      "empty": "Aucune transaction pour le moment",
+      "balanceAfter": "Solde: {amount}"
+    },
+    "actions": {
+      "recharge": "Recharger des crédits",
+      "manage": "Gérer l'abonnement",
+      "pay": "Payer",
+      "amountPlaceholder": "Montant €",
+      "minAmount": "Montant minimum: 1€",
+      "portalError": "Erreur lors de l'ouverture du portail",
+      "paymentError": "Erreur lors de la création du paiement"
+    }
+  },
   "admin": {},
   "adminDashboard": {
     "header": {

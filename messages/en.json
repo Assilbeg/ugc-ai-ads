@@ -354,7 +354,65 @@
     }
   },
   "campaign": {},
-  "billing": {},
+  "billing": {
+    "header": {
+      "title": "Billing",
+      "subtitle": "Manage your credits and subscription"
+    },
+    "negativeBalance": {
+      "title": "Negative balance: {amount}",
+      "description": "Your account has a negative balance. Top up your credits to continue generating content."
+    },
+    "earlyBird": {
+      "title": "Early Bird offer available!",
+      "description": "Get a reduced price for your first campaign. Limited time offer.",
+      "cta": "Get the offer"
+    },
+    "balance": {
+      "title": "Current balance",
+      "available": "available",
+      "rechargeRequired": "Top-up required"
+    },
+    "subscription": {
+      "title": "Subscription",
+      "renewalDate": "Renews on {date}"
+    },
+    "remaining": {
+      "title": "Remaining generations",
+      "campaigns": "{count} campaigns",
+      "details": "or {videos} videos or {images} images"
+    },
+    "tiers": {
+      "free": "Free",
+      "early_bird": "Early Bird",
+      "starter": "Starter",
+      "pro": "Pro",
+      "business": "Business"
+    },
+    "costs": {
+      "title": "Cost per generation",
+      "subtitle": "Current rates for each generation type",
+      "firstFrame": "First Frame",
+      "video": "Video Veo 3.1",
+      "voice": "Voice",
+      "ambient": "Ambient"
+    },
+    "transactions": {
+      "title": "Transaction history",
+      "subtitle": "Your last 20 transactions",
+      "empty": "No transactions yet",
+      "balanceAfter": "Balance: {amount}"
+    },
+    "actions": {
+      "recharge": "Top up credits",
+      "manage": "Manage subscription",
+      "pay": "Pay",
+      "amountPlaceholder": "Amount €",
+      "minAmount": "Minimum amount: €1",
+      "portalError": "Error opening portal",
+      "paymentError": "Error creating payment"
+    }
+  },
   "admin": {},
   "adminDashboard": {
     "header": {

@@ -354,7 +354,65 @@
     }
   },
   "campaign": {},
-  "billing": {},
+  "billing": {
+    "header": {
+      "title": "Fatturazione",
+      "subtitle": "Gestisci i tuoi crediti e il tuo abbonamento"
+    },
+    "negativeBalance": {
+      "title": "Saldo negativo: {amount}",
+      "description": "Il tuo account ha un saldo negativo. Ricarica i tuoi crediti per continuare a generare contenuti."
+    },
+    "earlyBird": {
+      "title": "Offerta Early Bird disponibile!",
+      "description": "Approfitta di un prezzo ridotto per la tua prima campagna. Offerta a tempo limitato.",
+      "cta": "Approfitta dell'offerta"
+    },
+    "balance": {
+      "title": "Saldo attuale",
+      "available": "disponibili",
+      "rechargeRequired": "Ricarica richiesta"
+    },
+    "subscription": {
+      "title": "Abbonamento",
+      "renewalDate": "Rinnovo il {date}"
+    },
+    "remaining": {
+      "title": "Generazioni rimanenti",
+      "campaigns": "{count} campagne",
+      "details": "o {videos} video o {images} immagini"
+    },
+    "tiers": {
+      "free": "Gratuito",
+      "early_bird": "Early Bird",
+      "starter": "Starter",
+      "pro": "Pro",
+      "business": "Business"
+    },
+    "costs": {
+      "title": "Costo per generazione",
+      "subtitle": "Tariffe attuali per ogni tipo di generazione",
+      "firstFrame": "First Frame",
+      "video": "Video Veo 3.1",
+      "voice": "Voce",
+      "ambient": "Ambiente"
+    },
+    "transactions": {
+      "title": "Cronologia transazioni",
+      "subtitle": "Le tue ultime 20 transazioni",
+      "empty": "Nessuna transazione al momento",
+      "balanceAfter": "Saldo: {amount}"
+    },
+    "actions": {
+      "recharge": "Ricarica crediti",
+      "manage": "Gestisci abbonamento",
+      "pay": "Paga",
+      "amountPlaceholder": "Importo €",
+      "minAmount": "Importo minimo: 1€",
+      "portalError": "Errore nell'apertura del portale",
+      "paymentError": "Errore nella creazione del pagamento"
+    }
+  },
   "admin": {},
   "adminDashboard": {
     "header": {

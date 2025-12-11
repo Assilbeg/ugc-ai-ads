@@ -354,7 +354,65 @@
     }
   },
   "campaign": {},
-  "billing": {},
+  "billing": {
+    "header": {
+      "title": "Faturamento",
+      "subtitle": "Gerencie seus créditos e assinatura"
+    },
+    "negativeBalance": {
+      "title": "Saldo negativo: {amount}",
+      "description": "Sua conta tem saldo negativo. Recarregue seus créditos para continuar gerando conteúdo."
+    },
+    "earlyBird": {
+      "title": "Oferta Early Bird disponível!",
+      "description": "Aproveite um preço reduzido para sua primeira campanha. Oferta por tempo limitado.",
+      "cta": "Aproveitar a oferta"
+    },
+    "balance": {
+      "title": "Saldo atual",
+      "available": "disponíveis",
+      "rechargeRequired": "Recarga necessária"
+    },
+    "subscription": {
+      "title": "Assinatura",
+      "renewalDate": "Renovação em {date}"
+    },
+    "remaining": {
+      "title": "Gerações restantes",
+      "campaigns": "{count} campanhas",
+      "details": "ou {videos} vídeos ou {images} imagens"
+    },
+    "tiers": {
+      "free": "Grátis",
+      "early_bird": "Early Bird",
+      "starter": "Starter",
+      "pro": "Pro",
+      "business": "Business"
+    },
+    "costs": {
+      "title": "Custo por geração",
+      "subtitle": "Tarifas atuais para cada tipo de geração",
+      "firstFrame": "First Frame",
+      "video": "Vídeo Veo 3.1",
+      "voice": "Voz",
+      "ambient": "Ambiente"
+    },
+    "transactions": {
+      "title": "Histórico de transações",
+      "subtitle": "Suas últimas 20 transações",
+      "empty": "Nenhuma transação no momento",
+      "balanceAfter": "Saldo: {amount}"
+    },
+    "actions": {
+      "recharge": "Recarregar créditos",
+      "manage": "Gerenciar assinatura",
+      "pay": "Pagar",
+      "amountPlaceholder": "Valor €",
+      "minAmount": "Valor mínimo: 1€",
+      "portalError": "Erro ao abrir o portal",
+      "paymentError": "Erro ao criar o pagamento"
+    }
+  },
   "admin": {},
   "adminDashboard": {
     "header": {

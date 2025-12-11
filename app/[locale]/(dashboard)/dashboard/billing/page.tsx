@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { getTranslations } from 'next-intl/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { 
@@ -26,6 +27,7 @@ export default async function BillingPage({
   params: Promise<{ locale: string }>
 }) {
   const { locale } = await params
+  const t = await getTranslations('billing')
   const supabase = await createClient()
   
   // Get authenticated user
@@ -74,14 +76,8 @@ export default async function BillingPage({
   // Check for negative balance
   const isNegativeBalance = (userCredits?.balance || 0) < 0
 
-  // Format subscription tier display
-  const tierLabels: Record<string, string> = {
-    free: 'Gratuit',
-    early_bird: 'Early Bird',
-    starter: 'Starter',
-    pro: 'Pro',
-    business: 'Business',
-  }
+  // Format subscription tier display - labels come from translations
+  const getTierLabel = (tier: string) => t(`tiers.${tier}`)
 
   const tierColors: Record<string, string> = {
     free: 'bg-muted text-muted-foreground',
@@ -118,9 +114,9 @@ export default async function BillingPage({
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Facturation</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">{t('header.title')}</h1>
         <p className="text-muted-foreground mt-2">
-          Gérez vos crédits et votre abonnement
+          {t('header.subtitle')}
         </p>
       </div>
 
@@ -134,10 +130,10 @@ export default async function BillingPage({
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold text-lg text-red-600 dark:text-red-400">
-                  Solde négatif : {formatAsCredits(userCredits?.balance || 0)}
+                  {t('negativeBalance.title', { amount: formatAsCredits(userCredits?.balance || 0) })}
                 </h3>
                 <p className="text-muted-foreground">
-                  Votre compte a un solde négatif. Rechargez vos crédits pour continuer à générer du contenu.
+                  {t('negativeBalance.description')}
                 </p>
               </div>
               <BillingActions 
@@ -159,9 +155,9 @@ export default async function BillingPage({
                 <Sparkles className="w-6 h-6 text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="font-semibold text-lg">Offre Early Bird disponible !</h3>
+                <h3 className="font-semibold text-lg">{t('earlyBird.title')}</h3>
                 <p className="text-muted-foreground">
-                  Profitez d'un prix réduit pour votre première campagne. Offre limitée dans le temps.
+                  {t('earlyBird.description')}
                 </p>
               </div>
               <BillingActions 
@@ -180,7 +176,7 @@ export default async function BillingPage({
         <Card className={isNegativeBalance ? 'border-red-500/40 bg-red-500/5' : ''}>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-medium">Solde actuel</CardTitle>
+              <CardTitle className="text-base font-medium">{t('balance.title')}</CardTitle>
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
                 isNegativeBalance 
                   ? 'bg-red-500/10' 
@@ -200,8 +196,8 @@ export default async function BillingPage({
             </p>
             <p className="text-sm text-muted-foreground mt-1">
               {isNegativeBalance 
-                ? 'Rechargement requis' 
-                : 'disponibles'}
+                ? t('balance.rechargeRequired') 
+                : t('balance.available')}
             </p>
           </CardContent>
         </Card>
@@ -210,7 +206,7 @@ export default async function BillingPage({
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-medium">Abonnement</CardTitle>
+              <CardTitle className="text-base font-medium">{t('subscription.title')}</CardTitle>
               <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
                 <Zap className="w-5 h-5 text-purple-500" />
               </div>
@@ -218,11 +214,11 @@ export default async function BillingPage({
           </CardHeader>
           <CardContent>
             <Badge className={tierColors[userCredits?.subscription_tier || 'free']}>
-              {tierLabels[userCredits?.subscription_tier || 'free']}
+              {getTierLabel(userCredits?.subscription_tier || 'free')}
             </Badge>
             {userCredits?.subscription_current_period_end && (
               <p className="text-sm text-muted-foreground mt-2">
-                Renouvellement le {formatDate(userCredits.subscription_current_period_end)}
+                {t('subscription.renewalDate', { date: formatDate(userCredits.subscription_current_period_end) })}
               </p>
             )}
           </CardContent>
@@ -232,7 +228,7 @@ export default async function BillingPage({
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-medium">Générations restantes</CardTitle>
+              <CardTitle className="text-base font-medium">{t('remaining.title')}</CardTitle>
               <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
                 <TrendingUp className="w-5 h-5 text-blue-500" />
               </div>
@@ -241,9 +237,9 @@ export default async function BillingPage({
           <CardContent>
             {remaining ? (
               <div className="space-y-1">
-                <p className="text-2xl font-bold">{remaining.fullCampaigns} campagnes</p>
+                <p className="text-2xl font-bold">{t('remaining.campaigns', { count: remaining.fullCampaigns })}</p>
                 <p className="text-sm text-muted-foreground">
-                  ou {remaining.videos} vidéos ou {remaining.firstFrames} images
+                  {t('remaining.details', { videos: remaining.videos, images: remaining.firstFrames })}
                 </p>
               </div>
             ) : (
@@ -256,9 +252,9 @@ export default async function BillingPage({
       {/* Costs Info */}
       <Card>
         <CardHeader>
-          <CardTitle>Coûts par génération</CardTitle>
+          <CardTitle>{t('costs.title')}</CardTitle>
           <CardDescription>
-            Tarifs actuels pour chaque type de génération
+            {t('costs.subtitle')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -266,28 +262,28 @@ export default async function BillingPage({
             <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
               <Image className="w-5 h-5 text-blue-500" />
               <div>
-                <p className="font-medium">First Frame</p>
+                <p className="font-medium">{t('costs.firstFrame')}</p>
                 <p className="text-sm text-muted-foreground">{formatAsCredits(costs.first_frame)}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
               <Video className="w-5 h-5 text-purple-500" />
               <div>
-                <p className="font-medium">Vidéo Veo 3.1</p>
+                <p className="font-medium">{t('costs.video')}</p>
                 <p className="text-sm text-muted-foreground">{formatAsCredits(costs.video_veo31_fast || costs.video_veo31)}/s</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
               <Mic className="w-5 h-5 text-green-500" />
               <div>
-                <p className="font-medium">Voice</p>
+                <p className="font-medium">{t('costs.voice')}</p>
                 <p className="text-sm text-muted-foreground">{formatAsCredits(costs.voice_chatterbox)}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
               <Music className="w-5 h-5 text-amber-500" />
               <div>
-                <p className="font-medium">Ambient</p>
+                <p className="font-medium">{t('costs.ambient')}</p>
                 <p className="text-sm text-muted-foreground">{formatAsCredits(costs.ambient_elevenlabs)}</p>
               </div>
             </div>
@@ -307,9 +303,9 @@ export default async function BillingPage({
       {/* Transactions History */}
       <Card>
         <CardHeader>
-          <CardTitle>Historique des transactions</CardTitle>
+          <CardTitle>{t('transactions.title')}</CardTitle>
           <CardDescription>
-            Vos 20 dernières transactions
+            {t('transactions.subtitle')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -340,7 +336,7 @@ export default async function BillingPage({
                       {tx.amount > 0 ? '+' : ''}{formatAsCredits(tx.amount)}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Solde: {formatAsCredits(tx.balance_after)}
+                      {t('transactions.balanceAfter', { amount: formatAsCredits(tx.balance_after) })}
                     </p>
                   </div>
                 </div>
@@ -348,7 +344,7 @@ export default async function BillingPage({
             </div>
           ) : (
             <p className="text-center text-muted-foreground py-8">
-              Aucune transaction pour le moment
+              {t('transactions.empty')}
             </p>
           )}
         </CardContent>

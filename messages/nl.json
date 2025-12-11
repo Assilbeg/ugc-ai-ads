@@ -348,7 +348,65 @@
     }
   },
   "campaign": {},
-  "billing": {},
+  "billing": {
+    "header": {
+      "title": "Facturatie",
+      "subtitle": "Beheer je credits en abonnement"
+    },
+    "negativeBalance": {
+      "title": "Negatief saldo: {amount}",
+      "description": "Je account heeft een negatief saldo. Laad je credits op om door te gaan met het genereren van content."
+    },
+    "earlyBird": {
+      "title": "Early Bird aanbieding beschikbaar!",
+      "description": "Profiteer van een gereduceerde prijs voor je eerste campagne. Tijdelijke aanbieding.",
+      "cta": "Aanbieding pakken"
+    },
+    "balance": {
+      "title": "Huidig saldo",
+      "available": "beschikbaar",
+      "rechargeRequired": "Opladen vereist"
+    },
+    "subscription": {
+      "title": "Abonnement",
+      "renewalDate": "Verlenging op {date}"
+    },
+    "remaining": {
+      "title": "Resterende generaties",
+      "campaigns": "{count} campagnes",
+      "details": "of {videos} video's of {images} afbeeldingen"
+    },
+    "tiers": {
+      "free": "Gratis",
+      "early_bird": "Early Bird",
+      "starter": "Starter",
+      "pro": "Pro",
+      "business": "Business"
+    },
+    "costs": {
+      "title": "Kosten per generatie",
+      "subtitle": "Huidige tarieven voor elk generatietype",
+      "firstFrame": "First Frame",
+      "video": "Video Veo 3.1",
+      "voice": "Stem",
+      "ambient": "Ambient"
+    },
+    "transactions": {
+      "title": "Transactiegeschiedenis",
+      "subtitle": "Je laatste 20 transacties",
+      "empty": "Nog geen transacties",
+      "balanceAfter": "Saldo: {amount}"
+    },
+    "actions": {
+      "recharge": "Credits opladen",
+      "manage": "Abonnement beheren",
+      "pay": "Betalen",
+      "amountPlaceholder": "Bedrag €",
+      "minAmount": "Minimumbedrag: €1",
+      "portalError": "Fout bij openen portal",
+      "paymentError": "Fout bij aanmaken betaling"
+    }
+  },
   "admin": {},
   "adminDashboard": {
     "header": {
