@@ -130,6 +130,8 @@ export function useVideoGeneration() {
           engine: 'veo3.1',
           duration: clip.video.duration,
           quality: videoQuality,
+          campaignId: campaignId, // Pour la récupération des générations orphelines
+          clipId: clip.id, // Pour lier le log au clip
         }),
         signal: abortControllerRef.current?.signal,
       })
@@ -551,18 +553,86 @@ export function useVideoGeneration() {
         console.log('[Regenerate Video] Video prompt contains script?', videoPromptToSend?.includes(clip.script?.text || ''))
         console.log('[Regenerate Video] ═══════════════════════════════════════')
 
-        const videoResponse = await fetch('/api/generate/video', {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/e4231377-2382-45db-b33c-82d9e810facf', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            prompt: videoPromptToSend,
-            firstFrameUrl: frameUrl,
-            engine: 'veo3.1',
-            duration: clip.video.duration,
-            quality: videoQuality,
+            sessionId: 'debug-session',
+            runId: 'regen-run1',
+            hypothesisId: 'H1',
+            location: 'hooks/use-video-generation.ts:552',
+            message: 'Regenerate video payload',
+            data: {
+              clipOrder: clip.order,
+              what,
+              promptLength: videoPromptToSend?.length || 0,
+              hasPrompt: !!videoPromptToSend,
+              hasFirstFrame: !!frameUrl,
+              duration: clip.video.duration,
+            },
+            timestamp: Date.now(),
           }),
-          signal: abortControllerRef.current?.signal,
-        })
+        }).catch(() => {})
+        // #endregion
+
+        let videoResponse: Response
+        try {
+          videoResponse = await fetch('/api/generate/video', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt: videoPromptToSend,
+              firstFrameUrl: frameUrl,
+              engine: 'veo3.1',
+              duration: clip.video.duration,
+              quality: videoQuality,
+              clipId: clip.id, // Pour la récupération des générations orphelines
+            }),
+            signal: abortControllerRef.current?.signal,
+          })
+        } catch (videoFetchErr) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/e4231377-2382-45db-b33c-82d9e810facf', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId: 'debug-session',
+              runId: 'regen-run1',
+              hypothesisId: 'H4',
+              location: 'hooks/use-video-generation.ts:573',
+              message: 'Regenerate video fetch threw',
+              data: {
+                clipOrder: clip.order,
+                errorName: videoFetchErr instanceof Error ? videoFetchErr.name : 'unknown',
+                errorMessage: videoFetchErr instanceof Error ? videoFetchErr.message : String(videoFetchErr),
+              },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {})
+          // #endregion
+          throw videoFetchErr
+        }
+
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/e4231377-2382-45db-b33c-82d9e810facf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: 'debug-session',
+            runId: 'regen-run1',
+            hypothesisId: 'H2',
+            location: 'hooks/use-video-generation.ts:591',
+            message: 'Regenerate video response',
+            data: {
+              clipOrder: clip.order,
+              status: videoResponse.status,
+              ok: videoResponse.ok,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {})
+        // #endregion
 
         if (!videoResponse.ok) {
           const err = await videoResponse.json()

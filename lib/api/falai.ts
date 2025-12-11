@@ -1,7 +1,13 @@
 // Fal.ai API Client
 // Handles: NanoBanana Pro (first frames), Veo 3.1, Chatterbox HD, ElevenLabs v2
 
-const FAL_API_URL = 'https://queue.fal.run'
+// Mode queue (asynchrone) - peut avoir de longues files d'attente
+const FAL_QUEUE_URL = 'https://queue.fal.run'
+// Mode synchrone (direct) - pas de queue, mais timeout plus court
+const FAL_SYNC_URL = 'https://fal.run'
+
+// Garder le mode queue pour les opérations longues (Veo)
+const FAL_API_URL = FAL_QUEUE_URL
 
 interface FalRequestOptions {
   path: string
@@ -230,6 +236,12 @@ export async function generateVideoVeo31(
   duration: 4 | 6 | 8 = 6,
   quality: VideoQuality = 'standard'
 ): Promise<FalGenerationResult<string>> {
+  const FAL_KEY = process.env.FAL_KEY
+  
+  if (!FAL_KEY) {
+    throw new Error('FAL_KEY non configurée dans .env.local')
+  }
+
   const path = getVeo31Endpoint(quality)
   
   const input: Veo31Input = {
@@ -239,7 +251,7 @@ export async function generateVideoVeo31(
     aspect_ratio: '9:16',
   }
 
-  console.log(`[Veo3.1 ${quality.toUpperCase()}] Generating video:`, { 
+  console.log(`[Veo3.1 ${quality.toUpperCase()}] Generating video (SYNC mode):`, { 
     duration, 
     quality,
     endpoint: path,
@@ -251,17 +263,36 @@ export async function generateVideoVeo31(
     throw new Error('First frame URL is required for Veo3.1 image-to-video')
   }
 
-  const queue = await falRequest<FalQueueResponse>({ path, input })
-  const result = await pollUntilCompleteWithUrls<Veo31Output>(
-    queue.status_url, 
-    queue.response_url, 
-    180, 
-    10000
-  )
+  // ═══════════════════════════════════════════════════════════════════
+  // MODE SYNCHRONE : Utilise fal.run (pas queue.fal.run)
+  // Avantages : Pas de file d'attente publique, traitement direct
+  // Doc : https://fal.ai/models/fal-ai/veo3.1/fast/image-to-video/llms.txt
+  // ═══════════════════════════════════════════════════════════════════
+  const syncUrl = `https://fal.run/${path}`
   
-  console.log(`[Veo3.1 ${quality.toUpperCase()}] Video generated:`, result.video?.url?.slice(0, 80), `(request_id: ${queue.request_id})`)
+  const response = await fetch(syncUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Key ${FAL_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(input),
+  })
+
+  if (!response.ok) {
+    const error = await response.text()
+    console.error(`[Veo3.1] Sync request failed (${response.status}):`, error)
+    throw new Error(`Fal.ai sync error (${response.status}): ${error}`)
+  }
+
+  const result = await response.json() as Veo31Output
+
+  console.log(`[Veo3.1 ${quality.toUpperCase()}] Video generated (SYNC):`, result.video?.url?.slice(0, 80))
   
-  return { result: result.video.url, requestId: queue.request_id }
+  // En mode sync, pas de request_id retourné, on génère un UUID
+  const requestId = `sync-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+  
+  return { result: result.video.url, requestId }
 }
 
 // ─────────────────────────────────────────────────────────────────

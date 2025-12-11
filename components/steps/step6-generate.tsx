@@ -411,6 +411,57 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   const [checkingCredits, setCheckingCredits] = useState(false)
   
   // ══════════════════════════════════════════════════════════════
+  // RÉCUPÉRATION DES VIDÉOS ORPHELINES AU CHARGEMENT
+  // Si l'utilisateur a rafraîchi la page pendant le polling Fal.ai,
+  // les vidéos peuvent avoir été générées mais jamais reçues.
+  // ══════════════════════════════════════════════════════════════
+  const [recoveringPending, setRecoveringPending] = useState(false)
+  
+  useEffect(() => {
+    const recoverPendingGenerations = async () => {
+      if (!state.campaign_id) return
+      
+      try {
+        setRecoveringPending(true)
+        console.log('[Step6] Checking for pending generations to recover...')
+        
+        const response = await fetch('/api/generate/recover-pending', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ campaignId: state.campaign_id }),
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          console.log('[Step6] Recovery result:', data.summary)
+          
+          if (data.summary?.recovered > 0) {
+            // Recharger les clips depuis la base de données
+            const { data: updatedClips, error } = await (supabase
+              .from('campaign_clips') as any)
+              .select('*')
+              .eq('campaign_id', state.campaign_id)
+              .order('order', { ascending: true })
+            
+            if (!error && updatedClips) {
+              console.log('[Step6] ✓ Recovered', data.summary.recovered, 'videos - reloading clips')
+              setGeneratedClips(updatedClips)
+              // Déclencher une mise à jour du parent aussi
+              onClipsUpdate(updatedClips)
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[Step6] Error recovering pending generations:', err)
+      } finally {
+        setRecoveringPending(false)
+      }
+    }
+    
+    recoverPendingGenerations()
+  }, [state.campaign_id]) // eslint-disable-line react-hooks/exhaustive-deps
+  
+  // ══════════════════════════════════════════════════════════════
   // ÉDITION DU SCRIPT (ce que dit l'acteur)
   // ══════════════════════════════════════════════════════════════
   const [editingScript, setEditingScript] = useState<number | null>(null) // beat order en édition
@@ -1559,6 +1610,10 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   }, [campaignId, generatedClips, saveClipsToDb, hasNewlyGeneratedClips])
 
   const handleStartGeneration = async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/e4231377-2382-45db-b33c-82d9e810facf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'step6-generate.tsx:handleStartGeneration-entry',message:'handleStartGeneration called',data:{hasActor:!!actor,hasPreset:!!preset,clipsLength:clips.length},timestamp:Date.now(),sessionId:'debug-session',runId:'gen-debug',hypothesisId:'H5'})}).catch(()=>{});
+    // #endregion
+
     if (!actor || !preset || clips.length === 0) return
 
     // Un seul clip par beat : sélectionné prioritaire, sinon plus récent
@@ -1585,8 +1640,15 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
 
     if (clipsToGenerate.length === 0) {
       console.log('Tous les clips ont déjà des vidéos')
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/e4231377-2382-45db-b33c-82d9e810facf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'step6-generate.tsx:handleStartGeneration-noClips',message:'No clips to generate - all have videos',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'gen-debug',hypothesisId:'H5'})}).catch(()=>{});
+      // #endregion
       return
     }
+
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/e4231377-2382-45db-b33c-82d9e810facf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'step6-generate.tsx:handleStartGeneration-beforeCreditsCheck',message:'About to check credits',data:{clipsToGenerateCount:clipsToGenerate.length},timestamp:Date.now(),sessionId:'debug-session',runId:'gen-debug',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
 
     // ═══════════════════════════════════════════════════════════════════
     // VÉRIFICATION DES CRÉDITS AVANT GÉNÉRATION
@@ -1603,6 +1665,10 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       ]
       
       const creditsCheck = await checkMultipleCredits(generations)
+
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/e4231377-2382-45db-b33c-82d9e810facf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'step6-generate.tsx:handleStartGeneration-afterCreditsCheck',message:'Credits check completed',data:{hasEnough:creditsCheck?.hasEnough,requiredAmount:creditsCheck?.requiredAmount,currentBalance:creditsCheck?.currentBalance},timestamp:Date.now(),sessionId:'debug-session',runId:'gen-debug',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
       
       if (creditsCheck && !creditsCheck.hasEnough) {
         // Pas assez de crédits ! Ouvrir le modal d'achat
@@ -1623,6 +1689,10 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     }
     
     setCheckingCredits(false)
+
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/e4231377-2382-45db-b33c-82d9e810facf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'step6-generate.tsx:handleStartGeneration-afterCredits',message:'Credits check passed, starting generation',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'gen-debug',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
 
     // ═══════════════════════════════════════════════════════════════════
     // LANCEMENT DE LA GÉNÉRATION
@@ -1647,6 +1717,10 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       setCampaignId(dbCampaignId)
     }
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/e4231377-2382-45db-b33c-82d9e810facf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'step6-generate.tsx:handleStartGeneration-beforeGenerateAllClips',message:'Calling generateAllClips',data:{dbCampaignId,clipsToGenerateCount:clipsToGenerate.length,videoQuality,hasProduct:!!state.product},timestamp:Date.now(),sessionId:'debug-session',runId:'gen-debug',hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
+
     const results = await generateAllClips(
       clipsToGenerate,
       actor,
@@ -1656,6 +1730,10 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       videoQuality,
       state.product
     )
+
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/e4231377-2382-45db-b33c-82d9e810facf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'step6-generate.tsx:handleStartGeneration-afterGenerateAllClips',message:'generateAllClips completed',data:{resultsCount:results?.length||0,hasResults:!!results},timestamp:Date.now(),sessionId:'debug-session',runId:'gen-debug',hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
 
     // Marquer qu'on a de nouveaux clips générés (pour déclencher la sauvegarde)
     setHasNewlyGeneratedClips(true)

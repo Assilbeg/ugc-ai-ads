@@ -161,6 +161,79 @@ LIMIT 10;
 
 ---
 
+## Erreurs Fal.ai / Génération Vidéo
+
+### Queue Fal.ai très longue (position > 100)
+
+| Aspect | Détails |
+|--------|---------|
+| **Erreur** | Génération vidéo prend 10-30+ minutes au lieu de ~1 minute |
+| **Symptôme** | Polling montre `status: IN_QUEUE` avec `queue_position: 1000+` |
+| **Cause** | Utilisation de `queue.fal.run` (mode asynchrone) au lieu de `fal.run` (mode synchrone) |
+| **Solution** | Utiliser le mode synchrone direct |
+| **Commit de fix** | Décembre 2024 |
+
+```typescript
+// ❌ INCORRECT - Mode queue asynchrone (peut avoir des files de 1000+)
+const FAL_API_URL = 'https://queue.fal.run'
+const response = await fetch(`${FAL_API_URL}/${path}`, { ... })
+// Puis polling avec pollUntilComplete...
+
+// ✅ CORRECT - Mode synchrone direct (pas de file d'attente publique)
+const syncUrl = `https://fal.run/${path}`  // fal.run, pas queue.fal.run
+const response = await fetch(syncUrl, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Key ${FAL_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify(input),
+})
+// La réponse contient directement le résultat !
+const result = await response.json()
+```
+
+**Documentation officielle** : https://fal.ai/models/fal-ai/veo3.1/fast/image-to-video/llms.txt
+
+---
+
+### Génération vidéo perdue après refresh
+
+| Aspect | Détails |
+|--------|---------|
+| **Erreur** | L'utilisateur rafraîchit la page pendant la génération, la vidéo est perdue |
+| **Cause** | Le polling côté client est interrompu |
+| **Solution** | Système de récupération des générations orphelines |
+| **Fichiers** | `app/api/generate/recover-pending/route.ts`, `components/steps/step6-generate.tsx` |
+
+Le système de récupération :
+1. Sauvegarde `fal_request_id` dans `generation_logs` au début
+2. Au chargement de la page, appelle `/api/generate/recover-pending`
+3. L'API vérifie le statut auprès de Fal.ai
+4. Si COMPLETED → récupère la vidéo et met à jour le clip
+
+```typescript
+// Vérifier le statut d'une génération orpheline
+const statusUrl = `https://queue.fal.run/${model_path}/requests/${fal_request_id}/status`
+const status = await fetch(statusUrl, { headers: { 'Authorization': `Key ${FAL_KEY}` } })
+// status.status peut être: IN_QUEUE, IN_PROGRESS, COMPLETED, FAILED
+```
+
+---
+
+### Vérifier la position dans la queue Fal.ai
+
+```bash
+# Vérifier le statut d'une requête
+curl -s -H "Authorization: Key $FAL_KEY" \
+  "https://queue.fal.run/fal-ai/veo3.1/requests/{REQUEST_ID}/status"
+
+# Résultat exemple :
+# {"status": "IN_QUEUE", "queue_position": 1177}  ← Position dans la queue
+```
+
+---
+
 ## Erreurs de Génération IA
 
 ### Voix robotique / pas clonée

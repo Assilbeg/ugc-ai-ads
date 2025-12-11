@@ -28,6 +28,7 @@
 16. [Dashboard - Previews Vidéo](#16-dashboard---previews-vidéo)
 17. [Sous-titres Submagic](#17-sous-titres-submagic)
 18. [Indicateur de Débit (Syllabes/Seconde)](#18-indicateur-de-débit-syllabesseconde)
+19. [API Fal.ai - Mode Synchrone vs Queue](#19-api-falai---mode-synchrone-vs-queue)
 
 ---
 
@@ -1761,6 +1762,65 @@ L'algorithme `countSyllables()` utilise une approche basée sur les groupes voca
 
 ---
 
+## 19. API Fal.ai - Mode Synchrone vs Queue
+
+### Contexte
+> Fix Décembre 2024 - Résolution du problème de queue Fal.ai (position 1000+)
+
+Fal.ai propose deux modes d'appel API :
+- **Mode Queue** (`queue.fal.run`) : Asynchrone, passe par une file d'attente publique
+- **Mode Synchrone** (`fal.run`) : Direct, pas de file d'attente
+
+### Règles CRITIQUES
+
+| Règle | Description |
+|-------|-------------|
+| **TOUJOURS utiliser le mode synchrone pour Veo 3.1** | `https://fal.run/fal-ai/veo3.1/...` au lieu de `https://queue.fal.run/...` |
+| **Ne JAMAIS utiliser queue.fal.run pour les vidéos** | La queue publique peut avoir 1000+ requêtes en attente |
+| **Timeout Vercel = 5 min** | Si génération > 5 min, elle timeout (mais Veo prend ~1 min normalement) |
+
+### Code de référence
+
+```typescript
+// ❌ INCORRECT - Mode queue (longues files d'attente)
+const queue = await fetch(`https://queue.fal.run/${path}`, {
+  method: 'POST',
+  headers: { 'Authorization': `Key ${FAL_KEY}`, 'Content-Type': 'application/json' },
+  body: JSON.stringify(input),
+})
+// Puis polling avec status_url...
+
+// ✅ CORRECT - Mode synchrone (traitement direct)
+const response = await fetch(`https://fal.run/${path}`, {
+  method: 'POST',
+  headers: { 'Authorization': `Key ${FAL_KEY}`, 'Content-Type': 'application/json' },
+  body: JSON.stringify(input),
+})
+const result = await response.json()  // Contient directement video.url !
+```
+
+### Récupération des générations orphelines
+
+Si l'utilisateur quitte la page pendant une génération :
+1. Le `fal_request_id` est sauvegardé dans `generation_logs` au début
+2. L'endpoint `/api/generate/recover-pending` vérifie les générations en attente
+3. Au rechargement de Step6, on tente de récupérer les vidéos terminées
+
+### Documentation Fal.ai
+
+- **Veo 3.1 Fast** : https://fal.ai/models/fal-ai/veo3.1/fast/image-to-video/llms.txt
+- **Veo 3.1 Standard** : https://fal.ai/models/fal-ai/veo3.1/image-to-video/api
+
+### Temps de génération typiques
+
+| Qualité | Durée typique | Timeout Vercel |
+|---------|---------------|----------------|
+| Fast (4s vidéo) | ~45-90 secondes | ✅ OK |
+| Fast (8s vidéo) | ~90-120 secondes | ✅ OK |
+| Standard (8s vidéo) | ~2-3 minutes | ✅ OK |
+
+---
+
 ## 📝 Comment mettre à jour ce document
 
 1. **Avant de modifier un comportement listé ici** → Discuter et documenter la raison
@@ -1773,4 +1833,4 @@ L'algorithme `countSyllables()` utilise une approche basée sur les groupes voca
 
 ---
 
-*Dernière mise à jour : Janvier 2025 (fix resync step5→step6 - video.prompt du plan priorisé sur l'ancien state local)*
+*Dernière mise à jour : Décembre 2024 (fix Fal.ai mode synchrone - évite queue publique)*

@@ -45,6 +45,30 @@ export async function POST(request: NextRequest) {
     // Default to fast quality (moins cher)
     const videoQuality: VideoQuality = quality || 'fast'
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/e4231377-2382-45db-b33c-82d9e810facf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'regen-run1',
+        hypothesisId: 'H2',
+        location: 'app/api/generate/video/route.ts:60',
+        message: 'Video API request received',
+        data: {
+          hasUser: !!user,
+          promptLength: prompt?.length || 0,
+          hasFirstFrameUrl: !!firstFrameUrl,
+          duration,
+          quality: videoQuality,
+          campaignId: campaignId || null,
+          clipId: clipId || null,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+    // #endregion
+
     if (!prompt || !firstFrameUrl || !engine || !duration) {
       return NextResponse.json(
         { error: 'Paramètres manquants' },
@@ -142,6 +166,24 @@ export async function POST(request: NextRequest) {
         startTime
       )
     }
+
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/e4231377-2382-45db-b33c-82d9e810facf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'regen-run1',
+        hypothesisId: 'H3',
+        location: 'app/api/generate/video/route.ts:146',
+        message: 'Video API error',
+        data: {
+          errorMessage: error instanceof Error ? error.message : String(error),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+    // #endregion
     
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Erreur de génération' },
