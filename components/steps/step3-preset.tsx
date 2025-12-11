@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { INTENTION_PRESETS } from '@/lib/presets'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -25,21 +26,16 @@ const PRESET_EMOJIS: Record<string, string> = {
   'story-journey': '📖',
 }
 
-const TONE_LABELS: Record<string, string> = {
-  vulnerable: 'Vulnérable',
-  energetic: 'Énergique',
-  urgent: 'Urgent',
-  conversational: 'Conversationnel',
-  reflective: 'Réflexif',
-}
-
-const FILMING_LABELS: Record<string, { label: string; icon: string; color: string }> = {
-  handheld: { label: 'Selfie', icon: '🤳', color: 'bg-blue-500/30' },
-  filmed_by_other: { label: 'Filmé par autre', icon: '🎬', color: 'bg-purple-500/30' },
-  setup_phone: { label: 'Posé / Trépied', icon: '📱', color: 'bg-green-500/30' },
+const FILMING_META: Record<string, { icon: string; color: string }> = {
+  handheld: { icon: '🤳', color: 'bg-blue-500/30' },
+  filmed_by_other: { icon: '🎬', color: 'bg-purple-500/30' },
+  setup_phone: { icon: '📱', color: 'bg-green-500/30' },
 }
 
 export function Step3Preset({ selectedPresetId, selectedActor, onSelect, onNext, onBack }: Step3PresetProps) {
+  const t = useTranslations('step3')
+  const tc = useTranslations('common')
+  
   const handleContinue = () => {
     if (selectedPresetId) {
       onNext()
@@ -54,11 +50,11 @@ export function Step3Preset({ selectedPresetId, selectedActor, onSelect, onNext,
     <div className="space-y-8">
       {/* Header */}
       <div className="text-center max-w-lg mx-auto">
-        <h2 className="text-2xl font-semibold tracking-tight">Choisis ton intention</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">{t('header.title')}</h2>
         <p className="text-muted-foreground mt-2">
-          Le style et le contexte de ta vidéo UGC
+          {t('header.subtitle')}
           {selectedActor && (
-            <span className="text-foreground font-medium"> • avec {selectedActor.name}</span>
+            <span className="text-foreground font-medium"> • {t('header.withActor', { name: selectedActor.name })}</span>
           )}
         </p>
       </div>
@@ -110,17 +106,17 @@ export function Step3Preset({ selectedPresetId, selectedActor, onSelect, onNext,
                     {preset.description}
                   </p>
                   <div className="flex items-center gap-2 mt-2 flex-wrap">
-                    {preset.filming_type && FILMING_LABELS[preset.filming_type] && (
+                    {preset.filming_type && FILMING_META[preset.filming_type] && (
                       <Badge 
                         variant="secondary" 
-                        className={`text-[10px] rounded-full px-2 py-0.5 text-white border-0 ${FILMING_LABELS[preset.filming_type].color}`}
+                        className={`text-[10px] rounded-full px-2 py-0.5 text-white border-0 ${FILMING_META[preset.filming_type].color}`}
                       >
-                        <span className="mr-1">{FILMING_LABELS[preset.filming_type].icon}</span>
-                        {FILMING_LABELS[preset.filming_type].label}
+                        <span className="mr-1">{FILMING_META[preset.filming_type].icon}</span>
+                        {t(`filming.${preset.filming_type}`)}
                       </Badge>
                     )}
                     <Badge variant="secondary" className="text-[10px] rounded-full px-2 py-0 bg-white/20 text-white border-0">
-                      {TONE_LABELS[preset.script.tone] || preset.script.tone}
+                      {t(`tones.${preset.script.tone}`)}
                     </Badge>
                   </div>
                 </div>
@@ -134,14 +130,14 @@ export function Step3Preset({ selectedPresetId, selectedActor, onSelect, onNext,
       <div className="flex justify-between pt-4 max-w-5xl mx-auto">
         <Button variant="ghost" onClick={onBack} className="h-11 px-5 rounded-xl">
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Retour
+          {tc('back')}
         </Button>
         <Button
           onClick={handleContinue}
           disabled={!selectedPresetId}
           className="h-11 px-6 rounded-xl font-medium group"
         >
-          Continuer
+          {tc('continue')}
           <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
         </Button>
       </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { ProductConfig, ProductHoldingType } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -15,14 +16,16 @@ interface Step2ProductProps {
   onBack: () => void
 }
 
-const HOLDING_TYPES: { value: ProductHoldingType; label: string; icon: string }[] = [
-  { value: 'holding_box', label: 'Tenir une boîte', icon: '📦' },
-  { value: 'holding_bottle', label: 'Tenir une bouteille', icon: '🧴' },
-  { value: 'showing_phone_screen', label: 'Montrer un écran', icon: '📱' },
-  { value: 'pointing_at', label: 'Pointer du doigt', icon: '👆' },
+const HOLDING_TYPES: { value: ProductHoldingType; icon: string }[] = [
+  { value: 'holding_box', icon: '📦' },
+  { value: 'holding_bottle', icon: '🧴' },
+  { value: 'showing_phone_screen', icon: '📱' },
+  { value: 'pointing_at', icon: '👆' },
 ]
 
 export function Step2Product({ product, onChange, onNext, onBack }: Step2ProductProps) {
+  const t = useTranslations('step2')
+  const tc = useTranslations('common')
   const [imagePreview, setImagePreview] = useState<string | null>(product.image_url || null)
 
   const handleToggle = (hasProduct: boolean) => {
@@ -85,9 +88,9 @@ export function Step2Product({ product, onChange, onNext, onBack }: Step2Product
     <div className="space-y-8">
       {/* Header */}
       <div className="text-center max-w-lg mx-auto">
-        <h2 className="text-2xl font-semibold tracking-tight">Produit visible ?</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">{t('header.title')}</h2>
         <p className="text-muted-foreground mt-2">
-          Est-ce que ton acteur doit tenir ou montrer un produit ?
+          {t('header.subtitle')}
         </p>
       </div>
 
@@ -107,8 +110,8 @@ export function Step2Product({ product, onChange, onNext, onBack }: Step2Product
             <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
               <MessageSquare className="w-7 h-7 text-muted-foreground" />
             </div>
-            <h3 className="font-medium">Sans produit</h3>
-            <p className="text-xs text-muted-foreground mt-1">Talking head simple</p>
+            <h3 className="font-medium">{t('options.without.title')}</h3>
+            <p className="text-xs text-muted-foreground mt-1">{t('options.without.subtitle')}</p>
             {!product.has_product && (
               <div className="mt-4">
                 <div className="w-6 h-6 rounded-full bg-foreground flex items-center justify-center mx-auto">
@@ -133,8 +136,8 @@ export function Step2Product({ product, onChange, onNext, onBack }: Step2Product
             <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
               <Package className="w-7 h-7 text-muted-foreground" />
             </div>
-            <h3 className="font-medium">Avec produit</h3>
-            <p className="text-xs text-muted-foreground mt-1">Unboxing / Démo</p>
+            <h3 className="font-medium">{t('options.with.title')}</h3>
+            <p className="text-xs text-muted-foreground mt-1">{t('options.with.subtitle')}</p>
             {product.has_product && (
               <div className="mt-4">
                 <div className="w-6 h-6 rounded-full bg-foreground flex items-center justify-center mx-auto">
@@ -151,7 +154,7 @@ export function Step2Product({ product, onChange, onNext, onBack }: Step2Product
         <div className="space-y-6 max-w-lg mx-auto animate-in fade-in slide-in-from-bottom-4 duration-300">
           {/* Holding type selection */}
           <div className="space-y-3">
-            <Label className="text-sm font-medium">Comment l'acteur tient le produit ?</Label>
+            <Label className="text-sm font-medium">{t('holdingTypes.label')}</Label>
             <div className="grid grid-cols-2 gap-3">
               {HOLDING_TYPES.map((type) => (
                 <Card
@@ -167,7 +170,7 @@ export function Step2Product({ product, onChange, onNext, onBack }: Step2Product
                 >
                   <CardContent className="p-4 text-center">
                     <div className="text-2xl mb-2">{type.icon}</div>
-                    <span className="text-sm font-medium">{type.label}</span>
+                    <span className="text-sm font-medium">{t(`holdingTypes.${type.value}`)}</span>
                   </CardContent>
                 </Card>
               ))}
@@ -176,7 +179,7 @@ export function Step2Product({ product, onChange, onNext, onBack }: Step2Product
 
           {/* Product image upload */}
           <div className="space-y-3">
-            <Label className="text-sm font-medium">Image du produit (optionnel)</Label>
+            <Label className="text-sm font-medium">{t('productImage.label')}</Label>
             <div className="flex items-center gap-4">
               <div 
                 className="w-24 h-24 rounded-xl bg-muted border-2 border-dashed border-border flex items-center justify-center overflow-hidden cursor-pointer hover:border-foreground/30 transition-colors"
@@ -197,13 +200,13 @@ export function Step2Product({ product, onChange, onNext, onBack }: Step2Product
               />
               <div className="flex-1">
                 <Input
-                  placeholder="Nom du produit"
+                  placeholder={t('productImage.namePlaceholder')}
                   value={product.name || ''}
                   onChange={(e) => handleNameChange(e.target.value)}
                   className="h-11 rounded-xl bg-muted/50 border-transparent focus:border-foreground"
                 />
                 <p className="text-xs text-muted-foreground mt-2">
-                  Aide l'IA à générer un meilleur prompt
+                  {t('productImage.nameHelper')}
                 </p>
               </div>
             </div>
@@ -211,15 +214,15 @@ export function Step2Product({ product, onChange, onNext, onBack }: Step2Product
 
           {/* Product description */}
           <div className="space-y-3 mt-4">
-            <Label className="text-sm font-medium">Description du produit (optionnel)</Label>
+            <Label className="text-sm font-medium">{t('productDescription.label')}</Label>
             <textarea
-              placeholder="Décris ton produit : couleur, forme, texte visible sur le packaging..."
+              placeholder={t('productDescription.placeholder')}
               value={product.description || ''}
               onChange={(e) => handleDescriptionChange(e.target.value)}
               className="w-full h-20 px-3 py-2 rounded-xl bg-muted/50 border-transparent focus:border-foreground resize-none text-sm"
             />
             <p className="text-xs text-muted-foreground">
-              Plus la description est précise, meilleur sera le rendu dans la vidéo
+              {t('productDescription.helper')}
             </p>
           </div>
         </div>
@@ -229,13 +232,13 @@ export function Step2Product({ product, onChange, onNext, onBack }: Step2Product
       <div className="flex justify-between pt-4">
         <Button variant="ghost" onClick={onBack} className="h-11 px-5 rounded-xl">
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Retour
+          {tc('back')}
         </Button>
         <Button
           onClick={onNext}
           className="h-11 px-6 rounded-xl font-medium group"
         >
-          Continuer
+          {tc('continue')}
           <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
         </Button>
       </div>
