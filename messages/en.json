@@ -69,7 +69,15 @@
     "versionHistory": "Version history ({count})",
     "subtitlesProcessingShort": "⏳ Subtitles processing...",
     "etaShort": "1-5 min",
-    "edit": "Edit"
+    "edit": "Edit",
+    "downloadIcon": "📥 Download",
+    "currentVersion": "Current",
+    "subtitles": {
+      "processing": "Subtitles processing...",
+      "add": "🔤 Add subtitles",
+      "edit": "🔤 Edit subtitles",
+      "retry": "🔤 Retry subtitles"
+    }
   },
   "campaignCard": {
     "untitled": "Untitled",
@@ -211,7 +219,8 @@
       "energetic": "Energetic",
       "urgent": "Urgent",
       "conversational": "Conversational",
-      "reflective": "Reflective"
+      "reflective": "Reflective",
+      "authoritative": "Authoritative"
     },
     "filming": {
       "handheld": "Selfie",
@@ -437,6 +446,40 @@
     }
   },
   "admin": {},
+  "presets": {
+    "confession-intime": {
+      "name": "Intimate confession",
+      "description": "Personal and vulnerable sharing, like talking to a close friend"
+    },
+    "morning-discovery": {
+      "name": "Morning discovery",
+      "description": "You just discovered something amazing and you're sharing your excitement"
+    },
+    "street-hype": {
+      "name": "Street hype",
+      "description": "Walking in the city while sharing a tip with FOMO vibes"
+    },
+    "chill-testimonial": {
+      "name": "Chill testimonial",
+      "description": "Relaxed testimonial on your couch, authentic and sincere"
+    },
+    "car-confession": {
+      "name": "Car confession",
+      "description": "In your car, a moment of truth between trips"
+    },
+    "unboxing-product": {
+      "name": "Unboxing / Product",
+      "description": "Product focus with demonstration, hands visible"
+    },
+    "story-journey": {
+      "name": "Story Journey",
+      "description": "Multi-location narrative: share your journey with the product through different moments of your day"
+    },
+    "workplace-expert": {
+      "name": "Workplace Expert",
+      "description": "Share pro tips from your desk, your expertise serving your audience"
+    }
+  },
   "adminDashboard": {
     "header": {
       "title": "Admin dashboard",

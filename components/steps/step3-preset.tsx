@@ -35,6 +35,7 @@ const FILMING_META: Record<string, { icon: string; color: string }> = {
 export function Step3Preset({ selectedPresetId, selectedActor, onSelect, onNext, onBack }: Step3PresetProps) {
   const t = useTranslations('step3')
   const tc = useTranslations('common')
+  const tPresets = useTranslations('presets')
   
   const handleContinue = () => {
     if (selectedPresetId) {
@@ -83,7 +84,7 @@ export function Step3Preset({ selectedPresetId, selectedActor, onSelect, onNext,
                 {actorImage ? (
                   <img 
                     src={actorImage} 
-                    alt={`${selectedActor?.name} - ${preset.name}`}
+                    alt={`${selectedActor?.name} - ${tPresets(`${preset.id}.name`)}`}
                     className="w-full h-full object-cover"
                   />
                 ) : (
@@ -101,9 +102,9 @@ export function Step3Preset({ selectedPresetId, selectedActor, onSelect, onNext,
 
                 {/* Info overlay at bottom */}
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 pt-16">
-                  <h3 className="font-semibold text-white text-sm">{preset.name}</h3>
+                  <h3 className="font-semibold text-white text-sm">{tPresets(`${preset.id}.name`)}</h3>
                   <p className="text-xs text-white/70 mt-1 line-clamp-2">
-                    {preset.description}
+                    {tPresets(`${preset.id}.description`)}
                   </p>
                   <div className="flex items-center gap-2 mt-2 flex-wrap">
                     {preset.filming_type && FILMING_META[preset.filming_type] && (

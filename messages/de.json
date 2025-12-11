@@ -69,7 +69,15 @@
     "versionHistory": "Versionsverlauf ({count})",
     "subtitlesProcessingShort": "⏳ Untertitel werden erstellt...",
     "etaShort": "1-5 Min",
-    "edit": "Bearbeiten"
+    "edit": "Bearbeiten",
+    "downloadIcon": "📥 Herunterladen",
+    "currentVersion": "Aktuell",
+    "subtitles": {
+      "processing": "Untertitel werden erstellt...",
+      "add": "🔤 Untertitel hinzufügen",
+      "edit": "🔤 Untertitel bearbeiten",
+      "retry": "🔤 Untertitel erneut versuchen"
+    }
   },
   "campaignCard": {
     "untitled": "Ohne Titel",
@@ -211,7 +219,8 @@
       "energetic": "Energetisch",
       "urgent": "Dringend",
       "conversational": "Konversation",
-      "reflective": "Reflektierend"
+      "reflective": "Reflektierend",
+      "authoritative": "Autoritär"
     },
     "filming": {
       "handheld": "Selfie",
@@ -437,6 +446,40 @@
     }
   },
   "admin": {},
+  "presets": {
+    "confession-intime": {
+      "name": "Intimes Geständnis",
+      "description": "Persönliches und verletzliches Teilen, wie mit einem engen Freund"
+    },
+    "morning-discovery": {
+      "name": "Morgenentdeckung",
+      "description": "Du hast gerade etwas Tolles entdeckt und teilst deine Begeisterung"
+    },
+    "street-hype": {
+      "name": "Street Hype",
+      "description": "Du gehst durch die Stadt und teilst einen Tipp im FOMO-Modus"
+    },
+    "chill-testimonial": {
+      "name": "Entspanntes Testimonial",
+      "description": "Entspanntes Testimonial auf deinem Sofa, authentisch und aufrichtig"
+    },
+    "car-confession": {
+      "name": "Auto-Geständnis",
+      "description": "In deinem Auto, ein Moment der Wahrheit zwischen Fahrten"
+    },
+    "unboxing-product": {
+      "name": "Unboxing / Produkt",
+      "description": "Produktfokus mit Demonstration, sichtbare Hände"
+    },
+    "story-journey": {
+      "name": "Story Journey",
+      "description": "Multi-Location Erzählung: Teile deine Reise mit dem Produkt durch verschiedene Momente deines Tages"
+    },
+    "workplace-expert": {
+      "name": "Workplace Expert",
+      "description": "Teile Profi-Tipps von deinem Schreibtisch, deine Expertise im Dienst deiner Zielgruppe"
+    }
+  },
   "adminDashboard": {
     "header": {
       "title": "Admin-Dashboard",

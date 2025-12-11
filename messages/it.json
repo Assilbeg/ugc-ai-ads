@@ -69,7 +69,15 @@
     "versionHistory": "Cronologia versioni ({count})",
     "subtitlesProcessingShort": "⏳ Sottotitoli in elaborazione...",
     "etaShort": "1-5 min",
-    "edit": "Modifica"
+    "edit": "Modifica",
+    "downloadIcon": "📥 Scarica",
+    "currentVersion": "Corrente",
+    "subtitles": {
+      "processing": "Sottotitoli in elaborazione...",
+      "add": "🔤 Aggiungi sottotitoli",
+      "edit": "🔤 Modifica sottotitoli",
+      "retry": "🔤 Riprova sottotitoli"
+    }
   },
   "campaignCard": {
     "untitled": "Senza titolo",
@@ -211,7 +219,8 @@
       "energetic": "Energico",
       "urgent": "Urgente",
       "conversational": "Conversazionale",
-      "reflective": "Riflessivo"
+      "reflective": "Riflessivo",
+      "authoritative": "Autorevole"
     },
     "filming": {
       "handheld": "Selfie",
@@ -437,6 +446,40 @@
     }
   },
   "admin": {},
+  "presets": {
+    "confession-intime": {
+      "name": "Confessione intima",
+      "description": "Condivisione personale e vulnerabile, come se parlassi con un amico intimo"
+    },
+    "morning-discovery": {
+      "name": "Scoperta mattutina",
+      "description": "Hai appena scoperto qualcosa di fantastico e condividi il tuo entusiasmo"
+    },
+    "street-hype": {
+      "name": "Street hype",
+      "description": "Cammini in città condividendo un tip in modalità FOMO"
+    },
+    "chill-testimonial": {
+      "name": "Testimonianza rilassata",
+      "description": "Testimonianza rilassata sul tuo divano, autentica e sincera"
+    },
+    "car-confession": {
+      "name": "Confessione in auto",
+      "description": "Nella tua auto, un momento di verità tra i viaggi"
+    },
+    "unboxing-product": {
+      "name": "Unboxing / Prodotto",
+      "description": "Focus sul prodotto con dimostrazione, mani visibili"
+    },
+    "story-journey": {
+      "name": "Story Journey",
+      "description": "Narrazione multi-location: racconti il tuo percorso con il prodotto attraverso diversi momenti della giornata"
+    },
+    "workplace-expert": {
+      "name": "Workplace Expert",
+      "description": "Condividi consigli professionali dalla tua scrivania, la tua esperienza al servizio del pubblico"
+    }
+  },
   "adminDashboard": {
     "header": {
       "title": "Dashboard admin",

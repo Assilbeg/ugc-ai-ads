@@ -69,7 +69,15 @@
     "versionHistory": "Historique des versions ({count})",
     "subtitlesProcessingShort": "⏳ Sous-titres en cours...",
     "etaShort": "1-5 min",
-    "edit": "Éditer"
+    "edit": "Éditer",
+    "downloadIcon": "📥 Télécharger",
+    "currentVersion": "Actuelle",
+    "subtitles": {
+      "processing": "Sous-titres en cours...",
+      "add": "🔤 Ajouter sous-titres",
+      "edit": "🔤 Modifier sous-titres",
+      "retry": "🔤 Réessayer sous-titres"
+    }
   },
   "campaignCard": {
     "untitled": "Sans titre",
@@ -211,7 +219,8 @@
       "energetic": "Énergique",
       "urgent": "Urgent",
       "conversational": "Conversationnel",
-      "reflective": "Réflexif"
+      "reflective": "Réflexif",
+      "authoritative": "Autoritaire"
     },
     "filming": {
       "handheld": "Selfie",
@@ -437,6 +446,40 @@
     }
   },
   "admin": {},
+  "presets": {
+    "confession-intime": {
+      "name": "Confession intime",
+      "description": "Partage personnel et vulnérable, comme si tu parlais à un ami proche"
+    },
+    "morning-discovery": {
+      "name": "Morning discovery",
+      "description": "Tu viens de découvrir un truc génial et tu partages ton enthousiasme"
+    },
+    "street-hype": {
+      "name": "Street hype",
+      "description": "Tu marches en ville et tu partages un tip en mode FOMO"
+    },
+    "chill-testimonial": {
+      "name": "Chill testimonial",
+      "description": "Témoignage détendu sur ton canapé, authentique et sincère"
+    },
+    "car-confession": {
+      "name": "Car confession",
+      "description": "Dans ta voiture, moment de vérité entre deux trajets"
+    },
+    "unboxing-product": {
+      "name": "Unboxing / Product",
+      "description": "Focus produit avec démonstration, mains visibles"
+    },
+    "story-journey": {
+      "name": "Story Journey",
+      "description": "Narration multi-lieux : tu racontes ton parcours avec le produit à travers différents moments de ta journée"
+    },
+    "workplace-expert": {
+      "name": "Workplace Expert",
+      "description": "Tu partages un conseil pro depuis ton bureau, ton expertise au service de ton audience"
+    }
+  },
   "adminDashboard": {
     "header": {
       "title": "Dashboard Admin",

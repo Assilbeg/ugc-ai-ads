@@ -69,7 +69,15 @@
     "versionHistory": "Histórico de versões ({count})",
     "subtitlesProcessingShort": "⏳ Legendas em processamento...",
     "etaShort": "1-5 min",
-    "edit": "Editar"
+    "edit": "Editar",
+    "downloadIcon": "📥 Baixar",
+    "currentVersion": "Atual",
+    "subtitles": {
+      "processing": "Legendas em processamento...",
+      "add": "🔤 Adicionar legendas",
+      "edit": "🔤 Editar legendas",
+      "retry": "🔤 Tentar legendas novamente"
+    }
   },
   "campaignCard": {
     "untitled": "Sem título",
@@ -211,7 +219,8 @@
       "energetic": "Energético",
       "urgent": "Urgente",
       "conversational": "Conversacional",
-      "reflective": "Reflexivo"
+      "reflective": "Reflexivo",
+      "authoritative": "Autoritário"
     },
     "filming": {
       "handheld": "Selfie",
@@ -437,6 +446,40 @@
     }
   },
   "admin": {},
+  "presets": {
+    "confession-intime": {
+      "name": "Confissão íntima",
+      "description": "Compartilhamento pessoal e vulnerável, como se você estivesse conversando com um amigo próximo"
+    },
+    "morning-discovery": {
+      "name": "Descoberta matinal",
+      "description": "Você acabou de descobrir algo incrível e está compartilhando seu entusiasmo"
+    },
+    "street-hype": {
+      "name": "Street hype",
+      "description": "Você caminha pela cidade compartilhando uma dica em modo FOMO"
+    },
+    "chill-testimonial": {
+      "name": "Depoimento relaxado",
+      "description": "Depoimento relaxado no seu sofá, autêntico e sincero"
+    },
+    "car-confession": {
+      "name": "Confissão no carro",
+      "description": "No seu carro, um momento de verdade entre viagens"
+    },
+    "unboxing-product": {
+      "name": "Unboxing / Produto",
+      "description": "Foco no produto com demonstração, mãos visíveis"
+    },
+    "story-journey": {
+      "name": "Story Journey",
+      "description": "Narrativa multi-locação: você conta sua jornada com o produto através de diferentes momentos do seu dia"
+    },
+    "workplace-expert": {
+      "name": "Workplace Expert",
+      "description": "Compartilhe dicas profissionais da sua mesa, sua expertise a serviço do seu público"
+    }
+  },
   "adminDashboard": {
     "header": {
       "title": "Dashboard admin",

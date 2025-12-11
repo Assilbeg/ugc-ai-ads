@@ -69,7 +69,15 @@
     "versionHistory": "Versiegeschiedenis ({count})",
     "subtitlesProcessingShort": "⏳ Ondertitels worden verwerkt...",
     "etaShort": "1-5 min",
-    "edit": "Bewerken"
+    "edit": "Bewerken",
+    "downloadIcon": "📥 Downloaden",
+    "currentVersion": "Huidig",
+    "subtitles": {
+      "processing": "Ondertitels worden verwerkt...",
+      "add": "🔤 Ondertitels toevoegen",
+      "edit": "🔤 Ondertitels bewerken",
+      "retry": "🔤 Ondertitels opnieuw proberen"
+    }
   },
   "campaignCard": {
     "untitled": "Zonder titel",
@@ -211,7 +219,8 @@
       "energetic": "Energiek",
       "urgent": "Dringend",
       "conversational": "Conversationeel",
-      "reflective": "Reflecterend"
+      "reflective": "Reflecterend",
+      "authoritative": "Gezaghebbend"
     },
     "filming": {
       "handheld": "Selfie",
@@ -431,6 +440,40 @@
     }
   },
   "admin": {},
+  "presets": {
+    "confession-intime": {
+      "name": "Intieme bekentenis",
+      "description": "Persoonlijk en kwetsbaar delen, alsof je met een goede vriend praat"
+    },
+    "morning-discovery": {
+      "name": "Ochtendontdekking",
+      "description": "Je hebt net iets geweldigs ontdekt en deelt je enthousiasme"
+    },
+    "street-hype": {
+      "name": "Street hype",
+      "description": "Je loopt door de stad en deelt een tip in FOMO-modus"
+    },
+    "chill-testimonial": {
+      "name": "Ontspannen testimonial",
+      "description": "Ontspannen testimonial op je bank, authentiek en oprecht"
+    },
+    "car-confession": {
+      "name": "Auto-bekentenis",
+      "description": "In je auto, een moment van waarheid tussen ritten"
+    },
+    "unboxing-product": {
+      "name": "Unboxing / Product",
+      "description": "Productfocus met demonstratie, zichtbare handen"
+    },
+    "story-journey": {
+      "name": "Story Journey",
+      "description": "Multi-locatie verhaal: je deelt je reis met het product door verschillende momenten van je dag"
+    },
+    "workplace-expert": {
+      "name": "Workplace Expert",
+      "description": "Deel professionele tips vanaf je bureau, jouw expertise ten dienste van je publiek"
+    }
+  },
   "adminDashboard": {
     "header": {
       "title": "Admin dashboard",

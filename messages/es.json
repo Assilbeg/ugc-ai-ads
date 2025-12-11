@@ -69,7 +69,15 @@
     "versionHistory": "Historial de versiones ({count})",
     "subtitlesProcessingShort": "⏳ Subtítulos en proceso...",
     "etaShort": "1-5 min",
-    "edit": "Editar"
+    "edit": "Editar",
+    "downloadIcon": "📥 Descargar",
+    "currentVersion": "Actual",
+    "subtitles": {
+      "processing": "Subtítulos en proceso...",
+      "add": "🔤 Añadir subtítulos",
+      "edit": "🔤 Editar subtítulos",
+      "retry": "🔤 Reintentar subtítulos"
+    }
   },
   "campaignCard": {
     "untitled": "Sin título",
@@ -211,7 +219,8 @@
       "energetic": "Enérgico",
       "urgent": "Urgente",
       "conversational": "Conversacional",
-      "reflective": "Reflexivo"
+      "reflective": "Reflexivo",
+      "authoritative": "Autoritario"
     },
     "filming": {
       "handheld": "Selfie",
@@ -437,6 +446,40 @@
     }
   },
   "admin": {},
+  "presets": {
+    "confession-intime": {
+      "name": "Confesión íntima",
+      "description": "Compartir personal y vulnerable, como si hablaras con un amigo cercano"
+    },
+    "morning-discovery": {
+      "name": "Descubrimiento matutino",
+      "description": "Acabas de descubrir algo genial y compartes tu entusiasmo"
+    },
+    "street-hype": {
+      "name": "Street hype",
+      "description": "Caminas por la ciudad compartiendo un tip en modo FOMO"
+    },
+    "chill-testimonial": {
+      "name": "Testimonio relajado",
+      "description": "Testimonio relajado en tu sofá, auténtico y sincero"
+    },
+    "car-confession": {
+      "name": "Confesión en el coche",
+      "description": "En tu coche, un momento de verdad entre viajes"
+    },
+    "unboxing-product": {
+      "name": "Unboxing / Producto",
+      "description": "Foco en producto con demostración, manos visibles"
+    },
+    "story-journey": {
+      "name": "Story Journey",
+      "description": "Narración multi-lugar: cuentas tu recorrido con el producto a través de diferentes momentos del día"
+    },
+    "workplace-expert": {
+      "name": "Experto laboral",
+      "description": "Compartes un consejo pro desde tu escritorio, tu experiencia al servicio de tu audiencia"
+    }
+  },
   "adminDashboard": {
     "header": {
       "title": "Panel admin",
