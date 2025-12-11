@@ -12,21 +12,24 @@ export default async function AdminLayout({
   params,
 }: {
   children: React.ReactNode
-  params: { locale: string }
+  params: Promise<{ locale: string }>
 }) {
+  const { locale } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   const tNav = await getTranslations('nav')
 
   if (!user) {
-    redirect(`/${params.locale}/login`)
+    redirect(`/${locale}/login`)
   }
 
   if (!isAdmin(user.email)) {
-    redirect(`/${params.locale}/dashboard`)
+    redirect(`/${locale}/dashboard`)
   }
 
-  const basePath = `/${params.locale}`
+  const basePath = `/${locale}`
 
   return (
     <div className="min-h-screen bg-background">
@@ -38,40 +41,35 @@ export default async function AdminLayout({
               <div className="w-9 h-9 rounded-xl bg-foreground flex items-center justify-center">
                 <Shield className="w-5 h-5 text-background" />
               </div>
-              <span className="font-semibold text-lg">
-                {tNav('admin')}
-              </span>
+              <span className="font-semibold text-lg">{tNav('admin')}</span>
             </Link>
-            
+
             {/* Admin Navigation */}
             <nav className="hidden md:flex items-center gap-6">
-              <Link 
-                href={`${basePath}/admin/actors`} 
+              <Link
+                href={`${basePath}/admin/actors`}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 {tNav('adminActors')}
               </Link>
-              <Link 
-                href={`${basePath}/admin/presets`} 
+              <Link
+                href={`${basePath}/admin/presets`}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 {tNav('adminPresets')}
               </Link>
-              <Link 
-                href={`${basePath}/admin/prompts`} 
+              <Link
+                href={`${basePath}/admin/prompts`}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 {tNav('adminPrompts')}
               </Link>
             </nav>
           </div>
-          
+
           <div className="flex items-center gap-4">
             <LocaleSwitcher className="hidden md:block" />
-            <Link 
-              href={`${basePath}/dashboard`} 
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
+            <Link href={`${basePath}/dashboard`} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               {tNav('backToApp')}
             </Link>
             <span className="text-sm text-muted-foreground hidden sm:block">{user.email}</span>
@@ -81,9 +79,7 @@ export default async function AdminLayout({
       </header>
 
       {/* Main content */}
-      <main className="container mx-auto px-6 py-10">
-        {children}
-      </main>
+      <main className="container mx-auto px-6 py-10">{children}</main>
     </div>
   )
 }

@@ -12,18 +12,21 @@ export default async function DashboardLayout({
   params,
 }: {
   children: React.ReactNode
-  params: { locale: string }
+  params: Promise<{ locale: string }>
 }) {
+  const { locale } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   const tNav = await getTranslations('nav')
 
   if (!user) {
-    redirect(`/${params.locale}/login`)
+    redirect(`/${locale}/login`)
   }
 
   const userIsAdmin = isAdmin(user.email)
-  const basePath = `/${params.locale}`
+  const basePath = `/${locale}`
 
   return (
     <div className="min-h-screen bg-background">
@@ -85,9 +88,7 @@ export default async function DashboardLayout({
       </header>
 
       {/* Main content */}
-      <main className="container mx-auto px-6 py-10">
-        {children}
-      </main>
+      <main className="container mx-auto px-6 py-10">{children}</main>
     </div>
   )
 }
