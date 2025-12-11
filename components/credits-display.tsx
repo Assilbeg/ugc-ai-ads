@@ -125,4 +125,3 @@ export function triggerCreditsRefresh() {
     window.dispatchEvent(new CustomEvent('credits-updated'))
   }
 }
-

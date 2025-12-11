@@ -30,23 +30,6 @@ export function LocaleSwitcher({ className }: { className?: string }) {
       segments.unshift(newLocale)
     }
     const newPath = `/${segments.join('/') || ''}`
-
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/e4231377-2382-45db-b33c-82d9e810facf', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'run1',
-        hypothesisId: 'H1',
-        location: 'components/locale-switcher.tsx:33',
-        message: 'locale switch requested',
-        data: { from: locale, to: newLocale, pathname, newPath },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-    // #endregion
-
     router.push(newPath)
   }
 

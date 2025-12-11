@@ -4,14 +4,15 @@ import { createClient } from '@/lib/supabase/server'
 export default async function LocaleHomePage({
   params,
 }: {
-  params: { locale: string }
+  params: Promise<{ locale: string }>
 }) {
+  const { locale } = await params
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const basePath = `/${params.locale}`
+  const basePath = `/${locale}`
 
   if (user) {
     redirect(`${basePath}/dashboard`)
