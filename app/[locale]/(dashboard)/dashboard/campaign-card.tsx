@@ -139,7 +139,7 @@ export function CampaignCard({ campaign, presetName, statusConfig, onDelete }: C
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors flex items-center justify-center">
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/90 opacity-0 scale-75 group-hover:opacity-100 group-hover:scale-100 transition-all duration-300 shadow-lg">
                 <Pencil className="w-4 h-4 text-zinc-900" />
-                <span className="text-sm font-medium text-zinc-900">Éditer</span>
+                <span className="text-sm font-medium text-zinc-900">{t('edit')}</span>
               </div>
             </div>
 

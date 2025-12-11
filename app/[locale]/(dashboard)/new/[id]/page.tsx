@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { useLocale } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { NewCampaignState, ProductConfig, CampaignBrief, CampaignClip, GeneratedFirstFrames, Campaign } from '@/types'
 import { StepIndicator } from '@/components/steps/step-indicator'
@@ -36,21 +36,25 @@ const getPrimaryClips = (clips: CampaignClip[] = []) => {
     .filter(Boolean) as CampaignClip[]
 }
 
-const STEPS = [
-  { number: 1, title: 'Acteur', description: 'Choisis ton créateur IA' },
-  { number: 2, title: 'Produit', description: 'Avec ou sans produit' },
-  { number: 3, title: 'Intention', description: 'Style de la vidéo' },
-  { number: 4, title: 'Brief', description: 'Décris ton offre' },
-  { number: 5, title: 'Plan', description: 'Valide le script' },
-  { number: 6, title: 'Génération', description: 'Créer les vidéos' },
-]
+const STEP_KEYS = ['actor', 'product', 'preset', 'brief', 'plan', 'generate'] as const
 
 export default function ExistingCampaignPage() {
   const router = useRouter()
   const params = useParams()
   const locale = useLocale()
+  const t = useTranslations('steps')
+  const tDesc = useTranslations('stepDescriptions')
+  const tPage = useTranslations('newCampaignPage')
+  const tc = useTranslations('common')
   const campaignId = params.id as string
   const supabase = createClient()
+  
+  // Build steps with translations
+  const STEPS = useMemo(() => STEP_KEYS.map((key, index) => ({
+    number: index + 1,
+    title: t(key),
+    description: tDesc(key),
+  })), [t, tDesc])
   
   const { getActorById } = useActors()
   
@@ -79,7 +83,7 @@ export default function ExistingCampaignPage() {
   useEffect(() => {
     async function loadCampaign() {
       if (!campaignId) {
-        setLoadError('ID de campagne manquant')
+        setLoadError(tPage('errors.missingId'))
         setLoading(false)
         return
       }
@@ -94,7 +98,7 @@ export default function ExistingCampaignPage() {
 
         if (campaignError || !campaign) {
           console.error('Erreur chargement campagne:', campaignError)
-          setLoadError('Campagne introuvable')
+          setLoadError(tPage('errors.notFound'))
           setLoading(false)
           return
         }
@@ -227,7 +231,7 @@ export default function ExistingCampaignPage() {
         setLoading(false)
       } catch (err) {
         console.error('Erreur inattendue:', err)
-        setLoadError('Erreur lors du chargement')
+        setLoadError(tPage('errors.loadError'))
         setLoading(false)
       }
     }
@@ -460,7 +464,7 @@ export default function ExistingCampaignPage() {
     return (
       <div className="max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[400px] gap-4">
         <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-        <p className="text-muted-foreground">Chargement de la campagne...</p>
+        <p className="text-muted-foreground">{tPage('loading')}</p>
       </div>
     )
   }
@@ -470,12 +474,12 @@ export default function ExistingCampaignPage() {
       <div className="max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[400px] gap-4">
         <div className="text-6xl">😕</div>
         <h2 className="text-xl font-semibold">{loadError}</h2>
-        <p className="text-muted-foreground">Cette campagne n'existe pas ou tu n'y as pas accès.</p>
+        <p className="text-muted-foreground">{tPage('errors.noAccess')}</p>
         <button 
           onClick={() => router.push(`/${locale}/new`)}
           className="mt-4 px-6 py-2 bg-foreground text-background rounded-xl font-medium hover:opacity-90 transition"
         >
-          Créer une nouvelle campagne
+          {tPage('createNew')}
         </button>
       </div>
     )
@@ -498,10 +502,10 @@ export default function ExistingCampaignPage() {
       {/* Modal de confirmation */}
       <ConfirmModal
         isOpen={confirmModal.isOpen}
-        title="Modifier les étapes précédentes ?"
-        message="Tu as un plan généré. Si tu modifies le brief ou les étapes précédentes, tu devras regénérer le plan avec un nouveau script."
-        confirmText="Continuer"
-        cancelText="Rester ici"
+        title={tPage('confirmModal.title')}
+        message={tPage('confirmModal.message')}
+        confirmText={tc('continue')}
+        cancelText={tPage('confirmModal.cancel')}
         variant="warning"
         onConfirm={confirmStepChange}
         onCancel={cancelStepChange}

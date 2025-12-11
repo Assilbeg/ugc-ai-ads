@@ -342,11 +342,11 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
               <Badge variant="secondary" className="rounded-lg">{preset.name}</Badge>
             )}
             <span className="text-sm text-muted-foreground">
-              {brief?.target_duration || 30}s • {product?.has_product ? 'Avec produit' : 'Sans produit'}
+              {brief?.target_duration || 30}s • {product?.has_product ? tCampaign('withProduct') : tCampaign('withoutProduct')}
             </span>
             {campaign.status === 'draft' && (
               <Link href={`${basePath}/new/${id}`}>
-                <Button size="sm">Continuer l'édition</Button>
+                <Button size="sm">{tCampaign('continueEditing')}</Button>
               </Link>
             )}
           </div>
@@ -374,7 +374,7 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Historique des versions ({allVersions.length + (campaign.submagic_status === 'processing' ? 1 : 0)})
+              {tCampaign('versionHistory', { count: allVersions.length + (campaign.submagic_status === 'processing' ? 1 : 0) })}
             </h3>
             <div className="space-y-2">
               {/* Sous-titres en cours de génération - Toujours en premier */}
@@ -386,7 +386,7 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
-                        ⏳ Sous-titres en cours...
+                        {tCampaign('subtitlesProcessingShort')}
                       </span>
                       {processingTemplateName && (
                         <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900/50">
@@ -396,7 +396,7 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
                       )}
                     </div>
                     <span className="text-xs text-amber-600 dark:text-amber-400">
-                      1-5 min
+                      {tCampaign('etaShort')}
                     </span>
                   </div>
                 )
@@ -543,11 +543,11 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
             </svg>
           </div>
           <p className="text-muted-foreground mb-4">
-            Aucune vidéo n'a encore été générée pour cette campagne.
+            {tCampaign('noVideoGenerated')}
           </p>
           <Link href={`${basePath}/new/${id}`}>
             <Button className="rounded-xl">
-              ▶️ Continuer la campagne
+              {tCampaign('continueGeneration')}
             </Button>
           </Link>
         </div>

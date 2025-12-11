@@ -57,12 +57,19 @@
     "downloadWithSubtitles": "With subtitles",
     "presetBadgePrefix": "🎬 {name}",
     "targetDuration": "{duration}s target",
-    "withProduct": "📦 With product",
-    "withoutProduct": "💬 Without product",
+    "withProduct": "With product",
+    "withoutProduct": "Without product",
     "clipsGenerated": "Clips generated",
     "finalDuration": "Final duration",
     "createdAt": "Created on {date}",
-    "editVideo": "Edit video"
+    "editVideo": "Edit video",
+    "continueEditing": "Continue editing",
+    "continueGeneration": "▶️ Continue campaign",
+    "noVideoGenerated": "No video has been generated for this campaign yet.",
+    "versionHistory": "Version history ({count})",
+    "subtitlesProcessingShort": "⏳ Subtitles processing...",
+    "etaShort": "1-5 min",
+    "edit": "Edit"
   },
   "campaignCard": {
     "untitled": "Untitled",
@@ -73,7 +80,8 @@
     "confirm": "Delete",
     "confirming": "Deleting...",
     "cancel": "Cancel",
-    "clips": "{count, plural, one {# clip} other {# clips}}"
+    "clips": "{count, plural, one {# clip} other {# clips}}",
+    "edit": "Edit"
   },
   "nav": {
     "dashboard": "Campaigns",
@@ -107,6 +115,21 @@
     "brief": "Describe your offer",
     "plan": "Validate the script",
     "generate": "Create the videos"
+  },
+  "newCampaignPage": {
+    "loading": "Loading campaign...",
+    "createNew": "Create a new campaign",
+    "errors": {
+      "missingId": "Missing campaign ID",
+      "notFound": "Campaign not found",
+      "loadError": "Error loading campaign",
+      "noAccess": "This campaign doesn't exist or you don't have access to it."
+    },
+    "confirmModal": {
+      "title": "Edit previous steps?",
+      "message": "You have a generated plan. If you edit the brief or previous steps, you'll need to regenerate the plan with a new script.",
+      "cancel": "Stay here"
+    }
   },
   "loginPage": {
     "heroTitle": "Create UGC ads",

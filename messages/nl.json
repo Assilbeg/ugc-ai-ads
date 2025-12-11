@@ -57,12 +57,19 @@
     "downloadWithSubtitles": "Met ondertitels",
     "presetBadgePrefix": "🎬 {name}",
     "targetDuration": "Doel {duration}s",
-    "withProduct": "📦 Met product",
-    "withoutProduct": "💬 Zonder product",
+    "withProduct": "Met product",
+    "withoutProduct": "Zonder product",
     "clipsGenerated": "Gegenereerde clips",
     "finalDuration": "Eindduur",
     "createdAt": "Gemaakt op {date}",
-    "editVideo": "Video bewerken"
+    "editVideo": "Video bewerken",
+    "continueEditing": "Bewerken hervatten",
+    "continueGeneration": "▶️ Campagne hervatten",
+    "noVideoGenerated": "Er is nog geen video gegenereerd voor deze campagne.",
+    "versionHistory": "Versiegeschiedenis ({count})",
+    "subtitlesProcessingShort": "⏳ Ondertitels worden verwerkt...",
+    "etaShort": "1-5 min",
+    "edit": "Bewerken"
   },
   "campaignCard": {
     "untitled": "Zonder titel",
@@ -73,7 +80,8 @@
     "confirm": "Verwijderen",
     "confirming": "Bezig met verwijderen...",
     "cancel": "Annuleren",
-    "clips": "{count, plural, one {# clip} other {# clips}}"
+    "clips": "{count, plural, one {# clip} other {# clips}}",
+    "edit": "Bewerken"
   },
   "nav": {
     "dashboard": "Campagnes",
@@ -107,6 +115,21 @@
     "brief": "Beschrijf je aanbod",
     "plan": "Valideer het script",
     "generate": "Maak de video's"
+  },
+  "newCampaignPage": {
+    "loading": "Campagne laden...",
+    "createNew": "Nieuwe campagne maken",
+    "errors": {
+      "missingId": "Campagne-ID ontbreekt",
+      "notFound": "Campagne niet gevonden",
+      "loadError": "Fout bij laden van campagne",
+      "noAccess": "Deze campagne bestaat niet of je hebt geen toegang."
+    },
+    "confirmModal": {
+      "title": "Vorige stappen bewerken?",
+      "message": "Je hebt een gegenereerd plan. Als je de brief of vorige stappen wijzigt, moet je het plan opnieuw genereren met een nieuw script.",
+      "cancel": "Hier blijven"
+    }
   },
   "loginPage": {
     "heroTitle": "Maak UGC-advertenties",

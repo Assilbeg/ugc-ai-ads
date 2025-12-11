@@ -57,12 +57,19 @@
     "downloadWithSubtitles": "Mit Untertiteln",
     "presetBadgePrefix": "🎬 {name}",
     "targetDuration": "Ziel {duration}s",
-    "withProduct": "📦 Mit Produkt",
-    "withoutProduct": "💬 Ohne Produkt",
+    "withProduct": "Mit Produkt",
+    "withoutProduct": "Ohne Produkt",
     "clipsGenerated": "Erstellte Clips",
     "finalDuration": "Endgültige Dauer",
     "createdAt": "Erstellt am {date}",
-    "editVideo": "Video bearbeiten"
+    "editVideo": "Video bearbeiten",
+    "continueEditing": "Bearbeitung fortsetzen",
+    "continueGeneration": "▶️ Kampagne fortsetzen",
+    "noVideoGenerated": "Für diese Kampagne wurde noch kein Video erstellt.",
+    "versionHistory": "Versionsverlauf ({count})",
+    "subtitlesProcessingShort": "⏳ Untertitel werden erstellt...",
+    "etaShort": "1-5 Min",
+    "edit": "Bearbeiten"
   },
   "campaignCard": {
     "untitled": "Ohne Titel",
@@ -73,7 +80,8 @@
     "confirm": "Löschen",
     "confirming": "Wird gelöscht...",
     "cancel": "Abbrechen",
-    "clips": "{count, plural, one {# Clip} other {# Clips}}"
+    "clips": "{count, plural, one {# Clip} other {# Clips}}",
+    "edit": "Bearbeiten"
   },
   "nav": {
     "dashboard": "Kampagnen",
@@ -107,6 +115,21 @@
     "brief": "Beschreibe dein Angebot",
     "plan": "Skript validieren",
     "generate": "Videos erstellen"
+  },
+  "newCampaignPage": {
+    "loading": "Kampagne wird geladen...",
+    "createNew": "Neue Kampagne erstellen",
+    "errors": {
+      "missingId": "Kampagnen-ID fehlt",
+      "notFound": "Kampagne nicht gefunden",
+      "loadError": "Fehler beim Laden der Kampagne",
+      "noAccess": "Diese Kampagne existiert nicht oder du hast keinen Zugang."
+    },
+    "confirmModal": {
+      "title": "Vorherige Schritte bearbeiten?",
+      "message": "Du hast einen generierten Plan. Wenn du das Brief oder vorherige Schritte änderst, musst du den Plan mit einem neuen Skript neu generieren.",
+      "cancel": "Hier bleiben"
+    }
   },
   "loginPage": {
     "heroTitle": "Erstelle UGC-Anzeigen",

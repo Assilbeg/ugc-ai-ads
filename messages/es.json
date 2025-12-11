@@ -57,12 +57,19 @@
     "downloadWithSubtitles": "Con subtítulos",
     "presetBadgePrefix": "🎬 {name}",
     "targetDuration": "Objetivo {duration}s",
-    "withProduct": "📦 Con producto",
-    "withoutProduct": "💬 Sin producto",
+    "withProduct": "Con producto",
+    "withoutProduct": "Sin producto",
     "clipsGenerated": "Clips generados",
     "finalDuration": "Duración final",
     "createdAt": "Creado el {date}",
-    "editVideo": "Editar video"
+    "editVideo": "Editar video",
+    "continueEditing": "Continuar edición",
+    "continueGeneration": "▶️ Continuar campaña",
+    "noVideoGenerated": "Aún no se ha generado ningún video para esta campaña.",
+    "versionHistory": "Historial de versiones ({count})",
+    "subtitlesProcessingShort": "⏳ Subtítulos en proceso...",
+    "etaShort": "1-5 min",
+    "edit": "Editar"
   },
   "campaignCard": {
     "untitled": "Sin título",
@@ -73,7 +80,8 @@
     "confirm": "Eliminar",
     "confirming": "Eliminando...",
     "cancel": "Cancelar",
-    "clips": "{count, plural, one {# clip} other {# clips}}"
+    "clips": "{count, plural, one {# clip} other {# clips}}",
+    "edit": "Editar"
   },
   "nav": {
     "dashboard": "Campañas",
@@ -107,6 +115,21 @@
     "brief": "Describe tu oferta",
     "plan": "Valida el guion",
     "generate": "Crea los videos"
+  },
+  "newCampaignPage": {
+    "loading": "Cargando campaña...",
+    "createNew": "Crear una nueva campaña",
+    "errors": {
+      "missingId": "ID de campaña faltante",
+      "notFound": "Campaña no encontrada",
+      "loadError": "Error al cargar la campaña",
+      "noAccess": "Esta campaña no existe o no tienes acceso."
+    },
+    "confirmModal": {
+      "title": "¿Modificar los pasos anteriores?",
+      "message": "Tienes un plan generado. Si modificas el brief o los pasos anteriores, deberás regenerar el plan con un nuevo guion.",
+      "cancel": "Quedarme aquí"
+    }
   },
   "loginPage": {
     "heroTitle": "Crea anuncios UGC",
