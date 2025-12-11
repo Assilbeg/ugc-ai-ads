@@ -33,11 +33,12 @@ async function getFalBalance(): Promise<{ balance: number; currency: string } | 
 export default async function AdminDashboard({
   params,
 }: {
-  params: { locale: string }
+  params: Promise<{ locale: string }>
 }) {
+  const { locale } = await params
   const t = await getTranslations('adminDashboard')
   const supabase = await createClient()
-  const basePath = `/${params.locale}`
+  const basePath = `/${locale}`
   
   // Get Fal.ai balance
   const falBalance = await getFalBalance()

@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { useLocale } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { NewCampaignState, ProductConfig, CampaignBrief, CampaignClip, GeneratedFirstFrames, Campaign } from '@/types'
 import { StepIndicator } from '@/components/steps/step-indicator'
@@ -47,6 +48,7 @@ const STEPS = [
 export default function ExistingCampaignPage() {
   const router = useRouter()
   const params = useParams()
+  const locale = useLocale()
   const campaignId = params.id as string
   const supabase = createClient()
   
@@ -442,7 +444,7 @@ export default function ExistingCampaignPage() {
           <Step6Generate
             state={state}
             onClipsUpdate={handleClipsGenerated}
-            onComplete={(id) => router.push(`/campaign/${id}`)}
+            onComplete={(campaignId) => router.push(`/${locale}/campaign/${campaignId}`)}
             onBack={prevStep}
           />
         )
@@ -470,7 +472,7 @@ export default function ExistingCampaignPage() {
         <h2 className="text-xl font-semibold">{loadError}</h2>
         <p className="text-muted-foreground">Cette campagne n'existe pas ou tu n'y as pas accès.</p>
         <button 
-          onClick={() => router.push('/new')}
+          onClick={() => router.push(`/${locale}/new`)}
           className="mt-4 px-6 py-2 bg-foreground text-background rounded-xl font-medium hover:opacity-90 transition"
         >
           Créer une nouvelle campagne

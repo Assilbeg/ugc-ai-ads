@@ -62,8 +62,8 @@ export default function LoginPage() {
         </div>
         
         <div className="relative z-10 space-y-6">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full text-sm backdrop-blur-sm">
-              <Sparkles className="w-4 h-4" />
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full text-sm backdrop-blur-sm">
+            <Sparkles className="w-4 h-4" />
               <span>{tl('aiPowered')}</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-semibold leading-tight tracking-tight">

@@ -23,15 +23,16 @@ import { isAdmin } from '@/lib/admin'
 export default async function BillingPage({
   params,
 }: {
-  params: { locale: string }
+  params: Promise<{ locale: string }>
 }) {
+  const { locale } = await params
   const supabase = await createClient()
   
   // Get authenticated user
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   
   if (authError || !user) {
-    redirect(`/${params.locale}/login`)
+    redirect(`/${locale}/login`)
   }
 
   const userIsAdmin = isAdmin(user.email)
@@ -355,4 +356,3 @@ export default async function BillingPage({
     </div>
   )
 }
-
