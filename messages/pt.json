@@ -128,9 +128,74 @@
   "stepsTitle": {
     "actor": "Escolha seu criador IA"
   },
-  "step1": {},
-  "step2": {},
-  "step3": {},
+  "step1": {
+    "header": {
+      "title": "Escolha seu criador",
+      "subtitle": "Selecione um ator IA para seu anúncio UGC"
+    },
+    "gender": {
+      "female": "Mulher",
+      "male": "Homem",
+      "nonbinary": "Não-binário"
+    },
+    "customBadge": "Custom",
+    "createActor": {
+      "title": "Criar um ator",
+      "subtitle": "com SOUL AI"
+    }
+  },
+  "step2": {
+    "header": {
+      "title": "Produto visível?",
+      "subtitle": "Seu ator deve segurar ou mostrar um produto?"
+    },
+    "options": {
+      "without": {
+        "title": "Sem produto",
+        "subtitle": "Talking head simples"
+      },
+      "with": {
+        "title": "Com produto",
+        "subtitle": "Unboxing / Demo"
+      }
+    },
+    "holdingTypes": {
+      "label": "Como o ator segura o produto?",
+      "holding_box": "Segurar uma caixa",
+      "holding_bottle": "Segurar uma garrafa",
+      "showing_phone_screen": "Mostrar tela",
+      "pointing_at": "Apontar"
+    },
+    "productImage": {
+      "label": "Imagem do produto (opcional)",
+      "namePlaceholder": "Nome do produto",
+      "nameHelper": "Ajuda a IA a gerar prompts melhores"
+    },
+    "productDescription": {
+      "label": "Descrição do produto (opcional)",
+      "placeholder": "Descreva seu produto: cor, forma, texto visível na embalagem...",
+      "helper": "Quanto mais preciso, melhor o resultado no vídeo"
+    }
+  },
+  "step3": {
+    "header": {
+      "title": "Escolha sua intenção",
+      "subtitle": "O estilo e contexto do seu vídeo UGC",
+      "withActor": "com {name}"
+    },
+    "tones": {
+      "vulnerable": "Vulnerável",
+      "energetic": "Energético",
+      "urgent": "Urgente",
+      "conversational": "Conversacional",
+      "reflective": "Reflexivo"
+    },
+    "filming": {
+      "handheld": "Selfie",
+      "filmed_by_other": "Filmado por outro",
+      "setup_phone": "Tripé / Setup"
+    }
+  },
   "step4": {
     "beats": {
       "hook": "Gancho",

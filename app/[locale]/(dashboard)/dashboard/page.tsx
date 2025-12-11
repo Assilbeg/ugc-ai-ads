@@ -9,10 +9,11 @@ import { getTranslations } from 'next-intl/server'
 export default async function DashboardPage({
   params,
 }: {
-  params: { locale: string }
+  params: Promise<{ locale: string }>
 }) {
+  const { locale } = await params
   const supabase = await createClient()
-  const basePath = `/${params.locale}`
+  const basePath = `/${locale}`
   const t = await getTranslations('dashboardPage')
   const tStatus = await getTranslations('status')
   

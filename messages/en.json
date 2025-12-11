@@ -128,9 +128,74 @@
   "stepsTitle": {
     "actor": "Choose your AI creator"
   },
-  "step1": {},
-  "step2": {},
-  "step3": {},
+  "step1": {
+    "header": {
+      "title": "Choose your creator",
+      "subtitle": "Select an AI actor for your UGC ad"
+    },
+    "gender": {
+      "female": "Female",
+      "male": "Male",
+      "nonbinary": "Non-binary"
+    },
+    "customBadge": "Custom",
+    "createActor": {
+      "title": "Create an actor",
+      "subtitle": "with SOUL AI"
+    }
+  },
+  "step2": {
+    "header": {
+      "title": "Visible product?",
+      "subtitle": "Should your actor hold or show a product?"
+    },
+    "options": {
+      "without": {
+        "title": "Without product",
+        "subtitle": "Simple talking head"
+      },
+      "with": {
+        "title": "With product",
+        "subtitle": "Unboxing / Demo"
+      }
+    },
+    "holdingTypes": {
+      "label": "How does the actor hold the product?",
+      "holding_box": "Hold a box",
+      "holding_bottle": "Hold a bottle",
+      "showing_phone_screen": "Show a screen",
+      "pointing_at": "Point at"
+    },
+    "productImage": {
+      "label": "Product image (optional)",
+      "namePlaceholder": "Product name",
+      "nameHelper": "Helps AI generate a better prompt"
+    },
+    "productDescription": {
+      "label": "Product description (optional)",
+      "placeholder": "Describe your product: color, shape, visible text on packaging...",
+      "helper": "The more precise, the better the video result"
+    }
+  },
+  "step3": {
+    "header": {
+      "title": "Choose your intention",
+      "subtitle": "The style and context of your UGC video",
+      "withActor": "with {name}"
+    },
+    "tones": {
+      "vulnerable": "Vulnerable",
+      "energetic": "Energetic",
+      "urgent": "Urgent",
+      "conversational": "Conversational",
+      "reflective": "Reflective"
+    },
+    "filming": {
+      "handheld": "Selfie",
+      "filmed_by_other": "Filmed by other",
+      "setup_phone": "Tripod / Setup"
+    }
+  },
   "step4": {
     "beats": {
       "hook": "Hook",

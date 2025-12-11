@@ -299,16 +299,16 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
             <div className="text-sm text-muted-foreground pt-2">
               {tCampaign('createdAt', {
                 date: new Date(campaign.created_at).toLocaleDateString(locale, {
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
                 }),
               })}
             </div>
 
             {/* Actions secondaires : Modifier la vidéo + Modifier les sous-titres */}
             <div className="flex gap-3 pt-2">
-              <Link href={`/new/${id}`} className="flex-1">
+              <Link href={`${basePath}/new/${id}`} className="flex-1">
                 <Button variant="outline" className="w-full rounded-xl h-11">
                   {tCampaign('editVideo')}
                 </Button>
@@ -345,7 +345,7 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
               {brief?.target_duration || 30}s • {product?.has_product ? 'Avec produit' : 'Sans produit'}
             </span>
             {campaign.status === 'draft' && (
-              <Link href={`/new/${id}`}>
+              <Link href={`${basePath}/new/${id}`}>
                 <Button size="sm">Continuer l'édition</Button>
               </Link>
             )}
@@ -545,7 +545,7 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
           <p className="text-muted-foreground mb-4">
             Aucune vidéo n'a encore été générée pour cette campagne.
           </p>
-          <Link href={`/new/${id}`}>
+          <Link href={`${basePath}/new/${id}`}>
             <Button className="rounded-xl">
               ▶️ Continuer la campagne
             </Button>

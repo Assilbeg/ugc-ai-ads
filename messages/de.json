@@ -128,9 +128,74 @@
   "stepsTitle": {
     "actor": "Wähle deinen KI-Creator"
   },
-  "step1": {},
-  "step2": {},
-  "step3": {},
+  "step1": {
+    "header": {
+      "title": "Wähle deinen Creator",
+      "subtitle": "Wähle einen KI-Schauspieler für deine UGC-Anzeige"
+    },
+    "gender": {
+      "female": "Frau",
+      "male": "Mann",
+      "nonbinary": "Non-binär"
+    },
+    "customBadge": "Custom",
+    "createActor": {
+      "title": "Schauspieler erstellen",
+      "subtitle": "mit SOUL AI"
+    }
+  },
+  "step2": {
+    "header": {
+      "title": "Sichtbares Produkt?",
+      "subtitle": "Soll dein Schauspieler ein Produkt halten oder zeigen?"
+    },
+    "options": {
+      "without": {
+        "title": "Ohne Produkt",
+        "subtitle": "Einfaches Talking Head"
+      },
+      "with": {
+        "title": "Mit Produkt",
+        "subtitle": "Unboxing / Demo"
+      }
+    },
+    "holdingTypes": {
+      "label": "Wie hält der Schauspieler das Produkt?",
+      "holding_box": "Box halten",
+      "holding_bottle": "Flasche halten",
+      "showing_phone_screen": "Bildschirm zeigen",
+      "pointing_at": "Zeigen auf"
+    },
+    "productImage": {
+      "label": "Produktbild (optional)",
+      "namePlaceholder": "Produktname",
+      "nameHelper": "Hilft der KI bei besseren Prompts"
+    },
+    "productDescription": {
+      "label": "Produktbeschreibung (optional)",
+      "placeholder": "Beschreibe dein Produkt: Farbe, Form, sichtbarer Text auf der Verpackung...",
+      "helper": "Je präziser, desto besser das Videoergebnis"
+    }
+  },
+  "step3": {
+    "header": {
+      "title": "Wähle deine Intention",
+      "subtitle": "Stil und Kontext deines UGC-Videos",
+      "withActor": "mit {name}"
+    },
+    "tones": {
+      "vulnerable": "Verletzlich",
+      "energetic": "Energetisch",
+      "urgent": "Dringend",
+      "conversational": "Konversation",
+      "reflective": "Reflektierend"
+    },
+    "filming": {
+      "handheld": "Selfie",
+      "filmed_by_other": "Von anderen gefilmt",
+      "setup_phone": "Stativ / Setup"
+    }
+  },
   "step4": {
     "beats": {
       "hook": "Hook",

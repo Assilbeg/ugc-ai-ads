@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { NewCampaignState, ProductConfig, CampaignBrief, CampaignClip, GeneratedFirstFrames } from '@/types'
 import { StepIndicator } from '@/components/steps/step-indicator'
@@ -18,6 +18,7 @@ import { getPresetById } from '@/lib/presets'
 
 export default function NewCampaignPage() {
   const router = useRouter()
+  const locale = useLocale()
   const supabase = createClient()
   const { getActorById } = useActors()
   const tSteps = useTranslations('steps')
@@ -110,17 +111,17 @@ export default function NewCampaignPage() {
       }
 
       const campaignId = (campaign as any).id
-      console.log('✓ Campaign created, redirecting to:', `/new/${campaignId}`)
+      console.log('✓ Campaign created, redirecting to:', `/${locale}/new/${campaignId}`)
       
       // Rediriger vers /new/[id] pour avoir l'URL persistante
-      router.replace(`/new/${campaignId}`)
+      router.replace(`/${locale}/new/${campaignId}`)
     } catch (err) {
       console.error('Error creating campaign:', err)
       setIsCreatingCampaign(false)
       // Fallback: continuer sans persistance
       setState(prev => ({ ...prev, actor_id: actorId, step: 2 }))
     }
-  }, [supabase, router, isCreatingCampaign])
+  }, [supabase, router, isCreatingCampaign, locale])
 
   // Gérer le passage au step suivant
   // Au step 1, on crée la campagne et on redirige vers /new/[id]
@@ -236,7 +237,7 @@ export default function NewCampaignPage() {
           <Step6Generate
             state={state}
             onClipsUpdate={handleClipsGenerated}
-            onComplete={(campaignId) => router.push(`/campaign/${campaignId}`)}
+            onComplete={(campaignId) => router.push(`/${locale}/campaign/${campaignId}`)}
             onBack={prevStep}
           />
         )
@@ -273,4 +274,3 @@ export default function NewCampaignPage() {
     </div>
   )
 }
-

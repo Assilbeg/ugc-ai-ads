@@ -128,9 +128,74 @@
   "stepsTitle": {
     "actor": "Scegli il tuo creator IA"
   },
-  "step1": {},
-  "step2": {},
-  "step3": {},
+  "step1": {
+    "header": {
+      "title": "Scegli il tuo creatore",
+      "subtitle": "Seleziona un attore IA per la tua pubblicità UGC"
+    },
+    "gender": {
+      "female": "Donna",
+      "male": "Uomo",
+      "nonbinary": "Non-binario"
+    },
+    "customBadge": "Custom",
+    "createActor": {
+      "title": "Crea un attore",
+      "subtitle": "con SOUL AI"
+    }
+  },
+  "step2": {
+    "header": {
+      "title": "Prodotto visibile?",
+      "subtitle": "Il tuo attore deve tenere o mostrare un prodotto?"
+    },
+    "options": {
+      "without": {
+        "title": "Senza prodotto",
+        "subtitle": "Talking head semplice"
+      },
+      "with": {
+        "title": "Con prodotto",
+        "subtitle": "Unboxing / Demo"
+      }
+    },
+    "holdingTypes": {
+      "label": "Come l'attore tiene il prodotto?",
+      "holding_box": "Tenere una scatola",
+      "holding_bottle": "Tenere una bottiglia",
+      "showing_phone_screen": "Mostrare uno schermo",
+      "pointing_at": "Indicare"
+    },
+    "productImage": {
+      "label": "Immagine prodotto (opzionale)",
+      "namePlaceholder": "Nome prodotto",
+      "nameHelper": "Aiuta l'IA a generare prompt migliori"
+    },
+    "productDescription": {
+      "label": "Descrizione prodotto (opzionale)",
+      "placeholder": "Descrivi il prodotto: colore, forma, testo visibile sulla confezione...",
+      "helper": "Più preciso è, migliore sarà il risultato video"
+    }
+  },
+  "step3": {
+    "header": {
+      "title": "Scegli la tua intenzione",
+      "subtitle": "Lo stile e il contesto del tuo video UGC",
+      "withActor": "con {name}"
+    },
+    "tones": {
+      "vulnerable": "Vulnerabile",
+      "energetic": "Energico",
+      "urgent": "Urgente",
+      "conversational": "Conversazionale",
+      "reflective": "Riflessivo"
+    },
+    "filming": {
+      "handheld": "Selfie",
+      "filmed_by_other": "Filmato da altri",
+      "setup_phone": "Treppiede / Setup"
+    }
+  },
   "step4": {
     "beats": {
       "hook": "Gancio",

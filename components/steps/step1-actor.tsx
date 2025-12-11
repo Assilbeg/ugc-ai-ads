@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { Actor } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -17,6 +18,8 @@ export function Step1Actor({ selectedActorId, onSelect, onNext }: Step1ActorProp
   const [actors, setActors] = useState<Actor[]>([])
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
+  const t = useTranslations('step1')
+  const tc = useTranslations('common')
 
   useEffect(() => {
     loadActors()
@@ -46,13 +49,19 @@ export function Step1Actor({ selectedActorId, onSelect, onNext }: Step1ActorProp
     }
   }
 
+  const getGenderLabel = (gender: string) => {
+    if (gender === 'female') return t('gender.female')
+    if (gender === 'male') return t('gender.male')
+    return t('gender.nonbinary')
+  }
+
   return (
     <div className="space-y-8">
       {/* Header */}
       <div className="text-center max-w-lg mx-auto">
-        <h2 className="text-2xl font-semibold tracking-tight">Choisis ton créateur</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">{t('header.title')}</h2>
         <p className="text-muted-foreground mt-2">
-          Sélectionne un acteur IA pour ta publicité UGC
+          {t('header.subtitle')}
         </p>
       </div>
 
@@ -111,7 +120,7 @@ export function Step1Actor({ selectedActorId, onSelect, onNext }: Step1ActorProp
                 {/* Custom badge */}
                 {actor.is_custom && (
                   <div className="absolute top-3 left-3 px-2.5 py-1 bg-foreground rounded-full text-xs text-background font-medium">
-                    Custom
+                    {t('customBadge')}
                   </div>
                 )}
                 
@@ -119,7 +128,7 @@ export function Step1Actor({ selectedActorId, onSelect, onNext }: Step1ActorProp
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 pt-10">
                   <h3 className="font-medium text-white">{actor.name}</h3>
                   <p className="text-xs text-white/70 mt-0.5">
-                    {actor.appearance.gender === 'female' ? 'Femme' : actor.appearance.gender === 'male' ? 'Homme' : 'Non-binaire'}
+                    {getGenderLabel(actor.appearance.gender)}
                     {' • '}{actor.appearance.age_range}
                   </p>
                 </div>
@@ -136,8 +145,8 @@ export function Step1Actor({ selectedActorId, onSelect, onNext }: Step1ActorProp
               <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
                 <Plus className="w-6 h-6 text-muted-foreground" />
               </div>
-              <span className="text-sm font-medium">Créer un acteur</span>
-              <span className="text-xs text-muted-foreground mt-1">avec SOUL AI</span>
+              <span className="text-sm font-medium">{t('createActor.title')}</span>
+              <span className="text-xs text-muted-foreground mt-1">{t('createActor.subtitle')}</span>
             </div>
           </Card>
         </div>
@@ -150,7 +159,7 @@ export function Step1Actor({ selectedActorId, onSelect, onNext }: Step1ActorProp
           disabled={!selectedActorId}
           className="h-11 px-6 rounded-xl font-medium group"
         >
-          Continuer
+          {tc('continue')}
           <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
         </Button>
       </div>

@@ -128,9 +128,74 @@
   "stepsTitle": {
     "actor": "Choisis ton créateur IA"
   },
-  "step1": {},
-  "step2": {},
-  "step3": {},
+  "step1": {
+    "header": {
+      "title": "Choisis ton créateur",
+      "subtitle": "Sélectionne un acteur IA pour ta publicité UGC"
+    },
+    "gender": {
+      "female": "Femme",
+      "male": "Homme",
+      "nonbinary": "Non-binaire"
+    },
+    "customBadge": "Custom",
+    "createActor": {
+      "title": "Créer un acteur",
+      "subtitle": "avec SOUL AI"
+    }
+  },
+  "step2": {
+    "header": {
+      "title": "Produit visible ?",
+      "subtitle": "Est-ce que ton acteur doit tenir ou montrer un produit ?"
+    },
+    "options": {
+      "without": {
+        "title": "Sans produit",
+        "subtitle": "Talking head simple"
+      },
+      "with": {
+        "title": "Avec produit",
+        "subtitle": "Unboxing / Démo"
+      }
+    },
+    "holdingTypes": {
+      "label": "Comment l'acteur tient le produit ?",
+      "holding_box": "Tenir une boîte",
+      "holding_bottle": "Tenir une bouteille",
+      "showing_phone_screen": "Montrer un écran",
+      "pointing_at": "Pointer du doigt"
+    },
+    "productImage": {
+      "label": "Image du produit (optionnel)",
+      "namePlaceholder": "Nom du produit",
+      "nameHelper": "Aide l'IA à générer un meilleur prompt"
+    },
+    "productDescription": {
+      "label": "Description du produit (optionnel)",
+      "placeholder": "Décris ton produit : couleur, forme, texte visible sur le packaging...",
+      "helper": "Plus la description est précise, meilleur sera le rendu dans la vidéo"
+    }
+  },
+  "step3": {
+    "header": {
+      "title": "Choisis ton intention",
+      "subtitle": "Le style et le contexte de ta vidéo UGC",
+      "withActor": "avec {name}"
+    },
+    "tones": {
+      "vulnerable": "Vulnérable",
+      "energetic": "Énergique",
+      "urgent": "Urgent",
+      "conversational": "Conversationnel",
+      "reflective": "Réflexif"
+    },
+    "filming": {
+      "handheld": "Selfie",
+      "filmed_by_other": "Filmé par autre",
+      "setup_phone": "Posé / Trépied"
+    }
+  },
   "step4": {
     "beats": {
       "hook": "HOOK",

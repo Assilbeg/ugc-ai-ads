@@ -128,9 +128,74 @@
   "stepsTitle": {
     "actor": "Elige tu creador IA"
   },
-  "step1": {},
-  "step2": {},
-  "step3": {},
+  "step1": {
+    "header": {
+      "title": "Elige tu creador",
+      "subtitle": "Selecciona un actor IA para tu anuncio UGC"
+    },
+    "gender": {
+      "female": "Mujer",
+      "male": "Hombre",
+      "nonbinary": "No binario"
+    },
+    "customBadge": "Custom",
+    "createActor": {
+      "title": "Crear un actor",
+      "subtitle": "con SOUL AI"
+    }
+  },
+  "step2": {
+    "header": {
+      "title": "¿Producto visible?",
+      "subtitle": "¿Tu actor debe sostener o mostrar un producto?"
+    },
+    "options": {
+      "without": {
+        "title": "Sin producto",
+        "subtitle": "Talking head simple"
+      },
+      "with": {
+        "title": "Con producto",
+        "subtitle": "Unboxing / Demo"
+      }
+    },
+    "holdingTypes": {
+      "label": "¿Cómo sostiene el actor el producto?",
+      "holding_box": "Sostener una caja",
+      "holding_bottle": "Sostener una botella",
+      "showing_phone_screen": "Mostrar pantalla",
+      "pointing_at": "Señalar"
+    },
+    "productImage": {
+      "label": "Imagen del producto (opcional)",
+      "namePlaceholder": "Nombre del producto",
+      "nameHelper": "Ayuda a la IA a generar un mejor prompt"
+    },
+    "productDescription": {
+      "label": "Descripción del producto (opcional)",
+      "placeholder": "Describe tu producto: color, forma, texto visible en el empaque...",
+      "helper": "Cuanto más preciso, mejor será el resultado en el video"
+    }
+  },
+  "step3": {
+    "header": {
+      "title": "Elige tu intención",
+      "subtitle": "El estilo y contexto de tu video UGC",
+      "withActor": "con {name}"
+    },
+    "tones": {
+      "vulnerable": "Vulnerable",
+      "energetic": "Enérgico",
+      "urgent": "Urgente",
+      "conversational": "Conversacional",
+      "reflective": "Reflexivo"
+    },
+    "filming": {
+      "handheld": "Selfie",
+      "filmed_by_other": "Filmado por otro",
+      "setup_phone": "Trípode / Setup"
+    }
+  },
   "step4": {
     "beats": {
       "hook": "Gancho",

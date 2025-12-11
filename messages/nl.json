@@ -128,9 +128,74 @@
   "stepsTitle": {
     "actor": "Kies je AI-maker"
   },
-  "step1": {},
-  "step2": {},
-  "step3": {},
+  "step1": {
+    "header": {
+      "title": "Kies je creator",
+      "subtitle": "Selecteer een AI-acteur voor je UGC-advertentie"
+    },
+    "gender": {
+      "female": "Vrouw",
+      "male": "Man",
+      "nonbinary": "Non-binair"
+    },
+    "customBadge": "Custom",
+    "createActor": {
+      "title": "Acteur maken",
+      "subtitle": "met SOUL AI"
+    }
+  },
+  "step2": {
+    "header": {
+      "title": "Zichtbaar product?",
+      "subtitle": "Moet je acteur een product vasthouden of tonen?"
+    },
+    "options": {
+      "without": {
+        "title": "Zonder product",
+        "subtitle": "Eenvoudige talking head"
+      },
+      "with": {
+        "title": "Met product",
+        "subtitle": "Unboxing / Demo"
+      }
+    },
+    "holdingTypes": {
+      "label": "Hoe houdt de acteur het product vast?",
+      "holding_box": "Doos vasthouden",
+      "holding_bottle": "Fles vasthouden",
+      "showing_phone_screen": "Scherm tonen",
+      "pointing_at": "Wijzen naar"
+    },
+    "productImage": {
+      "label": "Productafbeelding (optioneel)",
+      "namePlaceholder": "Productnaam",
+      "nameHelper": "Helpt de AI betere prompts te genereren"
+    },
+    "productDescription": {
+      "label": "Productbeschrijving (optioneel)",
+      "placeholder": "Beschrijf je product: kleur, vorm, zichtbare tekst op verpakking...",
+      "helper": "Hoe preciezer, hoe beter het videoresultaat"
+    }
+  },
+  "step3": {
+    "header": {
+      "title": "Kies je intentie",
+      "subtitle": "De stijl en context van je UGC-video",
+      "withActor": "met {name}"
+    },
+    "tones": {
+      "vulnerable": "Kwetsbaar",
+      "energetic": "Energiek",
+      "urgent": "Dringend",
+      "conversational": "Conversationeel",
+      "reflective": "Reflecterend"
+    },
+    "filming": {
+      "handheld": "Selfie",
+      "filmed_by_other": "Door anderen gefilmd",
+      "setup_phone": "Statief / Setup"
+    }
+  },
   "step4": {
     "beats": {
       "hook": "Hook",
