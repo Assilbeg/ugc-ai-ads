@@ -446,6 +446,27 @@
     }
   },
   "admin": {},
+  "failedCampaign": {
+    "status": "Fehlgeschlagen",
+    "title": "Generierung fehlgeschlagen",
+    "noCreditsMessage": "Du hast nicht genug Credits, um die Videos zu generieren. {highlight} um fortzufahren.",
+    "noCreditsHighlight": "Lade deine Credits auf",
+    "genericMessage": "Bei der Generierung ist ein Fehler aufgetreten. Du kannst es erneut versuchen oder deine Kampagne bearbeiten.",
+    "rechargeCredits": "Credits aufladen",
+    "continueCampaign": "Kampagne fortsetzen",
+    "continueAnyway": "Trotzdem fortfahren",
+    "clipsPlanned": "geplante Clips",
+    "targetDuration": "Zieldauer",
+    "firstCampaign": "Erste Kampagne?",
+    "firstCampaignSubtitle": "Nutze ein Sonderangebot, um die Plattform zu testen",
+    "seeOffers": "Angebote ansehen",
+    "scriptTitle": "Dein Kampagnen-Script",
+    "videos": "Videos",
+    "rechargeToFinish": "Lade deine Credits auf, um diese Kampagne abzuschließen",
+    "readyToFinish": "Bereit, deine Kampagne abzuschließen?",
+    "withProduct": "Mit Produkt",
+    "withoutProduct": "Ohne Produkt"
+  },
   "presets": {
     "confession-intime": {
       "name": "Intimes Geständnis",

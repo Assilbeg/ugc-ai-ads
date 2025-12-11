@@ -440,6 +440,27 @@
     }
   },
   "admin": {},
+  "failedCampaign": {
+    "status": "Mislukt",
+    "title": "Generatie mislukt",
+    "noCreditsMessage": "Je hebt niet genoeg credits om de video's te genereren. {highlight} om door te gaan.",
+    "noCreditsHighlight": "Laad je credits op",
+    "genericMessage": "Er is een fout opgetreden tijdens de generatie. Je kunt opnieuw proberen of je campagne bewerken.",
+    "rechargeCredits": "Credits opladen",
+    "continueCampaign": "Campagne voortzetten",
+    "continueAnyway": "Toch doorgaan",
+    "clipsPlanned": "geplande clips",
+    "targetDuration": "doelduur",
+    "firstCampaign": "Eerste campagne?",
+    "firstCampaignSubtitle": "Profiteer van een speciale aanbieding om het platform te testen",
+    "seeOffers": "Aanbiedingen bekijken",
+    "scriptTitle": "Script van je campagne",
+    "videos": "video's",
+    "rechargeToFinish": "Laad je credits op om deze campagne af te ronden",
+    "readyToFinish": "Klaar om je campagne af te ronden?",
+    "withProduct": "Met product",
+    "withoutProduct": "Zonder product"
+  },
   "presets": {
     "confession-intime": {
       "name": "Intieme bekentenis",

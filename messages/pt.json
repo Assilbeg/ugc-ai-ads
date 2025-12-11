@@ -446,6 +446,27 @@
     }
   },
   "admin": {},
+  "failedCampaign": {
+    "status": "Falhou",
+    "title": "A geração falhou",
+    "noCreditsMessage": "Você não tem créditos suficientes para gerar os vídeos. {highlight} para continuar.",
+    "noCreditsHighlight": "Recarregue seus créditos",
+    "genericMessage": "Ocorreu um erro durante a geração. Você pode tentar novamente ou editar sua campanha.",
+    "rechargeCredits": "Recarregar créditos",
+    "continueCampaign": "Continuar campanha",
+    "continueAnyway": "Continuar mesmo assim",
+    "clipsPlanned": "clipes planejados",
+    "targetDuration": "duração alvo",
+    "firstCampaign": "Primeira campanha?",
+    "firstCampaignSubtitle": "Aproveite uma oferta especial para testar a plataforma",
+    "seeOffers": "Ver ofertas",
+    "scriptTitle": "Script da sua campanha",
+    "videos": "vídeos",
+    "rechargeToFinish": "Recarregue seus créditos para finalizar esta campanha",
+    "readyToFinish": "Pronto para finalizar sua campanha?",
+    "withProduct": "Com produto",
+    "withoutProduct": "Sem produto"
+  },
   "presets": {
     "confession-intime": {
       "name": "Confissão íntima",

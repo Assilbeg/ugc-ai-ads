@@ -446,6 +446,27 @@
     }
   },
   "admin": {},
+  "failedCampaign": {
+    "status": "Failed",
+    "title": "Generation failed",
+    "noCreditsMessage": "You don't have enough credits to generate the videos. {highlight} to continue.",
+    "noCreditsHighlight": "Top up your credits",
+    "genericMessage": "An error occurred during generation. You can retry or edit your campaign.",
+    "rechargeCredits": "Top up credits",
+    "continueCampaign": "Continue campaign",
+    "continueAnyway": "Continue anyway",
+    "clipsPlanned": "clips planned",
+    "targetDuration": "target duration",
+    "firstCampaign": "First campaign?",
+    "firstCampaignSubtitle": "Enjoy a special offer to test the platform",
+    "seeOffers": "See offers",
+    "scriptTitle": "Your campaign script",
+    "videos": "videos",
+    "rechargeToFinish": "Top up your credits to finish this campaign",
+    "readyToFinish": "Ready to finish your campaign?",
+    "withProduct": "With product",
+    "withoutProduct": "Without product"
+  },
   "presets": {
     "confession-intime": {
       "name": "Intimate confession",

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -40,14 +41,7 @@ interface FailedCampaignStateProps {
   hasProduct: boolean
 }
 
-const BEAT_LABELS: Record<string, string> = {
-  hook: 'HOOK',
-  problem: 'PROBLÈME',
-  agitation: 'AGITATION',
-  solution: 'SOLUTION',
-  proof: 'PREUVE',
-  cta: 'CTA',
-}
+// BEAT_LABELS are now fetched from translations (step6.beats)
 
 const BEAT_COLORS: Record<string, string> = {
   hook: 'bg-amber-500',
@@ -67,6 +61,8 @@ export function FailedCampaignState({
   targetDuration,
   hasProduct
 }: FailedCampaignStateProps) {
+  const t = useTranslations('failedCampaign')
+  const tStep6 = useTranslations('step6')
   const { credits, isLoading: creditsLoading } = useCredits()
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [isFirstPurchase, setIsFirstPurchase] = useState(false)
@@ -88,7 +84,7 @@ export function FailedCampaignState({
       <div>
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium mb-4 bg-red-50 text-red-700">
           <span className="w-2 h-2 rounded-full bg-red-500" />
-          Échec
+          {t('status')}
         </div>
         <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">
           {title}
@@ -98,7 +94,7 @@ export function FailedCampaignState({
             <Badge variant="secondary" className="rounded-lg">{presetName}</Badge>
           )}
           <span className="text-sm text-muted-foreground">
-            {targetDuration}s • {hasProduct ? 'Avec produit' : 'Sans produit'}
+            {targetDuration}s • {hasProduct ? t('withProduct') : t('withoutProduct')}
           </span>
         </div>
       </div>
@@ -116,18 +112,17 @@ export function FailedCampaignState({
 
           <div className="flex-1">
             <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2">
-              La génération a échoué
+              {t('title')}
             </h2>
             <p className="text-muted-foreground mb-6 max-w-xl">
               {hasNoCredits ? (
                 <>
-                  Tu n'as pas assez de crédits pour générer les vidéos. 
-                  <span className="text-amber-600 font-medium"> Recharge tes crédits</span> pour continuer.
+                  {t('noCreditsMessage', { highlight: '' })}
+                  <span className="text-amber-600 font-medium"> {t('noCreditsHighlight')}</span>
                 </>
               ) : (
                 <>
-                  Une erreur est survenue lors de la génération. 
-                  Tu peux réessayer ou modifier ta campagne.
+                  {t('genericMessage')}
                 </>
               )}
             </p>
@@ -142,13 +137,13 @@ export function FailedCampaignState({
                     onClick={() => setShowUpgradeModal(true)}
                   >
                     <Zap className="w-5 h-5 mr-2" />
-                    Recharger mes crédits
+                    {t('rechargeCredits')}
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                   <Link href={`/new/${campaignId}`}>
                     <Button variant="outline" size="lg" className="rounded-xl">
                       <Play className="w-4 h-4 mr-2" />
-                      Continuer la campagne
+                      {t('continueCampaign')}
                     </Button>
                   </Link>
                 </>
@@ -156,7 +151,7 @@ export function FailedCampaignState({
                 <Link href={`/new/${campaignId}`}>
                   <Button size="lg" className="rounded-xl">
                     <Play className="w-4 h-4 mr-2" />
-                    Continuer la campagne
+                    {t('continueCampaign')}
                   </Button>
                 </Link>
               )}
@@ -167,11 +162,11 @@ export function FailedCampaignState({
           <div className="hidden lg:flex flex-col gap-3 text-right">
             <div className="bg-background/80 backdrop-blur rounded-xl px-4 py-2 border border-border">
               <div className="text-2xl font-bold">{clips.length}</div>
-              <div className="text-xs text-muted-foreground">clips prévus</div>
+              <div className="text-xs text-muted-foreground">{t('clipsPlanned')}</div>
             </div>
             <div className="bg-background/80 backdrop-blur rounded-xl px-4 py-2 border border-border">
               <div className="text-2xl font-bold">{totalDuration}s</div>
-              <div className="text-xs text-muted-foreground">durée cible</div>
+              <div className="text-xs text-muted-foreground">{t('targetDuration')}</div>
             </div>
           </div>
         </div>
@@ -185,16 +180,16 @@ export function FailedCampaignState({
               <Sparkles className="w-6 h-6 text-white" />
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-foreground">Première campagne ?</h3>
+              <h3 className="font-semibold text-foreground">{t('firstCampaign')}</h3>
               <p className="text-sm text-muted-foreground">
-                Profite d'une offre spéciale pour tester la plateforme
+                {t('firstCampaignSubtitle')}
               </p>
             </div>
             <Button 
               className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
               onClick={() => setShowUpgradeModal(true)}
             >
-              Voir les offres
+              {t('seeOffers')}
             </Button>
           </div>
         </Card>
@@ -206,12 +201,12 @@ export function FailedCampaignState({
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold flex items-center gap-2">
               <Film className="w-5 h-5" />
-              Script de ta campagne
+              {t('scriptTitle')}
             </h3>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Video className="w-4 h-4" />
-                {clipsWithVideo}/{clips.length} vidéos
+                {clipsWithVideo}/{clips.length} {t('videos')}
               </span>
               <span className="flex items-center gap-1">
                 <Clock className="w-4 h-4" />
@@ -262,7 +257,7 @@ export function FailedCampaignState({
                         {index + 1}
                       </span>
                       <Badge className={`${BEAT_COLORS[clip.beat]} text-white text-xs`}>
-                        {BEAT_LABELS[clip.beat] || clip.beat}
+                        {tStep6(`beats.${clip.beat}`)}
                       </Badge>
                       <span className="text-xs text-muted-foreground flex items-center gap-1">
                         <Clock className="w-3 h-3" />
@@ -284,8 +279,8 @@ export function FailedCampaignState({
       <div className="text-center py-6 border-t border-border mt-8">
         <p className="text-muted-foreground mb-4 mt-6">
           {hasNoCredits 
-            ? "Recharge tes crédits pour terminer cette campagne"
-            : "Prêt à terminer ta campagne ?"}
+            ? t('rechargeToFinish')
+            : t('readyToFinish')}
         </p>
         {hasNoCredits ? (
           <div className="flex justify-center gap-3">
@@ -295,11 +290,11 @@ export function FailedCampaignState({
               onClick={() => setShowUpgradeModal(true)}
             >
               <Zap className="w-5 h-5 mr-2" />
-              Recharger mes crédits
+              {t('rechargeCredits')}
             </Button>
             <Link href={`/new/${campaignId}`}>
               <Button size="lg" variant="outline" className="rounded-xl">
-                Continuer quand même
+                {t('continueAnyway')}
               </Button>
             </Link>
           </div>
@@ -307,7 +302,7 @@ export function FailedCampaignState({
           <Link href={`/new/${campaignId}`}>
             <Button size="lg" className="rounded-xl">
               <Play className="w-4 h-4 mr-2" />
-              Continuer la campagne
+              {t('continueCampaign')}
             </Button>
           </Link>
         )}
