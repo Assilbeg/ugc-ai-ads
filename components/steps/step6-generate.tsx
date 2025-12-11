@@ -149,6 +149,10 @@ function AssemblyModal({ isOpen, clipCount }: { isOpen: boolean; clipCount: numb
 // "speaks in ... accent: [SCRIPT]" ou "[SCRIPT OVERRIDE]: ..."
 // ══════════════════════════════════════════════════════════════
 function replaceScriptInPrompt(originalPrompt: string, oldScript: string, newScript: string): string {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/e4231377-2382-45db-b33c-82d9e810facf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'step6-generate.tsx:replaceScriptInPrompt-entry',message:'replaceScriptInPrompt called',data:{hasOriginalPrompt:!!originalPrompt,originalPromptLength:originalPrompt?.length||0,originalPromptFirst200:originalPrompt?.slice(0,200),oldScriptFirst80:oldScript?.slice(0,80),newScriptFirst80:newScript?.slice(0,80),oldScriptLength:oldScript?.length||0,newScriptLength:newScript?.length||0,oldEqualsNew:oldScript===newScript,promptContainsOld:originalPrompt?.includes(oldScript||''),promptContainsNew:originalPrompt?.includes(newScript||'')},timestamp:Date.now(),sessionId:'debug-session',runId:'script-regen',hypothesisId:'H2'})}).catch(()=>{});
+  // #endregion
+
   if (!originalPrompt) {
     // Pas de prompt original → créer un prompt minimal avec le script
     console.warn('[replaceScriptInPrompt] No original prompt, creating minimal prompt with script')
@@ -158,6 +162,9 @@ function replaceScriptInPrompt(originalPrompt: string, oldScript: string, newScr
   // Vérifier si le prompt contient DÉJÀ le nouveau script
   if (originalPrompt.includes(newScript)) {
     console.log('[replaceScriptInPrompt] ✓ Prompt already contains the new script')
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/e4231377-2382-45db-b33c-82d9e810facf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'step6-generate.tsx:replaceScriptInPrompt-alreadyContains',message:'Prompt already contains new script - returning unchanged',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'script-regen',hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
     return originalPrompt
   }
   
@@ -167,6 +174,9 @@ function replaceScriptInPrompt(originalPrompt: string, oldScript: string, newScr
   if (oldScript && oldScript !== newScript && originalPrompt.includes(oldScript)) {
     const updatedPrompt = originalPrompt.replace(oldScript, newScript)
     console.log('[replaceScriptInPrompt] ✓ Direct replace succeeded')
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/e4231377-2382-45db-b33c-82d9e810facf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'step6-generate.tsx:replaceScriptInPrompt-method1',message:'Direct replace succeeded',data:{method:'method1-direct',updatedPromptFirst200:updatedPrompt?.slice(0,200),containsNewScript:updatedPrompt?.includes(newScript||'')},timestamp:Date.now(),sessionId:'debug-session',runId:'script-regen',hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
     return updatedPrompt
   }
   
@@ -200,6 +210,9 @@ function replaceScriptInPrompt(originalPrompt: string, oldScript: string, newScr
     const afterScript = afterAccent.substring(scriptEndIndex)
     const updatedPrompt = beforeAccent + newScript + afterScript
     console.log('[replaceScriptInPrompt] ✓ Replaced using accent pattern method')
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/e4231377-2382-45db-b33c-82d9e810facf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'step6-generate.tsx:replaceScriptInPrompt-method2',message:'Accent pattern method succeeded',data:{method:'method2-regex',updatedPromptFirst200:updatedPrompt?.slice(0,200),containsNewScript:updatedPrompt?.includes(newScript||'')},timestamp:Date.now(),sessionId:'debug-session',runId:'script-regen',hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
     return updatedPrompt
   }
   
@@ -220,7 +233,11 @@ function replaceScriptInPrompt(originalPrompt: string, oldScript: string, newScr
   // Ajouter le script avec le format standard
   const scriptSection = `\n\nSpeech/Dialogue: speaks in standard metropolitan French accent, Parisian pronunciation, clear and neutral: "${newScript}"\n\n`
   
-  return beforeInsert + scriptSection + afterInsert
+  const finalPrompt = beforeInsert + scriptSection + afterInsert
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/e4231377-2382-45db-b33c-82d9e810facf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'step6-generate.tsx:replaceScriptInPrompt-method3',message:'Fallback method - added script section',data:{method:'method3-fallback',finalPromptFirst300:finalPrompt?.slice(0,300),containsNewScript:finalPrompt?.includes(newScript||'')},timestamp:Date.now(),sessionId:'debug-session',runId:'script-regen',hypothesisId:'H2'})}).catch(()=>{});
+  // #endregion
+  return finalPrompt
 }
 
 // Vitesses disponibles (UGC TikTok = dynamique, JAMAIS de ralentissement)
@@ -1697,7 +1714,11 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     // (au lieu de clipIndex qui était l'index dans uniqueBeats, pas dans clips)
     const { beatOrder, what, clipToRegenerate: passedClip } = confirmRegen
     const planClip = clips.find(c => c.order === beatOrder) // FIX: Recherche par order, pas par index
-    
+
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/e4231377-2382-45db-b33c-82d9e810facf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'step6-generate.tsx:handleConfirmRegenerate',message:'handleConfirmRegenerate - extracted from confirmRegen',data:{beatOrder,what,hasPassedClip:!!passedClip,passedClipScriptText:passedClip?.script?.text?.slice(0,80),passedClipPromptFirst100:passedClip?.video?.prompt?.slice(0,100),passedClipPromptContainsScript:passedClip?.video?.prompt?.includes(passedClip?.script?.text||''),planClipScriptText:planClip?.script?.text?.slice(0,80),planClipPromptFirst100:planClip?.video?.prompt?.slice(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'script-regen',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
+
     if (!planClip) {
       console.error('[Regenerate] No plan clip found for beat order:', beatOrder)
       setConfirmRegen(null)
@@ -1727,9 +1748,13 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
     
     const oldClipId = clipToRegenerate.id
     // beatOrder vient déjà de confirmRegen (pas besoin de le redéfinir)
-    
+
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/e4231377-2382-45db-b33c-82d9e810facf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'step6-generate.tsx:handleConfirmRegenerate-beforeRegen',message:'About to call regenerateSingleClip',data:{beatOrder,what,clipToRegenerateId:clipToRegenerate.id,clipToRegenerateScriptText:clipToRegenerate.script?.text?.slice(0,80),clipToRegeneratePromptFirst200:clipToRegenerate.video?.prompt?.slice(0,200),promptContainsScript:clipToRegenerate.video?.prompt?.includes(clipToRegenerate.script?.text||'')},timestamp:Date.now(),sessionId:'debug-session',runId:'script-regen',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
+
     setConfirmRegen(null)
-    
+
     // ══════════════════════════════════════════════════════════════
     // LANCER LA RÉGÉNÉRATION D'ABORD
     // (on archive APRÈS succès pour éviter les versions orphelines)
@@ -1923,6 +1948,10 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       frame: 'l\'image',
       all: 'tout',
     }
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/e4231377-2382-45db-b33c-82d9e810facf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'step6-generate.tsx:askRegenerate',message:'askRegenerate called',data:{beatOrder,what,hasClipToRegenerate:!!clipToRegenerate,clipToRegenerateScriptText:clipToRegenerate?.script?.text?.slice(0,80),clipToRegeneratePromptFirst100:clipToRegenerate?.video?.prompt?.slice(0,100),promptContainsScript:clipToRegenerate?.video?.prompt?.includes(clipToRegenerate?.script?.text||'')},timestamp:Date.now(),sessionId:'debug-session',runId:'script-regen',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
     
     setConfirmRegen({
       beatOrder, // FIX: Utiliser l'order du beat, pas un index
@@ -2575,6 +2604,10 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                         video: { ...(generatedClip?.video || clip.video), prompt: updatedVideoPrompt }
                                       }
                                       
+                                      // #region agent log
+                                      fetch('http://127.0.0.1:7242/ingest/e4231377-2382-45db-b33c-82d9e810facf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'step6-generate.tsx:SaveAndRegenButton',message:'Save&Regen button clicked - clipWithUpdatedScript created',data:{beatOrder:clip.order,editScriptText:editScriptText.slice(0,80),oldScript:oldScript?.slice(0,80),originalPrompt:originalPrompt?.slice(0,100),updatedVideoPrompt:updatedVideoPrompt?.slice(0,200),promptChanged:updatedVideoPrompt!==originalPrompt,promptContainsNewScript:updatedVideoPrompt?.includes(editScriptText),clipWithUpdatedScriptPromptFirst200:clipWithUpdatedScript.video?.prompt?.slice(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'script-regen',hypothesisId:'H2'})}).catch(()=>{});
+                                      // #endregion
+                                      
                                       await saveScript(clip.order)
                                       askRegenerate(clip.order, 'video', clipWithUpdatedScript)
                                     }}
@@ -3004,6 +3037,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
             : t('confirmRegen.message', { label: confirmRegen?.label || '' })
         }
         confirmText={t('confirmRegen.confirm')}
+        cancelText={tCommon('cancel')}
         variant={confirmRegen?.what === 'video' ? 'danger' : 'warning'}
       />
 

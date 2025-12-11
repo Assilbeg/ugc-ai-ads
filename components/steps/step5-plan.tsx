@@ -35,14 +35,7 @@ interface Step5PlanProps {
   onBack: () => void
 }
 
-const BEAT_LABELS: Record<string, string> = {
-  hook: 'HOOK',
-  problem: 'PROBLÈME',
-  agitation: 'AGITATION',
-  solution: 'SOLUTION',
-  proof: 'PREUVE',
-  cta: 'CTA',
-}
+// BEAT_LABELS now fetched from translations (step5.beats)
 
 const BEAT_COLORS: Record<string, string> = {
   hook: 'bg-amber-500',
@@ -51,15 +44,6 @@ const BEAT_COLORS: Record<string, string> = {
   solution: 'bg-emerald-500',
   proof: 'bg-blue-500',
   cta: 'bg-violet-500',
-}
-
-const BEAT_EMOJIS: Record<string, string> = {
-  hook: '🎣',
-  problem: '😰',
-  agitation: '🔥',
-  solution: '✨',
-  proof: '📊',
-  cta: '🚀',
 }
 
 // Helper: injecter le script dans le prompt vidéo (aligné avec CRITICAL_BEHAVIORS §8.1)
@@ -111,21 +95,31 @@ function replaceScriptInPrompt(originalPrompt: string, oldScript: string, newScr
 }
 
 // Configuration des étapes de chargement - toutes démarrent ensemble avec des vitesses différentes
-const LOADING_STEPS = [
-  { beat: 'hook', label: 'HOOK', emoji: '🎣' },
-  { beat: 'solution', label: 'SOLUTION', emoji: '✨' },
-  { beat: 'problem', label: 'PROBLÈME', emoji: '😰' },
-  { beat: 'proof', label: 'PREUVE', emoji: '📊' },
-  { beat: 'agitation', label: 'AGITATION', emoji: '🔥' },
-  { beat: 'cta', label: 'CTA', emoji: '🚀' },
-]
+const LOADING_STEP_BEATS = ['hook', 'solution', 'problem', 'proof', 'agitation', 'cta'] as const
+
+const BEAT_EMOJIS: Record<string, string> = {
+  hook: '🎣',
+  problem: '😰',
+  agitation: '🔥',
+  solution: '✨',
+  proof: '📊',
+  cta: '🚀',
+}
 
 function LoadingAnimation() {
+  const t = useTranslations('step5')
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set())
   const [activeStep, setActiveStep] = useState<string | null>(null)
   const [progress, setProgress] = useState<Record<string, number>>({})
   const [overallProgress, setOverallProgress] = useState(0)
   const [mounted, setMounted] = useState(false)
+  
+  // Build loading steps with translated labels
+  const LOADING_STEPS = LOADING_STEP_BEATS.map(beat => ({
+    beat,
+    label: t(`beats.${beat}`),
+    emoji: BEAT_EMOJIS[beat],
+  }))
 
   // S'assurer qu'on est côté client pour le Portal
   useEffect(() => {
@@ -239,9 +233,9 @@ function LoadingAnimation() {
       <div className="text-center mb-10">
         <div className="inline-flex items-center gap-2 px-4 py-2 bg-foreground text-background rounded-full text-sm font-medium mb-4">
           <Sparkles className="w-4 h-4 animate-pulse" />
-          Génération du script parfait...
+          {t('loading.badge')}
         </div>
-        <p className="text-muted-foreground text-sm">Analyse du brief et création des clips</p>
+        <p className="text-muted-foreground text-sm">{t('loading.subtitle')}</p>
       </div>
 
       {/* Animated timeline */}
@@ -343,7 +337,7 @@ function LoadingAnimation() {
             <div className="w-2 h-2 rounded-full bg-foreground animate-bounce" style={{ animationDelay: '0.2s' }} />
           </div>
           <span className="text-sm text-muted-foreground">
-            {activeStep ? `Écriture du ${LOADING_STEPS.find(s => s.beat === activeStep)?.label}...` : 'Analyse du brief...'}
+            {activeStep ? t('loading.writingBeat', { beat: LOADING_STEPS.find(s => s.beat === activeStep)?.label || '' }) : t('loading.subtitle')}
           </span>
         </div>
       </div>
@@ -1234,9 +1228,9 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
     <div className="space-y-8">
       {/* Header */}
       <div className="text-center max-w-lg mx-auto">
-        <h2 className="text-2xl font-semibold tracking-tight">Plan de campagne</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">{t('header.title')}</h2>
         <p className="text-muted-foreground mt-2">
-          Valide le script et les visuels générés par l'IA
+          {t('header.subtitle')}
         </p>
       </div>
 
@@ -1248,11 +1242,11 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
       {/* Error state */}
       {error && (
         <Card className="bg-destructive/5 border-destructive/20 p-6 gap-0">
-          <p className="text-destructive font-medium mb-2">Une erreur est survenue</p>
+          <p className="text-destructive font-medium mb-2">{t('error.title')}</p>
           <p className="text-destructive/70 text-sm mb-4">{error}</p>
           <Button variant="outline" onClick={handleRegenerate} className="w-fit rounded-xl">
             <RefreshCw className="w-4 h-4 mr-2" />
-            Réessayer
+            {t('error.retry')}
           </Button>
         </Card>
       )}
@@ -1265,17 +1259,16 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
               <AlertTriangle className="w-6 h-6 text-white" />
             </div>
             <div className="flex-1">
-              <p className="font-semibold text-amber-700 dark:text-amber-400 mb-1">Crédits insuffisants</p>
+              <p className="font-semibold text-amber-700 dark:text-amber-400 mb-1">{t('insufficientCredits.title')}</p>
               <p className="text-muted-foreground text-sm mb-4">
-                Tu n'as pas assez de crédits pour générer les visuels de prévisualisation. 
-                Recharge tes crédits pour continuer.
+                {t('insufficientCredits.message')}
               </p>
               <Button 
                 className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
                 onClick={() => setShowUpgradeModal(true)}
               >
                 <Sparkles className="w-4 h-4 mr-2" />
-                Recharger mes crédits
+                {t('insufficientCredits.cta')}
               </Button>
             </div>
           </div>
@@ -1290,7 +1283,7 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">
                 <Film className="w-4 h-4" />
-                <span className="font-medium">{displayClips.length} clips</span>
+                <span className="font-medium">{displayClips.length} {t('summary.clips')}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4" />
@@ -1301,11 +1294,11 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
                 {generatingFrames ? (
                   <span className="flex items-center gap-2">
                     <Loader2 className="w-3 h-3 animate-spin" />
-                    Génération...
+                    {t('summary.generating')}
                   </span>
                 ) : (
                   <span className={generatedFrames === displayClips.length ? 'text-emerald-300' : ''}>
-                    {generatedFrames}/{displayClips.length} images
+                    {generatedFrames}/{displayClips.length} {t('summary.images')}
                   </span>
                 )}
               </div>
@@ -1322,7 +1315,7 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
                 disabled={generatingFrames}
               >
                 <ImageIcon className="w-3.5 h-3.5 mr-1.5" />
-                Images
+                {t('summary.imagesBtn')}
               </Button>
               <Button 
                 variant="secondary" 
@@ -1331,7 +1324,7 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
                 onClick={handleRegenerate}
               >
                 <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-                Tout
+                {t('summary.allBtn')}
               </Button>
             </div>
           </div>
@@ -1350,7 +1343,7 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
                       {firstFrames[index]?.loading ? (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted">
                           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                          <span className="text-[10px] text-muted-foreground mt-2">Génération...</span>
+                          <span className="text-[10px] text-muted-foreground mt-2">{t('clip.generating')}</span>
                         </div>
                       ) : (() => {
                         const beat = clip.order
@@ -1378,7 +1371,7 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
                                 className="mt-2 h-6 text-[10px]"
                                 onClick={() => generateFirstFrame(index, clip, index > 0 ? firstFrames[index - 1]?.url : undefined, true)}
                               >
-                                Réessayer
+                                {t('error.retry')}
                               </Button>
                             </div>
                           )
@@ -1439,7 +1432,7 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
                               onClick={() => generateFirstFrame(index, clip, index > 0 ? firstFrames[index - 1]?.url : undefined, true)}
                             >
                               <RefreshCw className="w-3 h-3 mr-1" />
-                              Regénérer
+                              {t('clip.regenerate')}
                             </Button>
                           </div>
                         </div>
@@ -1456,7 +1449,7 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
                           {index + 1}
                         </div>
                         <Badge className={`${BEAT_COLORS[clip.beat]} text-white border-0`}>
-                          {BEAT_LABELS[clip.beat]}
+                          {t(`beats.${clip.beat}`)}
                         </Badge>
                         <span className="text-sm text-muted-foreground">
                           {clip.video.duration}s
@@ -1470,7 +1463,7 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
                           onClick={() => startEditing(index)}
                         >
                           <Pencil className="w-3.5 h-3.5 mr-1.5" />
-                          Modifier
+                          {t('clip.edit')}
                         </Button>
                       )}
                     </div>
@@ -1490,12 +1483,12 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
                             return (
                               <div className="flex items-center gap-2">
                                 <span className={`text-xs ${warning.isWarning ? 'text-amber-500 font-medium' : 'text-muted-foreground'}`}>
-                                  {warning.wordCount} mots
+                                  {warning.wordCount} {t('clip.words')}
                                 </span>
                                 {warning.isWarning && (
                                   <span className="text-xs text-amber-500 flex items-center gap-1">
                                     <AlertTriangle className="w-3 h-3" />
-                                    max ~{warning.maxWords} pour {clip.video.duration}s
+                                    {t('clip.maxWords', { max: warning.maxWords, duration: clip.video.duration })}
                                   </span>
                                 )}
                               </div>
@@ -1504,11 +1497,11 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
                           <div className="flex gap-2">
                             <Button variant="ghost" size="sm" onClick={cancelEdit} className="rounded-lg">
                               <X className="w-3.5 h-3.5 mr-1" />
-                              Annuler
+                              {tCommon('cancel')}
                             </Button>
                             <Button size="sm" onClick={saveEdit} className="rounded-lg">
                               <Check className="w-3.5 h-3.5 mr-1" />
-                              Sauvegarder
+                              {t('clip.save')}
                             </Button>
                           </div>
                         </div>
@@ -1524,7 +1517,7 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
                             return warning.isWarning ? (
                               <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-500">
                                 <AlertTriangle className="w-3.5 h-3.5" />
-                                <span>Script trop long : {warning.wordCount} mots pour {clip.video.duration}s (max ~{warning.maxWords})</span>
+                                <span>{t('clip.scriptTooLong', { count: warning.wordCount, duration: clip.video.duration, max: warning.maxWords })}</span>
                               </div>
                             ) : null
                           })()}

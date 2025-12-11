@@ -312,6 +312,48 @@
     }
   },
   "step5": {
+    "header": {
+      "title": "Campagneplan",
+      "subtitle": "Valideer het script en de door AI gegenereerde visuals"
+    },
+    "loading": {
+      "badge": "Het perfecte script wordt gegenereerd...",
+      "subtitle": "Brief analyseren en clips maken",
+      "writingBeat": "{beat} schrijven..."
+    },
+    "beats": {
+      "hook": "HOOK",
+      "problem": "PROBLEEM",
+      "agitation": "AGITATIE",
+      "solution": "OPLOSSING",
+      "proof": "BEWIJS",
+      "cta": "CTA"
+    },
+    "error": {
+      "title": "Er is een fout opgetreden",
+      "retry": "Opnieuw proberen"
+    },
+    "insufficientCredits": {
+      "title": "Onvoldoende credits",
+      "message": "Je hebt niet genoeg credits om de preview-visuals te genereren. Laad je credits op om door te gaan.",
+      "cta": "Credits opwaarderen"
+    },
+    "summary": {
+      "clips": "clips",
+      "images": "afbeeldingen",
+      "generating": "Genereren...",
+      "imagesBtn": "Afbeeldingen",
+      "allBtn": "Alles"
+    },
+    "clip": {
+      "generating": "Genereren...",
+      "regenerate": "Regenereren",
+      "edit": "Bewerken",
+      "save": "Opslaan",
+      "words": "woorden",
+      "maxWords": "max ~{max} voor {duration}s",
+      "scriptTooLong": "Script te lang: {count} woorden voor {duration}s (max ~{max})"
+    },
     "visualPrompt": {
       "label": "Visuele prompt",
       "edit": "Bewerken",
@@ -549,5 +591,78 @@
         "cta": "Presets beheren"
       }
     }
+  },
+  "submagic": {
+    "title": "Ondertitels & Hook",
+    "cost": "Kosten: {cost} credits",
+    "balance": "Saldo: {balance} credits",
+    "hookTitle": {
+      "label": "Hook-titel",
+      "placeholder": "Bijv: de geheime strategie om je verkoop te verdrievoudigen 🚀",
+      "generateBtn": "Genereren",
+      "generatedByAI": "✨ Gegenereerd door AI",
+      "theme": "Thema",
+      "position": "Positie",
+      "size": "Grootte"
+    },
+    "subtitles": {
+      "label": "Ondertitelstijl",
+      "noTemplate": "Geen template in deze categorie"
+    },
+    "video": {
+      "title": "Video-opties",
+      "magicZooms": "Magic Zooms",
+      "magicZoomsDesc": "Automatische zooms",
+      "badTakes": "Bad Takes",
+      "badTakesDesc": "Verwijdert aarzelingen",
+      "magicBrolls": "Magic B-rolls",
+      "magicBrollsDesc": "AI-gestuurde contextuele stock video's",
+      "coverage": "Dekking"
+    },
+    "audio": {
+      "title": "Audio-opties",
+      "silenceRemoval": "Stilteverwijdering",
+      "disabled": "Uitgeschakeld",
+      "natural": "Natuurlijk (0,6s+)",
+      "fast": "Snel (0,2-0,6s)",
+      "extraFast": "Heel snel (0,1-0,2s)"
+    },
+    "info": "Verwerking duurt 1 tot 5 minuten. De video met ondertitels verschijnt automatisch.",
+    "actions": {
+      "cancel": "Annuleren",
+      "processing": "Bezig met verwerken...",
+      "submit": "Starten ({cost} credits)"
+    },
+    "errors": {
+      "submagicCredits": "Submagic-credits op. Probeer later opnieuw of laad Submagic op.",
+      "insufficientCredits": "Onvoldoende credits. Je hebt {current} credits, je hebt {required} nodig.",
+      "generic": "Er is een fout opgetreden",
+      "connection": "Verbindingsfout",
+      "hookGeneration": "Fout bij het genereren van hook"
+    }
+  },
+  "firstPurchase": {
+    "title": "🎬 Je eerste video wacht!",
+    "subtitle": "Nog één stap om {count, plural, one {je clip} other {je # clips}} UGC te genereren",
+    "whatYouGet": {
+      "title": "Wat je krijgt:",
+      "videos": "{count, plural, one {# AI-gegenereerde UGC-video} other {# AI-gegenereerde UGC-video's}}",
+      "voice": "Gekloonde stem + omgevingsgeluid",
+      "export": "HD-export klaar voor TikTok/Reels"
+    },
+    "earlyBird": {
+      "timer": "Early Bird-aanbieding verloopt over",
+      "badge": "Early Bird -50%"
+    },
+    "recommended": "Aanbevolen",
+    "creditsIncluded": "{credits} credits inbegrepen",
+    "cta": "Mijn video's genereren",
+    "redirecting": "Doorsturen...",
+    "noPlans": "Momenteel geen plan beschikbaar",
+    "trust": {
+      "secure": "Veilige betaling",
+      "instant": "Directe activering"
+    },
+    "viewAllPlans": "Alle plannen bekijken →"
   }
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -129,6 +130,8 @@ export function SubmagicModal({
   onSuccess,
   currentBalance = 0,
 }: SubmagicModalProps) {
+  const t = useTranslations('submagic')
+  const tCommon = useTranslations('common')
   // Templates depuis l'API
   const [templates, setTemplates] = useState<string[]>(Object.keys(TEMPLATE_METADATA))
   const [hookTemplates, setHookTemplates] = useState<string[]>(Object.keys(HOOK_THEME_METADATA))
@@ -172,7 +175,7 @@ export function SubmagicModal({
       ])
 
       if (templatesRes.status === 402 || hookTemplatesRes.status === 402) {
-        setError("Crédits Submagic épuisés côté fournisseur. Réessaie plus tard ou recharge Submagic.")
+        setError(t('errors.submagicCredits'))
         return
       }
 
@@ -227,7 +230,7 @@ export function SubmagicModal({
       }
     } catch (err) {
       console.error('Error generating hook:', err)
-      setError(err instanceof Error ? err.message : 'Erreur lors de la génération du hook')
+      setError(err instanceof Error ? err.message : t('errors.hookGeneration'))
     } finally {
       setIsGeneratingHook(false)
     }
@@ -279,14 +282,14 @@ export function SubmagicModal({
       if (!response.ok) {
         if (response.status === 402) {
           if (data?.error === 'INSUFFICIENT_CREDITS') {
-            setError("Crédits Submagic épuisés côté fournisseur. Réessaie plus tard ou recharge Submagic.")
+            setError(t('errors.submagicCredits'))
           } else {
             const required = data?.required ?? SUBMAGIC_COST
             const current = data?.current ?? currentBalance
-            setError(`Crédits insuffisants. Vous avez ${current} crédits, il en faut ${required}.`)
+            setError(t('errors.insufficientCredits', { current, required }))
           }
         } else {
-          setError(data?.error || 'Une erreur est survenue')
+          setError(data?.error || t('errors.generic'))
         }
         return
       }
@@ -297,7 +300,7 @@ export function SubmagicModal({
 
     } catch (err) {
       console.error('Error creating Submagic project:', err)
-      setError('Erreur de connexion')
+      setError(t('errors.connection'))
     } finally {
       setIsSubmitting(false)
     }
@@ -361,7 +364,7 @@ export function SubmagicModal({
               <Subtitles className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold">Sous-titres & Hook</h2>
+              <h2 className="text-xl font-bold">{t('title')}</h2>
               <p className="text-sm text-muted-foreground truncate max-w-md">
                 {campaignTitle}
               </p>
@@ -372,10 +375,10 @@ export function SubmagicModal({
           <div className="mt-4 flex items-center justify-between p-3 rounded-xl bg-muted/50">
             <div className="flex items-center gap-2">
               <Zap className="w-4 h-4 text-amber-500" />
-              <span className="text-sm">Coût : <strong>{SUBMAGIC_COST} crédits</strong></span>
+              <span className="text-sm">{t('cost', { cost: SUBMAGIC_COST })}</span>
             </div>
             <div className={`text-sm ${hasEnoughCredits ? 'text-muted-foreground' : 'text-destructive'}`}>
-              Solde : {currentBalance} crédits
+              {t('balance', { balance: currentBalance })}
             </div>
           </div>
         </div>
@@ -391,7 +394,7 @@ export function SubmagicModal({
             <div className="flex items-center justify-between">
                 <Label className="flex items-center gap-2 text-base font-semibold">
                   <Sparkles className="w-5 h-5 text-orange-500" />
-                  Hook Title
+                  {t('hookTitle.label')}
               </Label>
               <button
                 type="button"
@@ -415,7 +418,7 @@ export function SubmagicModal({
                     <div className="flex gap-2">
                       <div className="flex-1 relative">
                   <Input
-                          placeholder="Ex: la stratégie secrète pour tripler vos ventes 🚀"
+                          placeholder={t('hookTitle.placeholder')}
                     value={config.hookTitle.text || ''}
                           onChange={(e) => {
                             setConfig(prev => ({
@@ -448,13 +451,13 @@ export function SubmagicModal({
                         ) : (
                           <Sparkles className="w-4 h-4" />
                         )}
-                        Générer
+                        {t('hookTitle.generateBtn')}
                       </Button>
                     </div>
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>
                         {config.hookTitle.isAutoGenerated && config.hookTitle.text && (
-                          <span className="text-orange-600 dark:text-orange-400">✨ Généré par IA</span>
+                          <span className="text-orange-600 dark:text-orange-400">{t('hookTitle.generatedByAI')}</span>
                         )}
                       </span>
                       <span>{(config.hookTitle.text || '').length}/100</span>
@@ -463,7 +466,7 @@ export function SubmagicModal({
 
                   {/* Theme Selection - Visual Buttons */}
                   <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">Theme</Label>
+                    <Label className="text-xs text-muted-foreground">{t('hookTitle.theme')}</Label>
                     <div className="flex flex-wrap gap-2">
                       {hookTemplates.map((theme) => {
                         const meta = HOOK_THEME_METADATA[theme] || { bgColor: '#374151', textColor: '#fff' }
@@ -499,7 +502,7 @@ export function SubmagicModal({
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <div className="flex justify-between">
-                        <Label className="text-xs text-muted-foreground">Position</Label>
+                        <Label className="text-xs text-muted-foreground">{t('hookTitle.position')}</Label>
                         <span className="text-xs font-mono">{config.hookTitle.top || 50}%</span>
                       </div>
                     <Slider
@@ -513,7 +516,7 @@ export function SubmagicModal({
                   </div>
                     <div className="space-y-2">
                       <div className="flex justify-between">
-                        <Label className="text-xs text-muted-foreground">Taille</Label>
+                        <Label className="text-xs text-muted-foreground">{t('hookTitle.size')}</Label>
                         <span className="text-xs font-mono">{config.hookTitle.size || 30}px</span>
                 </div>
                   <Slider
@@ -536,7 +539,7 @@ export function SubmagicModal({
             <div className="space-y-4">
               <Label className="flex items-center gap-2 text-base font-semibold">
                 <Type className="w-5 h-5" />
-                Style de sous-titres
+                {t('subtitles.label')}
               </Label>
 
               {/* Filtres */}
@@ -617,7 +620,7 @@ export function SubmagicModal({
 
               {filteredTemplates.length === 0 && !isLoadingTemplates && (
                 <p className="text-center text-sm text-muted-foreground py-4">
-                  Aucun template dans cette catégorie
+                  {t('subtitles.noTemplate')}
                 </p>
             )}
           </div>
@@ -628,7 +631,7 @@ export function SubmagicModal({
           <div className="space-y-4">
             <h3 className="text-sm font-medium flex items-center gap-2">
               <Film className="w-4 h-4" />
-              Options vidéo
+              {t('video.title')}
             </h3>
 
               <div className="grid grid-cols-2 gap-3">
@@ -643,14 +646,14 @@ export function SubmagicModal({
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-medium">Magic Zooms</p>
+                    <p className="text-sm font-medium">{t('video.magicZooms')}</p>
                     <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
                       config.magicZooms ? 'border-orange-500 bg-orange-500' : 'border-muted-foreground'
                     }`}>
                       {config.magicZooms && <Check className="w-3 h-3 text-white" />}
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">Zooms automatiques</p>
+                  <p className="text-xs text-muted-foreground">{t('video.magicZoomsDesc')}</p>
                 </button>
 
                 {/* Remove Bad Takes */}
@@ -666,7 +669,7 @@ export function SubmagicModal({
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-sm font-medium flex items-center gap-1">
                       <Scissors className="w-3 h-3" />
-                      Bad Takes
+                      {t('video.badTakes')}
                     </p>
                     <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
                       config.removeBadTakes ? 'border-orange-500 bg-orange-500' : 'border-muted-foreground'
@@ -674,7 +677,7 @@ export function SubmagicModal({
                       {config.removeBadTakes && <Check className="w-3 h-3 text-white" />}
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">Supprime les hésitations</p>
+                  <p className="text-xs text-muted-foreground">{t('video.badTakesDesc')}</p>
               </button>
             </div>
 
@@ -690,8 +693,8 @@ export function SubmagicModal({
                   className="w-full flex items-center justify-between text-left"
                 >
                   <div>
-                    <p className="text-sm font-medium">Magic B-rolls</p>
-                    <p className="text-xs text-muted-foreground">Vidéos stock IA contextuelles</p>
+                    <p className="text-sm font-medium">{t('video.magicBrolls')}</p>
+                    <p className="text-xs text-muted-foreground">{t('video.magicBrollsDesc')}</p>
                   </div>
                   <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
                     config.magicBrolls ? 'border-orange-500 bg-orange-500' : 'border-muted-foreground'
@@ -703,7 +706,7 @@ export function SubmagicModal({
               {config.magicBrolls && (
                   <div className="mt-3 pt-3 border-t border-border">
                     <div className="flex justify-between mb-2">
-                      <Label className="text-xs text-muted-foreground">Couverture</Label>
+                      <Label className="text-xs text-muted-foreground">{t('video.coverage')}</Label>
                       <span className="text-xs font-mono">{config.magicBrollsPercentage || 50}%</span>
                     </div>
                   <Slider
@@ -725,23 +728,23 @@ export function SubmagicModal({
             <div className="space-y-3">
             <h3 className="text-sm font-medium flex items-center gap-2">
               <Volume2 className="w-4 h-4" />
-              Options audio
+              {t('audio.title')}
             </h3>
 
               <div className="p-3 rounded-xl border border-border">
-                <Label className="text-xs text-muted-foreground mb-2 block">Suppression des silences</Label>
+                <Label className="text-xs text-muted-foreground mb-2 block">{t('audio.silenceRemoval')}</Label>
               <Select
                 value={config.removeSilencePace || 'none'}
                 onValueChange={(value) => updateConfig('removeSilencePace', value === 'none' ? undefined : value as 'natural' | 'fast' | 'extra-fast')}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Désactivé" />
+                  <SelectValue placeholder={t('audio.disabled')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Désactivé</SelectItem>
-                    <SelectItem value="natural">Naturel (0.6s+)</SelectItem>
-                    <SelectItem value="fast">Rapide (0.2-0.6s)</SelectItem>
-                    <SelectItem value="extra-fast">Très rapide (0.1-0.2s)</SelectItem>
+                  <SelectItem value="none">{t('audio.disabled')}</SelectItem>
+                    <SelectItem value="natural">{t('audio.natural')}</SelectItem>
+                    <SelectItem value="fast">{t('audio.fast')}</SelectItem>
+                    <SelectItem value="extra-fast">{t('audio.extraFast')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -751,7 +754,7 @@ export function SubmagicModal({
           <div className="flex items-start gap-2 p-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900">
             <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
             <p className="text-xs text-blue-700 dark:text-blue-300">
-                Le traitement prend 1 à 5 minutes. La vidéo avec sous-titres apparaîtra automatiquement.
+                {t('info')}
             </p>
           </div>
 
@@ -772,7 +775,7 @@ export function SubmagicModal({
             className="flex-1 h-11 rounded-xl"
             disabled={isSubmitting}
           >
-            Annuler
+            {t('actions.cancel')}
           </Button>
           <Button
             onClick={handleSubmit}
@@ -782,12 +785,12 @@ export function SubmagicModal({
             {isSubmitting ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Traitement...
+                {t('actions.processing')}
               </>
             ) : (
               <>
                 <Subtitles className="w-4 h-4 mr-2" />
-                Lancer ({SUBMAGIC_COST} crédits)
+                {t('actions.submit', { cost: SUBMAGIC_COST })}
               </>
             )}
           </Button>

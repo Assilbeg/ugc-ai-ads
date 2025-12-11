@@ -23,6 +23,8 @@ export default function NewCampaignPage() {
   const { getActorById } = useActors()
   const tSteps = useTranslations('steps')
   const tStepDescriptions = useTranslations('stepDescriptions')
+  const tCommon = useTranslations('common')
+  const tPage = useTranslations('newCampaignPage')
   const [state, setState] = useState<NewCampaignState>({
     step: 1,
     product: { has_product: false },
@@ -263,10 +265,10 @@ export default function NewCampaignPage() {
       {/* Modal de confirmation pour revenir en arrière */}
       <ConfirmModal
         isOpen={confirmModal.isOpen}
-        title="Modifier les étapes précédentes ?"
-        message="Tu as un plan généré. Si tu modifies le brief ou les étapes précédentes, tu devras regénérer le plan avec un nouveau script."
-        confirmText="Continuer"
-        cancelText="Rester ici"
+        title={tPage('confirmModal.title')}
+        message={tPage('confirmModal.message')}
+        confirmText={tCommon('continue')}
+        cancelText={tPage('confirmModal.cancel')}
         variant="warning"
         onConfirm={confirmStepChange}
         onCancel={cancelStepChange}

@@ -312,6 +312,48 @@
     }
   },
   "step5": {
+    "header": {
+      "title": "Kampagnenplan",
+      "subtitle": "Validiere das Skript und die von der KI generierten Visuals"
+    },
+    "loading": {
+      "badge": "Das perfekte Skript wird generiert...",
+      "subtitle": "Brief analysieren und Clips erstellen",
+      "writingBeat": "{beat} wird geschrieben..."
+    },
+    "beats": {
+      "hook": "HOOK",
+      "problem": "PROBLEM",
+      "agitation": "AGITATION",
+      "solution": "LÖSUNG",
+      "proof": "BEWEIS",
+      "cta": "CTA"
+    },
+    "error": {
+      "title": "Ein Fehler ist aufgetreten",
+      "retry": "Erneut versuchen"
+    },
+    "insufficientCredits": {
+      "title": "Nicht genug Credits",
+      "message": "Du hast nicht genug Credits, um die Vorschau-Visuals zu generieren. Lade deine Credits auf, um fortzufahren.",
+      "cta": "Credits aufladen"
+    },
+    "summary": {
+      "clips": "Clips",
+      "images": "Bilder",
+      "generating": "Generierung...",
+      "imagesBtn": "Bilder",
+      "allBtn": "Alle"
+    },
+    "clip": {
+      "generating": "Generierung...",
+      "regenerate": "Neu generieren",
+      "edit": "Bearbeiten",
+      "save": "Speichern",
+      "words": "Wörter",
+      "maxWords": "max ~{max} für {duration}s",
+      "scriptTooLong": "Skript zu lang: {count} Wörter für {duration}s (max ~{max})"
+    },
     "visualPrompt": {
       "label": "Visuelles Prompt",
       "edit": "Bearbeiten",
@@ -555,5 +597,78 @@
         "cta": "Presets verwalten"
       }
     }
+  },
+  "submagic": {
+    "title": "Untertitel & Hook",
+    "cost": "Kosten: {cost} Credits",
+    "balance": "Guthaben: {balance} Credits",
+    "hookTitle": {
+      "label": "Hook-Titel",
+      "placeholder": "Z.B.: die geheime Strategie, um Ihren Umsatz zu verdreifachen 🚀",
+      "generateBtn": "Generieren",
+      "generatedByAI": "✨ Von KI generiert",
+      "theme": "Theme",
+      "position": "Position",
+      "size": "Größe"
+    },
+    "subtitles": {
+      "label": "Untertitelstil",
+      "noTemplate": "Kein Template in dieser Kategorie"
+    },
+    "video": {
+      "title": "Video-Optionen",
+      "magicZooms": "Magic Zooms",
+      "magicZoomsDesc": "Automatische Zooms",
+      "badTakes": "Bad Takes",
+      "badTakesDesc": "Entfernt Zögern",
+      "magicBrolls": "Magic B-rolls",
+      "magicBrollsDesc": "KI-gestützte kontextuelle Stock-Videos",
+      "coverage": "Abdeckung"
+    },
+    "audio": {
+      "title": "Audio-Optionen",
+      "silenceRemoval": "Stilleentfernung",
+      "disabled": "Deaktiviert",
+      "natural": "Natürlich (0,6s+)",
+      "fast": "Schnell (0,2-0,6s)",
+      "extraFast": "Sehr schnell (0,1-0,2s)"
+    },
+    "info": "Die Verarbeitung dauert 1 bis 5 Minuten. Das Video mit Untertiteln erscheint automatisch.",
+    "actions": {
+      "cancel": "Abbrechen",
+      "processing": "Verarbeitung...",
+      "submit": "Starten ({cost} Credits)"
+    },
+    "errors": {
+      "submagicCredits": "Submagic-Credits erschöpft. Versuche es später erneut oder lade Submagic auf.",
+      "insufficientCredits": "Nicht genug Credits. Du hast {current} Credits, du brauchst {required}.",
+      "generic": "Ein Fehler ist aufgetreten",
+      "connection": "Verbindungsfehler",
+      "hookGeneration": "Fehler bei der Hook-Generierung"
+    }
+  },
+  "firstPurchase": {
+    "title": "🎬 Dein erstes Video wartet!",
+    "subtitle": "Noch ein Schritt, um {count, plural, one {deinen Clip} other {deine # Clips}} UGC zu generieren",
+    "whatYouGet": {
+      "title": "Was du bekommst:",
+      "videos": "{count, plural, one {# KI-generiertes UGC-Video} other {# KI-generierte UGC-Videos}}",
+      "voice": "Geklonte Stimme + Umgebungsgeräusche",
+      "export": "HD-Export bereit für TikTok/Reels"
+    },
+    "earlyBird": {
+      "timer": "Early Bird-Angebot läuft ab in",
+      "badge": "Early Bird -50%"
+    },
+    "recommended": "Empfohlen",
+    "creditsIncluded": "{credits} Credits inklusive",
+    "cta": "Meine Videos generieren",
+    "redirecting": "Weiterleitung...",
+    "noPlans": "Momentan kein Plan verfügbar",
+    "trust": {
+      "secure": "Sichere Zahlung",
+      "instant": "Sofortige Aktivierung"
+    },
+    "viewAllPlans": "Alle Pläne ansehen →"
   }
 }

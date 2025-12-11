@@ -312,6 +312,48 @@
     }
   },
   "step5": {
+    "header": {
+      "title": "Plan de campagne",
+      "subtitle": "Valide le script et les visuels générés par l'IA"
+    },
+    "loading": {
+      "badge": "Génération du script parfait...",
+      "subtitle": "Analyse du brief et création des clips",
+      "writingBeat": "Écriture du {beat}..."
+    },
+    "beats": {
+      "hook": "HOOK",
+      "problem": "PROBLÈME",
+      "agitation": "AGITATION",
+      "solution": "SOLUTION",
+      "proof": "PREUVE",
+      "cta": "CTA"
+    },
+    "error": {
+      "title": "Une erreur est survenue",
+      "retry": "Réessayer"
+    },
+    "insufficientCredits": {
+      "title": "Crédits insuffisants",
+      "message": "Tu n'as pas assez de crédits pour générer les visuels de prévisualisation. Recharge tes crédits pour continuer.",
+      "cta": "Recharger mes crédits"
+    },
+    "summary": {
+      "clips": "clips",
+      "images": "images",
+      "generating": "Génération...",
+      "imagesBtn": "Images",
+      "allBtn": "Tout"
+    },
+    "clip": {
+      "generating": "Génération...",
+      "regenerate": "Regénérer",
+      "edit": "Modifier",
+      "save": "Sauvegarder",
+      "words": "mots",
+      "maxWords": "max ~{max} pour {duration}s",
+      "scriptTooLong": "Script trop long : {count} mots pour {duration}s (max ~{max})"
+    },
     "visualPrompt": {
       "label": "Prompt visuel",
       "edit": "Éditer",
@@ -555,5 +597,78 @@
         "cta": "Gérer presets"
       }
     }
+  },
+  "submagic": {
+    "title": "Sous-titres & Hook",
+    "cost": "Coût : {cost} crédits",
+    "balance": "Solde : {balance} crédits",
+    "hookTitle": {
+      "label": "Hook Title",
+      "placeholder": "Ex: la stratégie secrète pour tripler vos ventes 🚀",
+      "generateBtn": "Générer",
+      "generatedByAI": "✨ Généré par IA",
+      "theme": "Theme",
+      "position": "Position",
+      "size": "Taille"
+    },
+    "subtitles": {
+      "label": "Style de sous-titres",
+      "noTemplate": "Aucun template dans cette catégorie"
+    },
+    "video": {
+      "title": "Options vidéo",
+      "magicZooms": "Magic Zooms",
+      "magicZoomsDesc": "Zooms automatiques",
+      "badTakes": "Bad Takes",
+      "badTakesDesc": "Supprime les hésitations",
+      "magicBrolls": "Magic B-rolls",
+      "magicBrollsDesc": "Vidéos stock IA contextuelles",
+      "coverage": "Couverture"
+    },
+    "audio": {
+      "title": "Options audio",
+      "silenceRemoval": "Suppression des silences",
+      "disabled": "Désactivé",
+      "natural": "Naturel (0.6s+)",
+      "fast": "Rapide (0.2-0.6s)",
+      "extraFast": "Très rapide (0.1-0.2s)"
+    },
+    "info": "Le traitement prend 1 à 5 minutes. La vidéo avec sous-titres apparaîtra automatiquement.",
+    "actions": {
+      "cancel": "Annuler",
+      "processing": "Traitement...",
+      "submit": "Lancer ({cost} crédits)"
+    },
+    "errors": {
+      "submagicCredits": "Crédits Submagic épuisés côté fournisseur. Réessaie plus tard ou recharge Submagic.",
+      "insufficientCredits": "Crédits insuffisants. Vous avez {current} crédits, il en faut {required}.",
+      "generic": "Une erreur est survenue",
+      "connection": "Erreur de connexion",
+      "hookGeneration": "Erreur lors de la génération du hook"
+    }
+  },
+  "firstPurchase": {
+    "title": "🎬 Ta première vidéo t'attend !",
+    "subtitle": "Plus qu'une étape pour générer {count, plural, one {ton clip} other {tes # clips}} UGC",
+    "whatYouGet": {
+      "title": "Ce que tu vas obtenir :",
+      "videos": "{count, plural, one {# vidéo UGC générée par IA} other {# vidéos UGC générées par IA}}",
+      "voice": "Voix clonée + ambiance sonore",
+      "export": "Export HD prêt pour TikTok/Reels"
+    },
+    "earlyBird": {
+      "timer": "Offre Early Bird expire dans",
+      "badge": "Early Bird -50%"
+    },
+    "recommended": "Recommandé",
+    "creditsIncluded": "{credits} crédits inclus",
+    "cta": "Générer mes vidéos",
+    "redirecting": "Redirection...",
+    "noPlans": "Aucun plan disponible pour le moment",
+    "trust": {
+      "secure": "Paiement sécurisé",
+      "instant": "Activation immédiate"
+    },
+    "viewAllPlans": "Voir tous les plans →"
   }
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { 
@@ -46,6 +47,7 @@ export function FirstPurchaseModal({
   clipCount = 1,
   onSuccess,
 }: FirstPurchaseModalProps) {
+  const t = useTranslations('firstPurchase')
   const [plans, setPlans] = useState<Plan[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isEarlyBirdEligible, setIsEarlyBirdEligible] = useState(false)
@@ -219,10 +221,10 @@ export function FirstPurchaseModal({
             </div>
 
             <h2 className="text-2xl font-bold mb-2">
-              🎬 Ta première vidéo t'attend !
+              {t('title')}
             </h2>
             <p className="text-muted-foreground">
-              Plus qu'une étape pour générer {clipCount > 1 ? `${clipCount} clips` : 'ton clip'} UGC
+              {t('subtitle', { count: clipCount })}
             </p>
           </div>
 
@@ -230,20 +232,20 @@ export function FirstPurchaseModal({
           <div className="mb-6 p-4 rounded-2xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/20">
             <p className="font-semibold mb-3 flex items-center gap-2">
               <Gift className="w-5 h-5 text-amber-500" />
-              Ce que tu vas obtenir :
+              {t('whatYouGet.title')}
             </p>
             <ul className="space-y-2">
               <li className="flex items-center gap-2 text-sm">
                 <Check className="w-4 h-4 text-green-500 shrink-0" />
-                <span>{clipCount} vidéo{clipCount > 1 ? 's' : ''} UGC générée{clipCount > 1 ? 's' : ''} par IA</span>
+                <span>{t('whatYouGet.videos', { count: clipCount })}</span>
               </li>
               <li className="flex items-center gap-2 text-sm">
                 <Check className="w-4 h-4 text-green-500 shrink-0" />
-                <span>Voix clonée + ambiance sonore</span>
+                <span>{t('whatYouGet.voice')}</span>
               </li>
               <li className="flex items-center gap-2 text-sm">
                 <Check className="w-4 h-4 text-green-500 shrink-0" />
-                <span>Export HD prêt pour TikTok/Reels</span>
+                <span>{t('whatYouGet.export')}</span>
               </li>
             </ul>
           </div>
@@ -253,7 +255,7 @@ export function FirstPurchaseModal({
             <div className="mb-6 p-3 rounded-xl bg-gradient-to-r from-rose-500/20 to-amber-500/20 border border-rose-500/30 text-center">
               <div className="flex items-center justify-center gap-2 text-sm font-medium text-rose-500">
                 <Clock className="w-4 h-4 animate-pulse" />
-                <span>Offre Early Bird expire dans</span>
+                <span>{t('earlyBird.timer')}</span>
                 <span className="font-mono font-bold text-lg">{formatTime(earlyBirdTimeRemaining)}</span>
               </div>
             </div>
@@ -271,7 +273,7 @@ export function FirstPurchaseModal({
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <Badge className="bg-gradient-to-r from-amber-500 to-orange-600 text-white px-4 py-1 text-sm">
                     <Star className="w-3 h-3 mr-1 fill-current" />
-                    {earlyBirdPlan ? 'Early Bird -50%' : 'Recommandé'}
+                    {earlyBirdPlan ? t('earlyBird.badge') : t('recommended')}
                   </Badge>
                 </div>
 
@@ -286,7 +288,7 @@ export function FirstPurchaseModal({
                     )}
                   </div>
                   <p className="text-sm text-muted-foreground mb-4">
-                    {formatAsCredits(recommendedPlan.monthly_credits)} inclus
+                    {t('creditsIncluded', { credits: formatAsCredits(recommendedPlan.monthly_credits) })}
                   </p>
                   
                   <Button
@@ -297,12 +299,12 @@ export function FirstPurchaseModal({
                     {processingPlanId === recommendedPlan.id ? (
                       <>
                         <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        Redirection...
+                        {t('redirecting')}
                       </>
                     ) : (
                       <>
                         <Zap className="w-5 h-5 mr-2" />
-                        Générer mes vidéos
+                        {t('cta')}
                         <ArrowRight className="w-5 h-5 ml-2" />
                       </>
                     )}
@@ -312,7 +314,7 @@ export function FirstPurchaseModal({
             </div>
           ) : (
             <p className="text-center text-muted-foreground mb-6">
-              Aucun plan disponible pour le moment
+              {t('noPlans')}
             </p>
           )}
 
@@ -320,11 +322,11 @@ export function FirstPurchaseModal({
           <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground">
             <div className="flex items-center gap-1">
               <Shield className="w-4 h-4" />
-              <span>Paiement sécurisé</span>
+              <span>{t('trust.secure')}</span>
             </div>
             <div className="flex items-center gap-1">
               <Zap className="w-4 h-4" />
-              <span>Activation immédiate</span>
+              <span>{t('trust.instant')}</span>
             </div>
           </div>
 
@@ -336,7 +338,7 @@ export function FirstPurchaseModal({
                 // TODO: Show all plans
               }}
             >
-              Voir tous les plans →
+              {t('viewAllPlans')}
             </button>
           )}
         </div>
