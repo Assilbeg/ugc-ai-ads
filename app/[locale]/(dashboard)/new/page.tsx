@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { NewCampaignState, ProductConfig, CampaignBrief, CampaignClip, GeneratedFirstFrames } from '@/types'
 import { StepIndicator } from '@/components/steps/step-indicator'
@@ -15,19 +16,12 @@ import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { useActors } from '@/hooks/use-actors'
 import { getPresetById } from '@/lib/presets'
 
-const STEPS = [
-  { number: 1, title: 'Acteur', description: 'Choisis ton créateur IA' },
-  { number: 2, title: 'Produit', description: 'Avec ou sans produit' },
-  { number: 3, title: 'Intention', description: 'Style de la vidéo' },
-  { number: 4, title: 'Brief', description: 'Décris ton offre' },
-  { number: 5, title: 'Plan', description: 'Valide le script' },
-  { number: 6, title: 'Génération', description: 'Créer les vidéos' },
-]
-
 export default function NewCampaignPage() {
   const router = useRouter()
   const supabase = createClient()
   const { getActorById } = useActors()
+  const tSteps = useTranslations('steps')
+  const tStepDescriptions = useTranslations('stepDescriptions')
   const [state, setState] = useState<NewCampaignState>({
     step: 1,
     product: { has_product: false },
@@ -47,6 +41,18 @@ export default function NewCampaignPage() {
   const updateState = useCallback((updates: Partial<NewCampaignState>) => {
     setState(prev => ({ ...prev, ...updates }))
   }, [])
+
+  const STEPS = useMemo(
+    () => [
+      { number: 1, title: tSteps('actor'), description: tStepDescriptions('actor') },
+      { number: 2, title: tSteps('product'), description: tStepDescriptions('product') },
+      { number: 3, title: tSteps('preset'), description: tStepDescriptions('preset') },
+      { number: 4, title: tSteps('brief'), description: tStepDescriptions('brief') },
+      { number: 5, title: tSteps('plan'), description: tStepDescriptions('plan') },
+      { number: 6, title: tSteps('generate'), description: tStepDescriptions('generate') },
+    ],
+    [tSteps, tStepDescriptions]
+  )
   
   // Callbacks stables pour éviter les boucles infinies dans les useEffect enfants
   const handleClipsGenerated = useCallback((clips: CampaignClip[]) => {

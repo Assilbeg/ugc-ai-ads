@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useLocale, useTranslations } from 'next-intl'
 import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Video, Clock, Calendar, Pencil, Trash2 } from 'lucide-react'
@@ -23,6 +24,8 @@ interface CampaignCardProps {
 }
 
 export function CampaignCard({ campaign, presetName, statusConfig, onDelete }: CampaignCardProps) {
+  const locale = useLocale()
+  const t = useTranslations('campaignCard')
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -31,7 +34,7 @@ export function CampaignCard({ campaign, presetName, statusConfig, onDelete }: C
   const inputRef = useRef<HTMLInputElement>(null)
 
   const status = statusConfig[campaign.status] || statusConfig.draft
-  const title = campaign.brief?.what_selling || 'Sans titre'
+  const title = campaign.brief?.what_selling || t('untitled')
   const duration = campaign.brief?.target_duration || 30
   const clipsCount = campaign.campaign_clips?.[0]?.count || 0
   const actor = campaign.actors
@@ -97,7 +100,7 @@ export function CampaignCard({ campaign, presetName, statusConfig, onDelete }: C
     <>
       <div className="group relative bg-card rounded-xl border overflow-hidden hover:shadow-xl hover:shadow-black/5 hover:border-foreground/20 transition-all duration-300">
 
-        <Link href={`/campaign/${campaign.id}`}>
+        <Link href={`/${locale}/campaign/${campaign.id}`}>
           {/* Video area - Format 9:16 */}
           <div className="relative aspect-[9/16] bg-gradient-to-br from-zinc-100 to-zinc-200 dark:from-zinc-800 dark:to-zinc-900 overflow-hidden cursor-pointer">
             {campaign.final_video_url ? (
@@ -206,7 +209,7 @@ export function CampaignCard({ campaign, presetName, statusConfig, onDelete }: C
                     setIsEditing(true)
                   }}
                   className="p-1 rounded text-muted-foreground hover:text-foreground opacity-0 group-hover/title:opacity-100 transition-opacity shrink-0"
-                  title="Modifier le titre"
+                  title={t('editTitle')}
                 >
                   <Pencil className="w-3 h-3" />
                 </button>
@@ -218,7 +221,7 @@ export function CampaignCard({ campaign, presetName, statusConfig, onDelete }: C
                 <div className="flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
                   <span>
-                    {new Date(campaign.created_at).toLocaleDateString('fr-FR', {
+                    {new Date(campaign.created_at).toLocaleDateString(locale, {
                       day: 'numeric',
                       month: 'short',
                     })}
@@ -227,7 +230,7 @@ export function CampaignCard({ campaign, presetName, statusConfig, onDelete }: C
                 {clipsCount > 0 && (
                   <>
                     <span className="text-border">•</span>
-                    <span>{clipsCount} clip{clipsCount > 1 ? 's' : ''}</span>
+                    <span>{t('clips', { count: clipsCount })}</span>
                   </>
                 )}
               </div>
@@ -240,7 +243,7 @@ export function CampaignCard({ campaign, presetName, statusConfig, onDelete }: C
                   setShowDeleteModal(true)
                 }}
                 className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"
-                title="Supprimer"
+                title={t('delete')}
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -254,10 +257,10 @@ export function CampaignCard({ campaign, presetName, statusConfig, onDelete }: C
         isOpen={showDeleteModal}
         onCancel={() => setShowDeleteModal(false)}
         onConfirm={handleDelete}
-        title="Supprimer la campagne"
-        message="Es-tu sûr de vouloir supprimer cette campagne ? Cette action est irréversible."
-        confirmText={deleting ? "Suppression..." : "Supprimer"}
-        cancelText="Annuler"
+        title={t('deleteTitle')}
+        message={t('deleteMessage')}
+        confirmText={deleting ? t('confirming') : t('confirm')}
+        cancelText={t('cancel')}
         variant="danger"
       />
     </>

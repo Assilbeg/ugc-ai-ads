@@ -10,20 +10,25 @@ import { FailedCampaignState } from './failed-campaign-state'
 import { SubmagicActions } from './submagic-actions'
 import { TemplateImage } from './template-image'
 import type { SubmagicStatus } from '@/types'
+import { getTranslations } from 'next-intl/server'
 
 // Désactiver le cache pour toujours avoir la dernière version de la campagne
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 interface CampaignPageProps {
-  params: Promise<{ id: string }>
+  params: Promise<{ locale: string; id: string }>
   searchParams: Promise<{ assembling?: string }>
 }
 
 export default async function CampaignPage({ params, searchParams }: CampaignPageProps) {
-  const { id } = await params
+  const { id, locale } = await params
   const { assembling: assemblingParam } = await searchParams
   const supabase = await createClient()
+  const tNav = await getTranslations('nav')
+  const tStatus = await getTranslations('status')
+  const tCampaign = await getTranslations('campaignPage')
+  const basePath = `/${locale}`
 
   // Fetch campaign with clips
   const { data: campaign, error } = await (supabase
@@ -104,7 +109,7 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
     ? brief.what_selling.length > 60 
       ? brief.what_selling.slice(0, 60) + '...'
       : brief.what_selling
-    : 'Campagne UGC'
+    : tCampaign('defaultTitle')
 
   const statusConfig: Record<string, { bg: string; text: string; dot: string }> = {
     draft: { bg: 'bg-zinc-100', text: 'text-zinc-600', dot: 'bg-zinc-400' },
@@ -115,11 +120,11 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
   }
 
   const statusLabels: Record<string, string> = {
-    draft: 'Brouillon',
-    generating: 'En cours',
-    assembling: 'Assemblage...',
-    completed: 'Terminé',
-    failed: 'Échec',
+    draft: tStatus('draft'),
+    generating: tStatus('generating'),
+    assembling: tStatus('assembling'),
+    completed: tStatus('completed'),
+    failed: tStatus('failed'),
   }
 
   const status = statusConfig[campaign.status] || statusConfig.draft
@@ -131,13 +136,13 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
     return (
       <div className="max-w-6xl mx-auto">
         <Link 
-          href="/dashboard" 
+          href={`${basePath}/dashboard`} 
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          Campagnes
+          {tNav('dashboard')}
         </Link>
         
         <AssemblingAnimation 
@@ -154,13 +159,13 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
     <div className="max-w-6xl mx-auto">
       {/* Breadcrumb */}
       <Link 
-        href="/dashboard" 
+        href={`${basePath}/dashboard`} 
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
-        Campagnes
+        {tNav('dashboard')}
       </Link>
 
       {/* Hero section avec vidéo */}
@@ -187,12 +192,12 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
                       </div>
                     </div>
                     <div className="text-center">
-                      <p className="text-white font-semibold text-lg">Sous-titres en cours...</p>
-                      <p className="text-zinc-400 text-sm mt-1">Encore 1 à 5 minutes</p>
+                      <p className="text-white font-semibold text-lg">{tCampaign('subtitlesProcessingTitle')}</p>
+                      <p className="text-zinc-400 text-sm mt-1">{tCampaign('subtitlesProcessingEta')}</p>
                     </div>
                     {(campaign as any).submagic_config?.templateName && (
                       <div className="px-3 py-1.5 rounded-full bg-violet-500/20 text-violet-300 text-sm">
-                        Template : {(campaign as any).submagic_config.templateName}
+                        {tCampaign('templateLabel', { name: (campaign as any).submagic_config.templateName })}
                       </div>
                     )}
                   </div>
@@ -222,7 +227,7 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                         </svg>
-                        Télécharger
+                        {tCampaign('download')}
                       </Button>
                     </a>
                   )}
@@ -238,7 +243,7 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                         </svg>
-                        Avec sous-titres
+                        {tCampaign('downloadWithSubtitles')}
                       </Button>
                     </a>
                   )}
@@ -267,14 +272,14 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
             <div className="flex flex-wrap gap-2">
               {preset && (
                 <Badge variant="secondary" className="rounded-lg px-3 py-1">
-                  🎬 {preset.name}
+                  {tCampaign('presetBadgePrefix', { name: preset.name })}
                 </Badge>
               )}
               <Badge variant="outline" className="rounded-lg px-3 py-1">
-                ⏱️ {brief?.target_duration || 30}s cible
+                {tCampaign('targetDuration', { duration: brief?.target_duration || 30 })}
               </Badge>
               <Badge variant="outline" className="rounded-lg px-3 py-1">
-                {product?.has_product ? '📦 Avec produit' : '💬 Sans produit'}
+                {product?.has_product ? tCampaign('withProduct') : tCampaign('withoutProduct')}
               </Badge>
             </div>
 
@@ -282,20 +287,22 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
             <div className="grid grid-cols-2 gap-4 pt-4">
               <div className="bg-muted/50 rounded-xl p-4">
                 <div className="text-3xl font-bold text-foreground">{clips?.length || 0}</div>
-                <div className="text-sm text-muted-foreground">Clips générés</div>
+                <div className="text-sm text-muted-foreground">{tCampaign('clipsGenerated')}</div>
               </div>
               <div className="bg-muted/50 rounded-xl p-4">
                 <div className="text-3xl font-bold text-foreground">{totalDuration}s</div>
-                <div className="text-sm text-muted-foreground">Durée finale</div>
+                <div className="text-sm text-muted-foreground">{tCampaign('finalDuration')}</div>
               </div>
             </div>
 
             {/* Date */}
             <div className="text-sm text-muted-foreground pt-2">
-              Créé le {new Date(campaign.created_at).toLocaleDateString('fr-FR', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
+              {tCampaign('createdAt', {
+                date: new Date(campaign.created_at).toLocaleDateString(locale, {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                }),
               })}
             </div>
 
@@ -303,7 +310,7 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
             <div className="flex gap-3 pt-2">
               <Link href={`/new/${id}`} className="flex-1">
                 <Button variant="outline" className="w-full rounded-xl h-11">
-                  ✏️ Modifier la vidéo
+                  {tCampaign('editVideo')}
                 </Button>
               </Link>
               

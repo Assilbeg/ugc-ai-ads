@@ -1,0 +1,403 @@
+{
+  "common": {
+    "loading": "Lädt...",
+    "error": "Ein Fehler ist aufgetreten",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "continue": "Weiter",
+    "back": "Zurück",
+    "delete": "Löschen",
+    "language": "Sprache",
+    "negativeBalanceHint": "Negatives Guthaben – bitte Credits aufladen"
+  },
+  "auth": {
+    "login": "Anmelden",
+    "register": "Registrieren",
+    "logout": "Abmelden",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "forgotPassword": "Passwort vergessen?",
+    "noAccount": "Noch kein Konto?",
+    "hasAccount": "Bereits ein Konto?",
+    "loginCta": "Einloggen",
+    "registerCta": "Konto erstellen",
+    "subheadingLogin": "Gib deine Zugangsdaten ein, um fortzufahren",
+    "subheadingRegister": "Erstelle dein Konto, um zu starten",
+    "successEmailSent": "E-Mail gesendet!",
+    "successCheckMail": "Prüfe dein Postfach, um dein Konto zu bestätigen und loszulegen.",
+    "backToLogin": "Zur Anmeldung",
+    "passwordsMismatch": "Passwörter stimmen nicht überein",
+    "passwordTooShort": "Passwort muss mindestens 6 Zeichen haben",
+    "ctaNewCampaign": "Neue Kampagne"
+  },
+  "dashboard": {
+    "title": "Meine Kampagnen",
+    "newCampaign": "Neue Kampagne",
+    "noCampaigns": "Keine Kampagnen",
+    "credits": "Credits"
+  },
+  "dashboardPage": {
+    "heroBadge": "KI-gestützt",
+    "heroTitle": "Meine Kampagnen",
+    "heroSubtitle": "Erstelle und verwalte deine KI-generierten UGC-Anzeigen. Jede Kampagne kann mehrere Clips für Social Media enthalten.",
+    "newCampaign": "Neue Kampagne",
+    "emptyTitle": "Keine Kampagnen",
+    "emptySubtitle": "Starte mit deiner ersten UGC-Kampagne. Unsere virtuellen Schauspieler erwecken deine Anzeigen in wenigen Klicks zum Leben.",
+    "emptyCta": "Meine erste Kampagne erstellen",
+    "statsCampaigns": "Kampagnen",
+    "statsCompleted": "Abgeschlossen",
+    "completionRate": "Abschlussrate"
+  },
+  "campaignPage": {
+    "defaultTitle": "UGC-Kampagne",
+    "subtitlesProcessingTitle": "Untertitel werden erstellt...",
+    "subtitlesProcessingEta": "Noch 1 bis 5 Minuten",
+    "templateLabel": "Template: {name}",
+    "download": "Herunterladen",
+    "downloadWithSubtitles": "Mit Untertiteln",
+    "presetBadgePrefix": "🎬 {name}",
+    "targetDuration": "Ziel {duration}s",
+    "withProduct": "📦 Mit Produkt",
+    "withoutProduct": "💬 Ohne Produkt",
+    "clipsGenerated": "Erstellte Clips",
+    "finalDuration": "Endgültige Dauer",
+    "createdAt": "Erstellt am {date}",
+    "editVideo": "Video bearbeiten"
+  },
+  "campaignCard": {
+    "untitled": "Ohne Titel",
+    "editTitle": "Titel bearbeiten",
+    "delete": "Löschen",
+    "deleteTitle": "Kampagne löschen",
+    "deleteMessage": "Möchtest du diese Kampagne wirklich löschen? Diese Aktion ist endgültig.",
+    "confirm": "Löschen",
+    "confirming": "Wird gelöscht...",
+    "cancel": "Abbrechen",
+    "clips": "{count, plural, one {# Clip} other {# Clips}}"
+  },
+  "nav": {
+    "dashboard": "Kampagnen",
+    "billing": "Abrechnung",
+    "admin": "Admin",
+    "newCampaign": "Neue Kampagne",
+    "backToApp": "← Zurück zur App",
+    "adminActors": "Schauspieler",
+    "adminPresets": "Presets",
+    "adminPrompts": "Prompts"
+  },
+  "status": {
+    "draft": "Entwurf",
+    "generating": "In Arbeit",
+    "assembling": "Zusammenfügen...",
+    "completed": "Abgeschlossen",
+    "failed": "Fehlgeschlagen"
+  },
+  "steps": {
+    "actor": "Darsteller",
+    "product": "Produkt",
+    "preset": "Stil",
+    "brief": "Briefing",
+    "plan": "Plan",
+    "generate": "Generierung"
+  },
+  "stepDescriptions": {
+    "actor": "Wähle deinen KI-Creator",
+    "product": "Mit oder ohne Produkt",
+    "preset": "Videostil",
+    "brief": "Beschreibe dein Angebot",
+    "plan": "Skript validieren",
+    "generate": "Videos erstellen"
+  },
+  "loginPage": {
+    "heroTitle": "Erstelle UGC-Anzeigen",
+    "heroSubtitle": "in wenigen Klicks",
+    "heroBody": "Generiere authentische Werbevideos mit virtuellen Schauspielern, optimiert für TikTok, Instagram und YouTube.",
+    "aiPowered": "KI-gestützt"
+  },
+  "registerPage": {
+    "heroTitle": "Schließe dich der Revolution an",
+    "heroSubtitle": "der UGC-Werbung",
+    "heroBody": "Tausende Creator nutzen UGC AI, um authentische und performante Anzeigen zu generieren.",
+    "features": {
+      "fast": "Generierung in Minuten",
+      "actors": "Realistische virtuelle Schauspieler",
+      "export": "Multi-Plattform Export"
+    }
+  },
+  "stepsTitle": {
+    "actor": "Wähle deinen KI-Creator"
+  },
+  "step1": {},
+  "step2": {},
+  "step3": {},
+  "step4": {
+    "beats": {
+      "hook": "Hook",
+      "problem": "Problem",
+      "solution": "Lösung",
+      "proof": "Beweis",
+      "cta": "CTA"
+    },
+    "generating": {
+      "badge": "Erstellung läuft...",
+      "scriptSubtitle": "Perfektes Skript wird erstellt...",
+      "imagesSubtitle": "Visuals werden vorbereitet...",
+      "scriptLabel": "Skript",
+      "imagesLabel": "Bilder"
+    },
+    "header": {
+      "title": "Schnelles Briefing",
+      "subtitle": "Beschreibe dein Angebot, damit die KI das beste Skript schreibt"
+    },
+    "import": {
+      "titleExtracted": "✨ Briefing von deiner Website ausgefüllt!",
+      "titleDefault": "Hast du eine Website oder Landing Page?",
+      "subtitleExtracted": "Du kannst die Felder unten bei Bedarf anpassen",
+      "subtitleDefault": "Füge die URL ein und wir extrahieren die Infos automatisch",
+      "placeholder": "https://deine-seite.de/produkt",
+      "action": "Extrahieren",
+      "loading": "Analysiere...",
+      "error": "Extraktionsfehler"
+    },
+    "manualDivider": "oder manuell ausfüllen",
+    "fields": {
+      "whatSelling": {
+        "label": "Was verkaufst du?",
+        "placeholder": "Z. B. ein Online-Kurs, um in 30 Tagen Python zu lernen, ideal für Einsteiger, die in die Tech wechseln wollen...",
+        "helper": "Je genauer du bist, desto besser wird das Skript"
+      },
+      "painPoint": {
+        "label": "Welches Problem löst es?",
+        "placeholder": "Z. B. Menschen wollen in die Tech wechseln, haben aber Angst zu scheitern, denken es sei zu komplex und sie seien zu alt, um programmieren zu lernen...",
+        "helper": "💡 Die Frustration deiner Zielgruppe macht das Skript wirkungsvoll"
+      },
+      "targetAudience": {
+        "label": "Zielgruppe",
+        "placeholder": "Freelancer, Unternehmer..."
+      },
+      "keyBenefits": {
+        "label": "Hauptvorteile",
+        "placeholder": "Zeitersparnis, Einfachheit..."
+      }
+    },
+    "duration": {
+      "label": "Dauer",
+      "options": {
+        "s15": {
+          "label": "15s",
+          "clips": "2-3 Clips"
+        },
+        "s30": {
+          "label": "30s",
+          "clips": "4-5 Clips"
+        },
+        "s45": {
+          "label": "45s",
+          "clips": "5-6 Clips"
+        },
+        "s60": {
+          "label": "60s",
+          "clips": "6-8 Clips"
+        }
+      }
+    },
+    "language": {
+      "label": "Skriptsprache",
+      "more": "+ Weitere Sprachen"
+    },
+    "plan": {
+      "loading": "Skript wird generiert...",
+      "submit": "Plan generieren"
+    },
+    "errors": {
+      "generation": "Fehler bei der Generierung"
+    }
+  },
+  "step5": {
+    "visualPrompt": {
+      "label": "Visuelles Prompt",
+      "edit": "Bearbeiten",
+      "placeholder": "Visuelles Prompt...",
+      "saveAndRegenerate": "Speichern & neu generieren"
+    },
+    "cta": {
+      "generatingImages": "Bilder werden generiert...",
+      "continueWithoutImages": "Ohne Bilder fortfahren",
+      "imagesProgress": "Bilder {done}/{total}",
+      "generateVideos": "Videos generieren"
+    }
+  },
+  "step6": {
+    "actions": {
+      "cancel": "✕ Abbrechen",
+      "backToPlan": "← Zurück zum Plan",
+      "generateRemaining": "{count, plural, one {🚀 # Clip verbleibend generieren} other {🚀 # Clips verbleibend generieren}}",
+      "assemblingInProgress": "Zusammenfügen läuft (≈30s)...",
+      "assembleFinal": "Finales Video zusammenfügen"
+    },
+    "beats": {
+      "hook": "Hook",
+      "problem": "Problem",
+      "agitation": "Agitation",
+      "solution": "Lösung",
+      "proof": "Beweis",
+      "cta": "CTA"
+    },
+    "status": {
+      "video": "Video",
+      "voice": "Stimme",
+      "ambient": "Atmosphäre"
+    },
+    "errors": {
+      "credits": {
+        "title": "Unzureichende Credits",
+        "description": "Es fehlen Credits, um dieses Video zu generieren.",
+        "missing": "Fehlend: {amount}€",
+        "cta": "Credits aufladen"
+      },
+      "generic": {
+        "title": "Generierung fehlgeschlagen",
+        "description": "Bei der Generierung ist ein Fehler aufgetreten.",
+        "retry": "Erneut versuchen"
+      },
+      "assembly": {
+        "default": "Zusammenfügen-Fehler",
+        "unknown": "Unbekannter Fehler",
+        "invalidClips": "{count} Clip(s) mit Problemen:\n{details}",
+        "alert": "❌ Fehler beim Zusammenfügen\n\n{message}\n\nDu kannst es erneut versuchen oder die problematischen Clips neu generieren."
+      }
+    },
+    "assembly": {
+      "title": "🎬 Zusammenfügen läuft...",
+      "messages": {
+        "upload": "Clips werden in die Cloud geladen...",
+        "adjust": "Trim-/Geschwindigkeitsanpassungen anwenden...",
+        "merge": "Videospuren zusammenführen...",
+        "optimize": "Qualität optimieren...",
+        "finish": "Zusammenfügen abschließen..."
+      },
+      "clipCount": "{count} Clip{count > 1 ? 's' : ''}",
+      "withAdjustments": "Mit Anpassungen",
+      "hint": "Dies kann bis zu 30 Sekunden dauern..."
+    },
+    "confirmRegen": {
+      "title": "{label} neu generieren?",
+      "messageWithWarning": "{warning} — Diese Aktion generiert {label} des Clips neu.",
+      "message": "Diese Aktion generiert {label} des Clips neu.",
+      "confirm": "Neu generieren"
+    }
+  },
+  "campaign": {},
+  "billing": {},
+  "admin": {},
+  "adminDashboard": {
+    "header": {
+      "title": "Admin-Dashboard",
+      "subtitle": "Verwalte Schauspieler, Presets und Prompts"
+    },
+    "fal": {
+      "title": "Fal.ai-Guthaben",
+      "balanceDescription": "Credits für KI-Generierungen verfügbar"
+    },
+    "stats": {
+      "configure": "Konfigurieren",
+      "actors": {
+        "title": "Schauspieler",
+        "description": "KI-Schauspieler verwalten"
+      },
+      "presets": {
+        "title": "Presets",
+        "description": "Intent-Vorlagen"
+      },
+      "prompts": {
+        "title": "Prompts",
+        "description": "System-Prompts"
+      },
+      "campaigns": {
+        "title": "Kampagnen",
+        "description": "Gesamtanzahl Nutzer"
+      },
+      "billing": {
+        "title": "Billing",
+        "description": "Preise und Pläne verwalten"
+      },
+      "logs": {
+        "title": "Logs",
+        "description": "Fal.ai-Generierungslogs"
+      }
+    },
+    "quickActions": {
+      "title": "Schnellaktionen",
+      "addActor": {
+        "title": "Schauspieler hinzufügen",
+        "description": "Neuen KI-Schauspieler mit SOUL anlegen",
+        "cta": "Neuer Schauspieler"
+      },
+      "prompts": {
+        "title": "Prompts bearbeiten",
+        "description": "Claude- oder NanoBanana-Megaprompt bearbeiten",
+        "cta": "Prompts bearbeiten"
+      },
+      "presets": {
+        "title": "Presets verwalten",
+        "description": "Intent-Vorlagen hinzufügen oder bearbeiten",
+        "cta": "Presets verwalten"
+      }
+    }
+  }
+  "adminDashboard": {
+    "header": {
+      "title": "Admin-Dashboard",
+      "subtitle": "Verwalte Schauspieler, Presets und Prompts"
+    },
+    "fal": {
+      "title": "Fal.ai-Guthaben",
+      "balanceDescription": "Credits für KI-Generierungen verfügbar"
+    },
+    "stats": {
+      "configure": "Konfigurieren",
+      "actors": {
+        "title": "Schauspieler",
+        "description": "KI-Schauspieler verwalten"
+      },
+      "presets": {
+        "title": "Presets",
+        "description": "Intent-Vorlagen"
+      },
+      "prompts": {
+        "title": "Prompts",
+        "description": "System-Prompts"
+      },
+      "campaigns": {
+        "title": "Kampagnen",
+        "description": "Gesamtanzahl Nutzer"
+      },
+      "billing": {
+        "title": "Billing",
+        "description": "Preise und Pläne verwalten"
+      },
+      "logs": {
+        "title": "Logs",
+        "description": "Fal.ai-Generierungslogs"
+      }
+    },
+    "quickActions": {
+      "title": "Schnellaktionen",
+      "addActor": {
+        "title": "Schauspieler hinzufügen",
+        "description": "Neuen KI-Schauspieler mit SOUL anlegen",
+        "cta": "Neuer Schauspieler"
+      },
+      "prompts": {
+        "title": "Prompts bearbeiten",
+        "description": "Claude- oder NanoBanana-Megaprompt bearbeiten",
+        "cta": "Prompts bearbeiten"
+      },
+      "presets": {
+        "title": "Presets verwalten",
+        "description": "Intent-Vorlagen hinzufügen oder bearbeiten",
+        "cta": "Presets verwalten"
+      }
+    }
+  }
+}

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useTranslations } from 'next-intl'
 import { NewCampaignState, CampaignClip, ClipStatus, ClipAdjustments, ClipVersionAction, ClipVersion, AutoAdjustments, UserAdjustments, getEffectiveAdjustments } from '@/types'
 import { useVideoGeneration, RegenerateWhat, VideoQuality, GenerationProgress } from '@/hooks/use-video-generation'
 import { useCredits } from '@/hooks/use-credits'
@@ -21,12 +22,12 @@ import { UpgradeModal } from '@/components/modals/upgrade-modal'
 import { FirstPurchaseModal } from '@/components/modals/first-purchase-modal'
 
 // Messages rotatifs pour l'assemblage
-const ASSEMBLY_MESSAGES = [
-  "Upload des clips vers le cloud...",
-  "Application des ajustements trim/vitesse...",
-  "Fusion des pistes vidéo...",
-  "Optimisation de la qualité...",
-  "Finalisation de l'assemblage...",
+const ASSEMBLY_MESSAGE_KEYS = [
+  'assembly.messages.upload',
+  'assembly.messages.adjust',
+  'assembly.messages.merge',
+  'assembly.messages.optimize',
+  'assembly.messages.finish',
 ]
 
 // Helper: un seul clip par beat (is_selected prioritaire, sinon le plus récent)
@@ -51,11 +52,12 @@ function getPrimaryClips(clips: CampaignClip[] = []): CampaignClip[] {
 function AssemblyModal({ isOpen, clipCount }: { isOpen: boolean; clipCount: number }) {
   const [messageIndex, setMessageIndex] = useState(0)
   const [dots, setDots] = useState('')
+  const t = useTranslations('step6')
 
   useEffect(() => {
     if (!isOpen) return
     const interval = setInterval(() => {
-      setMessageIndex(prev => (prev + 1) % ASSEMBLY_MESSAGES.length)
+      setMessageIndex(prev => (prev + 1) % ASSEMBLY_MESSAGE_KEYS.length)
     }, 3000)
     return () => clearInterval(interval)
   }, [isOpen])
@@ -91,12 +93,12 @@ function AssemblyModal({ isOpen, clipCount }: { isOpen: boolean; clipCount: numb
 
         {/* Titre */}
         <h2 className="text-xl font-bold text-center text-foreground mb-2">
-          🎬 Assemblage en cours
+          {t('assembly.title')}
         </h2>
 
         {/* Message rotatif */}
         <p className="text-center text-muted-foreground mb-6 h-6">
-          {ASSEMBLY_MESSAGES[messageIndex]}{dots}
+          {t(ASSEMBLY_MESSAGE_KEYS[messageIndex] as any)}{dots}
         </p>
 
         {/* Info */}
@@ -104,12 +106,12 @@ function AssemblyModal({ isOpen, clipCount }: { isOpen: boolean; clipCount: numb
           <div className="flex items-center justify-center gap-4 text-sm">
             <div className="flex items-center gap-2">
               <Video className="w-4 h-4 text-violet-500" />
-              <span>{clipCount} clips</span>
+              <span>{t('assembly.clipCount', { count: clipCount })}</span>
             </div>
             <div className="text-muted-foreground">•</div>
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-amber-500" />
-              <span>Avec ajustements</span>
+              <span>{t('assembly.withAdjustments')}</span>
             </div>
           </div>
         </div>
@@ -125,7 +127,7 @@ function AssemblyModal({ isOpen, clipCount }: { isOpen: boolean; clipCount: numb
             />
           </div>
           <p className="text-xs text-muted-foreground text-center mt-3">
-            Ça peut prendre jusqu'à 30 secondes...
+            {t('assembly.hint')}
           </p>
         </div>
 
@@ -247,13 +249,13 @@ interface Step6GenerateProps {
   onBack: () => void
 }
 
-const BEAT_LABELS: Record<string, string> = {
-  hook: 'Hook',
-  problem: 'Problème',
-  agitation: 'Agitation',
-  solution: 'Solution',
-  proof: 'Preuve',
-  cta: 'CTA',
+const BEAT_LABEL_KEYS: Record<string, string> = {
+  hook: 'beats.hook',
+  problem: 'beats.problem',
+  agitation: 'beats.agitation',
+  solution: 'beats.solution',
+  proof: 'beats.proof',
+  cta: 'beats.cta',
 }
 
 // Palette plus sobre et professionnelle
@@ -267,12 +269,14 @@ const BEAT_COLORS: Record<string, string> = {
 }
 
 const STATUS_STEPS = [
-  { status: 'generating_video', label: 'Vidéo', icon: Video, color: 'text-blue-500' },
-  { status: 'generating_voice', label: 'Voix', icon: Mic, color: 'text-violet-500' },
-  { status: 'generating_ambient', label: 'Ambiance', icon: Music, color: 'text-fuchsia-500' },
+  { status: 'generating_video', labelKey: 'status.video', icon: Video, color: 'text-blue-500' },
+  { status: 'generating_voice', labelKey: 'status.voice', icon: Mic, color: 'text-violet-500' },
+  { status: 'generating_ambient', labelKey: 'status.ambient', icon: Music, color: 'text-fuchsia-500' },
 ]
 
 export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step6GenerateProps) {
+  const t = useTranslations('step6')
+  const tCommon = useTranslations('common')
   const { getActorById } = useActors()
   const { generating, isClipRegenerating, progress, generateAllClips, regenerateSingleClip, cancel, getOverallProgress } = useVideoGeneration()
   const { saving } = useCampaignCreation()
@@ -1321,14 +1325,17 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       
       if (!response.ok) {
         // Gestion d'erreur améliorée avec détails
-        let errorMessage = result.error || 'Erreur assemblage'
+        let errorMessage = result.error || t('errors.assembly.default')
         
         // Si des clips invalides sont identifiés
         if (result.invalidClips?.length > 0) {
           const clipDetails = result.invalidClips
             .map((c: { clipOrder: number; error: string }) => `Clip ${c.clipOrder}: ${c.error}`)
             .join('\n')
-          errorMessage = `${result.invalidClips.length} clip(s) avec problème:\n${clipDetails}`
+          errorMessage = t('errors.assembly.invalidClips', {
+            count: result.invalidClips.length,
+            details: clipDetails,
+          })
         }
         
         // Ajouter la suggestion si disponible
@@ -1351,10 +1358,10 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       
     } catch (err) {
       console.error('[Assemble] Error caught:', err)
-      const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue'
+      const errorMessage = err instanceof Error ? err.message : t('errors.assembly.unknown')
       
       // Afficher l'erreur de manière plus visible et formatée
-      const formattedError = `❌ Erreur d'assemblage\n\n${errorMessage}\n\nVous pouvez réessayer ou régénérer les clips problématiques.`
+      const formattedError = t('errors.assembly.alert', { message: errorMessage })
       alert(formattedError)
       
       setAssembling(false)
@@ -2328,7 +2335,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                       {index + 1}
                     </span>
                     <Badge className={`${BEAT_COLORS[clip.beat]} text-white text-xs px-2.5 py-0.5`}>
-                      {BEAT_LABELS[clip.beat]}
+                      {t(BEAT_LABEL_KEYS[clip.beat] as any)}
                     </Badge>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Clock className="w-3.5 h-3.5" />
@@ -2623,12 +2630,16 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                     <StepIcon className="w-3.5 h-3.5 text-muted-foreground" />
                                   )}
                                 </div>
-                                <span className={`text-xs font-medium ${
-                                  isDone ? 'text-emerald-600' : 
-                                  isActive ? 'text-foreground' : 
-                                  'text-muted-foreground'
-                                }`}>
-                                  {step.label}
+                                <span
+                                  className={`text-xs font-medium ${
+                                    isDone
+                                      ? 'text-emerald-600'
+                                      : isActive
+                                        ? 'text-foreground'
+                                        : 'text-muted-foreground'
+                                  }`}
+                                >
+                                  {t(step.labelKey as any)}
                                 </span>
                               </div>
                             )
@@ -2659,13 +2670,13 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                 <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
                                   <div className="flex items-center gap-2 mb-2">
                                     <Zap className="w-5 h-5 text-amber-500" />
-                                    <span className="font-semibold text-amber-600">Crédits insuffisants</span>
+                                    <span className="font-semibold text-amber-600">{t('errors.credits.title')}</span>
                                   </div>
                                   <p className="text-sm text-muted-foreground mb-3">
-                                    Il vous manque des crédits pour générer cette vidéo.
+                                    {t('errors.credits.description')}
                                     {errorInfo.errorDetails?.missing && (
                                       <span className="block mt-1 font-medium text-amber-600">
-                                        Manquant : {(errorInfo.errorDetails.missing / 100).toFixed(2)}€
+                                        {t('errors.credits.missing', { amount: (errorInfo.errorDetails.missing / 100).toFixed(2) })}
                                       </span>
                                     )}
                                   </p>
@@ -2678,7 +2689,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                     )}
                                   >
                                     <Zap className="w-4 h-4 mr-1" />
-                                    Recharger mes crédits
+                                    {t('errors.credits.cta')}
                                   </Button>
                                 </div>
                               )
@@ -2688,10 +2699,10 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                 <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30">
                                   <div className="flex items-center gap-2 mb-2">
                                     <AlertCircle className="w-5 h-5 text-red-500" />
-                                    <span className="font-semibold text-red-600">Échec de la génération</span>
+                                    <span className="font-semibold text-red-600">{t('errors.generic.title')}</span>
                                   </div>
                                   <p className="text-sm text-muted-foreground mb-3">
-                                    {clipProgress?.message || 'Une erreur est survenue lors de la génération.'}
+                                    {clipProgress?.message || t('errors.generic.description')}
                                   </p>
                                   <Button 
                                     variant="destructive" 
@@ -2701,7 +2712,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                     disabled={isClipRegenerating(`clip-${clip.order}`)}
                                   >
                                     <RefreshCw className="w-4 h-4 mr-1" />
-                                    Réessayer
+                                    {t('errors.generic.retry')}
                                   </Button>
                                 </div>
                               )
@@ -2932,11 +2943,11 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
           <div className="flex items-center justify-between pt-6">
             {generating ? (
               <Button variant="destructive" onClick={cancel} className="h-12 px-6 rounded-xl text-base">
-                ✕ Annuler
+                {t('actions.cancel')}
               </Button>
             ) : (
               <Button variant="ghost" onClick={onBack} className="h-12 px-6 rounded-xl text-base">
-                ← Retour au plan
+                {t('actions.backToPlan')}
               </Button>
             )}
 
@@ -2947,7 +2958,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                   onClick={handleStartGeneration}
                   className="h-12 px-6 rounded-xl font-medium text-base"
                 >
-                  🚀 Générer {remainingClips} clip{remainingClips > 1 ? 's' : ''} restant{remainingClips > 1 ? 's' : ''}
+                  {t('actions.generateRemaining', { count: remainingClips })}
                 </Button>
               )}
 
@@ -2960,12 +2971,12 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                   {assembling ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Assemblage en cours (≈30s)...
+                      {t('actions.assemblingInProgress')}
                     </>
                   ) : (
                     <>
                       <Film className="w-4 h-4 mr-2" />
-                      Assembler la vidéo finale
+                      {t('actions.assembleFinal')}
                     </>
                   )}
                 </Button>
@@ -2986,13 +2997,13 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
         isOpen={!!confirmRegen}
         onCancel={() => setConfirmRegen(null)}
         onConfirm={handleConfirmRegenerate}
-        title={`Régénérer ${confirmRegen?.label} ?`}
+        title={t('confirmRegen.title', { label: confirmRegen?.label || '' })}
         message={
           confirmRegen?.warning 
-            ? `${confirmRegen.warning} — Cette action va régénérer ${confirmRegen.label} du clip.`
-            : `Cette action va régénérer ${confirmRegen?.label || ''} du clip.`
+            ? t('confirmRegen.messageWithWarning', { warning: confirmRegen.warning, label: confirmRegen.label })
+            : t('confirmRegen.message', { label: confirmRegen?.label || '' })
         }
-        confirmText="Régénérer"
+        confirmText={t('confirmRegen.confirm')}
         variant={confirmRegen?.what === 'video' ? 'danger' : 'warning'}
       />
 

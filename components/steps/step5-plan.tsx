@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { NewCampaignState, CampaignClip, CampaignBrief, Actor } from '@/types'
 import { usePlanGeneration } from '@/hooks/use-plan-generation'
@@ -359,6 +360,8 @@ function LoadingAnimation() {
 export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext, onBack }: Step5PlanProps) {
   const { clips, campaignTitle, loading, error, generatePlan, updateClipScript, setClips } = usePlanGeneration()
   const { credits, checkCredits } = useCredits()
+  const t = useTranslations('step5')
+  const tCommon = useTranslations('common')
   const [editingClip, setEditingClip] = useState<number | null>(null)
   const [editText, setEditText] = useState('')
   const [editingVisualPrompt, setEditingVisualPrompt] = useState<number | null>(null)
@@ -1530,7 +1533,7 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
                         {/* Visual prompt */}
                         <div className="p-3 bg-muted/50 rounded-xl">
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-medium text-muted-foreground">Prompt visuel</span>
+                            <span className="text-xs font-medium text-muted-foreground">{t('visualPrompt.label')}</span>
                             {editingVisualPrompt !== index && (
                               <Button 
                                 variant="ghost" 
@@ -1539,7 +1542,7 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
                                 onClick={() => startEditingVisual(index)}
                               >
                                 <Pencil className="w-2.5 h-2.5 mr-1" />
-                                Éditer
+                                {t('visualPrompt.edit')}
                               </Button>
                             )}
                           </div>
@@ -1549,17 +1552,17 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
                                 value={editVisualText}
                                 onChange={(e) => setEditVisualText(e.target.value)}
                                 className="bg-background border-border min-h-[80px] text-sm rounded-xl focus:border-foreground"
-                                placeholder="Prompt visuel..."
+                                placeholder={t('visualPrompt.placeholder')}
                               />
                               <div className="flex justify-end gap-2">
                                 <Button variant="ghost" size="sm" className="h-7 text-xs rounded-lg" onClick={cancelVisualEdit}>
-                                  Annuler
+                                  {tCommon('cancel')}
                                 </Button>
                                 <Button size="sm" className="h-7 text-xs rounded-lg" onClick={async () => {
                                   await saveVisualEdit()
                                   generateFirstFrame(index, { ...clip, first_frame: { ...clip.first_frame, prompt: editVisualText } }, index > 0 ? firstFrames[index - 1]?.url : undefined, true)
                                 }}>
-                                  Sauvegarder & Regénérer
+                                  {t('visualPrompt.saveAndRegenerate')}
                                 </Button>
                               </div>
                             </div>
@@ -1583,7 +1586,7 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
       <div className="flex justify-between pt-4">
         <Button variant="ghost" onClick={onBack} className="h-11 px-5 rounded-xl">
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Retour
+          {tCommon('back')}
         </Button>
         <Button
           onClick={handleContinue}
@@ -1593,21 +1596,21 @@ export function Step5Plan({ state, onClipsGenerated, onFirstFramesUpdate, onNext
           {generatingFrames && !hasInsufficientCredits ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Génération des images...
+              {t('cta.generatingImages')}
             </>
           ) : hasInsufficientCredits ? (
             <>
-              Continuer sans images
+              {t('cta.continueWithoutImages')}
               <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
             </>
           ) : generatedFrames < displayClips.length && !hasInsufficientCredits ? (
             <>
-              Images {generatedFrames}/{displayClips.length}
+              {t('cta.imagesProgress', { done: generatedFrames, total: displayClips.length })}
               <Loader2 className="w-4 h-4 ml-2 animate-spin" />
             </>
           ) : (
             <>
-              Générer les vidéos
+              {t('cta.generateVideos')}
               <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
             </>
           )}

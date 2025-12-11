@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { getTranslations } from 'next-intl/server'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -29,8 +30,14 @@ async function getFalBalance(): Promise<{ balance: number; currency: string } | 
   }
 }
 
-export default async function AdminDashboard() {
+export default async function AdminDashboard({
+  params,
+}: {
+  params: { locale: string }
+}) {
+  const t = await getTranslations('adminDashboard')
   const supabase = await createClient()
+  const basePath = `/${params.locale}`
   
   // Get Fal.ai balance
   const falBalance = await getFalBalance()
@@ -50,45 +57,45 @@ export default async function AdminDashboard() {
 
   const stats = [
     {
-      title: 'Acteurs',
+      title: t('stats.actors.title'),
       count: actorsCount || 0,
-      href: '/admin/actors',
-      description: 'Gérer les acteurs IA',
+      href: `${basePath}/admin/actors`,
+      description: t('stats.actors.description'),
       icon: Users,
     },
     {
-      title: 'Presets',
+      title: t('stats.presets.title'),
       count: presetsCount || 0,
-      href: '/admin/presets',
-      description: 'Templates d\'intention',
+      href: `${basePath}/admin/presets`,
+      description: t('stats.presets.description'),
       icon: Palette,
     },
     {
-      title: 'Prompts',
+      title: t('stats.prompts.title'),
       count: 3,
-      href: '/admin/prompts',
-      description: 'Prompts système',
+      href: `${basePath}/admin/prompts`,
+      description: t('stats.prompts.description'),
       icon: FileText,
     },
     {
-      title: 'Campagnes',
+      title: t('stats.campaigns.title'),
       count: campaignsCount || 0,
-      href: '/dashboard',
-      description: 'Total utilisateurs',
+      href: `${basePath}/dashboard`,
+      description: t('stats.campaigns.description'),
       icon: BarChart3,
     },
     {
-      title: 'Billing',
+      title: t('stats.billing.title'),
       count: null,
-      href: '/admin/billing',
-      description: 'Gérer les prix et plans',
+      href: `${basePath}/admin/billing`,
+      description: t('stats.billing.description'),
       icon: CreditCard,
     },
     {
-      title: 'Logs',
+      title: t('stats.logs.title'),
       count: null,
-      href: '/admin/logs',
-      description: 'Logs de génération Fal.ai',
+      href: `${basePath}/admin/logs`,
+      description: t('stats.logs.description'),
       icon: Activity,
     },
   ]
@@ -97,8 +104,8 @@ export default async function AdminDashboard() {
     <div className="space-y-10">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Dashboard Admin</h1>
-        <p className="text-muted-foreground mt-2">Gérer les acteurs, presets et prompts</p>
+        <h1 className="text-3xl font-semibold tracking-tight">{t('header.title')}</h1>
+        <p className="text-muted-foreground mt-2">{t('header.subtitle')}</p>
       </div>
 
       {/* Fal.ai Balance Card */}
@@ -111,8 +118,8 @@ export default async function AdminDashboard() {
                   <Wallet className="w-6 h-6 text-violet-500" />
                 </div>
                 <div>
-                  <CardTitle className="text-lg font-medium">Solde Fal.ai</CardTitle>
-                  <CardDescription>Crédits disponibles pour les générations IA</CardDescription>
+                  <CardTitle className="text-lg font-medium">{t('fal.title')}</CardTitle>
+                  <CardDescription>{t('fal.balanceDescription')}</CardDescription>
                 </div>
               </div>
               <div className="text-right">
@@ -148,7 +155,7 @@ export default async function AdminDashboard() {
                   {stat.count !== null ? (
                     <p className="text-4xl font-semibold">{stat.count}</p>
                   ) : (
-                    <p className="text-sm text-muted-foreground">Configurer</p>
+                    <p className="text-sm text-muted-foreground">{t('stats.configure')}</p>
                   )}
                 </CardContent>
               </Card>
@@ -159,7 +166,7 @@ export default async function AdminDashboard() {
 
       {/* Quick Actions */}
       <div>
-        <h2 className="text-lg font-semibold mb-4">Actions rapides</h2>
+        <h2 className="text-lg font-semibold mb-4">{t('quickActions.title')}</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           <Card className="group hover:shadow-md transition-all">
             <CardHeader>
@@ -168,18 +175,18 @@ export default async function AdminDashboard() {
                   <Plus className="w-5 h-5" />
                 </div>
                 <div>
-                  <CardTitle className="text-base font-medium">Ajouter un acteur</CardTitle>
+                  <CardTitle className="text-base font-medium">{t('quickActions.addActor.title')}</CardTitle>
                   <CardDescription className="text-sm">
-                    Créer un nouvel acteur IA avec SOUL
+                    {t('quickActions.addActor.description')}
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <Link href="/admin/actors?new=true">
+              <Link href={`${basePath}/admin/actors?new=true`}>
                 <Button className="rounded-xl h-10">
                   <Plus className="w-4 h-4 mr-2" />
-                  Nouvel acteur
+                  {t('quickActions.addActor.cta')}
                 </Button>
               </Link>
             </CardContent>
@@ -192,18 +199,18 @@ export default async function AdminDashboard() {
                   <Settings className="w-5 h-5" />
                 </div>
                 <div>
-                  <CardTitle className="text-base font-medium">Éditer les prompts</CardTitle>
+                  <CardTitle className="text-base font-medium">{t('quickActions.prompts.title')}</CardTitle>
                   <CardDescription className="text-sm">
-                    Modifier le mega prompt Claude ou NanoBanana
+                    {t('quickActions.prompts.description')}
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <Link href="/admin/prompts">
+              <Link href={`${basePath}/admin/prompts`}>
                 <Button variant="outline" className="rounded-xl h-10">
                   <FileText className="w-4 h-4 mr-2" />
-                  Éditer prompts
+                  {t('quickActions.prompts.cta')}
                 </Button>
               </Link>
             </CardContent>
@@ -216,18 +223,18 @@ export default async function AdminDashboard() {
                   <Layers className="w-5 h-5" />
                 </div>
                 <div>
-                  <CardTitle className="text-base font-medium">Gérer les presets</CardTitle>
+                  <CardTitle className="text-base font-medium">{t('quickActions.presets.title')}</CardTitle>
                   <CardDescription className="text-sm">
-                    Ajouter ou modifier les templates d'intention
+                    {t('quickActions.presets.description')}
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <Link href="/admin/presets">
+              <Link href={`${basePath}/admin/presets`}>
                 <Button variant="outline" className="rounded-xl h-10">
                   <Palette className="w-4 h-4 mr-2" />
-                  Gérer presets
+                  {t('quickActions.presets.cta')}
                 </Button>
               </Link>
             </CardContent>

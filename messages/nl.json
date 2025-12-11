@@ -1,0 +1,342 @@
+{
+  "common": {
+    "loading": "Laden...",
+    "error": "Er is een fout opgetreden",
+    "save": "Opslaan",
+    "cancel": "Annuleren",
+    "continue": "Doorgaan",
+    "back": "Terug",
+    "delete": "Verwijderen",
+    "language": "Taal",
+    "negativeBalanceHint": "Negatief saldo - laad je credits op"
+  },
+  "auth": {
+    "login": "Inloggen",
+    "register": "Registreren",
+    "logout": "Uitloggen",
+    "email": "Email",
+    "password": "Wachtwoord",
+    "forgotPassword": "Wachtwoord vergeten?",
+    "noAccount": "Nog geen account?",
+    "hasAccount": "Heb je al een account?",
+    "loginCta": "Inloggen",
+    "registerCta": "Account aanmaken",
+    "subheadingLogin": "Vul je gegevens in om verder te gaan",
+    "subheadingRegister": "Maak je account aan om te starten",
+    "successEmailSent": "Email verzonden!",
+    "successCheckMail": "Controleer je inbox om je account te bevestigen en te beginnen.",
+    "backToLogin": "Terug naar login",
+    "passwordsMismatch": "Wachtwoorden komen niet overeen",
+    "passwordTooShort": "Wachtwoord moet minstens 6 tekens hebben",
+    "ctaNewCampaign": "Nieuwe campagne"
+  },
+  "dashboard": {
+    "title": "Mijn campagnes",
+    "newCampaign": "Nieuwe campagne",
+    "noCampaigns": "Geen campagnes",
+    "credits": "credits"
+  },
+  "dashboardPage": {
+    "heroBadge": "AI aangedreven",
+    "heroTitle": "Mijn campagnes",
+    "heroSubtitle": "Maak en beheer je AI-gegenereerde UGC-advertenties. Elke campagne kan meerdere clips bevatten die zijn geoptimaliseerd voor social media.",
+    "newCampaign": "Nieuwe campagne",
+    "emptyTitle": "Geen campagnes",
+    "emptySubtitle": "Begin met het maken van je eerste UGC-campagne. Onze virtuele acteurs brengen je advertenties in een paar klikken tot leven.",
+    "emptyCta": "Mijn eerste campagne maken",
+    "statsCampaigns": "Campagnes",
+    "statsCompleted": "Voltooid",
+    "completionRate": "Afrondingspercentage"
+  },
+  "campaignPage": {
+    "defaultTitle": "UGC-campagne",
+    "subtitlesProcessingTitle": "Ondertitels worden verwerkt...",
+    "subtitlesProcessingEta": "Nog 1 tot 5 minuten",
+    "templateLabel": "Template: {name}",
+    "download": "Downloaden",
+    "downloadWithSubtitles": "Met ondertitels",
+    "presetBadgePrefix": "🎬 {name}",
+    "targetDuration": "Doel {duration}s",
+    "withProduct": "📦 Met product",
+    "withoutProduct": "💬 Zonder product",
+    "clipsGenerated": "Gegenereerde clips",
+    "finalDuration": "Eindduur",
+    "createdAt": "Gemaakt op {date}",
+    "editVideo": "Video bewerken"
+  },
+  "campaignCard": {
+    "untitled": "Zonder titel",
+    "editTitle": "Titel bewerken",
+    "delete": "Verwijderen",
+    "deleteTitle": "Campagne verwijderen",
+    "deleteMessage": "Weet je zeker dat je deze campagne wilt verwijderen? Dit kan niet ongedaan worden gemaakt.",
+    "confirm": "Verwijderen",
+    "confirming": "Bezig met verwijderen...",
+    "cancel": "Annuleren",
+    "clips": "{count, plural, one {# clip} other {# clips}}"
+  },
+  "nav": {
+    "dashboard": "Campagnes",
+    "billing": "Facturatie",
+    "admin": "Admin",
+    "newCampaign": "Nieuwe campagne",
+    "backToApp": "← Terug naar de app",
+    "adminActors": "Acteurs",
+    "adminPresets": "Presets",
+    "adminPrompts": "Prompts"
+  },
+  "status": {
+    "draft": "Concept",
+    "generating": "Bezig",
+    "assembling": "Samenstellen...",
+    "completed": "Voltooid",
+    "failed": "Mislukt"
+  },
+  "steps": {
+    "actor": "Acteur",
+    "product": "Product",
+    "preset": "Stijl",
+    "brief": "Brief",
+    "plan": "Plan",
+    "generate": "Generatie"
+  },
+  "stepDescriptions": {
+    "actor": "Kies je AI-maker",
+    "product": "Met of zonder product",
+    "preset": "Videostijl",
+    "brief": "Beschrijf je aanbod",
+    "plan": "Valideer het script",
+    "generate": "Maak de video's"
+  },
+  "loginPage": {
+    "heroTitle": "Maak UGC-advertenties",
+    "heroSubtitle": "in een paar klikken",
+    "heroBody": "Genereer authentieke reclamevideo's met virtuele acteurs, geoptimaliseerd voor TikTok, Instagram en YouTube.",
+    "aiPowered": "AI aangedreven"
+  },
+  "registerPage": {
+    "heroTitle": "Doe mee met de revolutie",
+    "heroSubtitle": "van UGC-advertenties",
+    "heroBody": "Duizenden makers gebruiken UGC AI al om authentieke en performante advertenties te genereren.",
+    "features": {
+      "fast": "Generatie in minuten",
+      "actors": "Realistische virtuele acteurs",
+      "export": "Multi-platform export"
+    }
+  },
+  "stepsTitle": {
+    "actor": "Kies je AI-maker"
+  },
+  "step1": {},
+  "step2": {},
+  "step3": {},
+  "step4": {
+    "beats": {
+      "hook": "Hook",
+      "problem": "Probleem",
+      "solution": "Oplossing",
+      "proof": "Bewijs",
+      "cta": "CTA"
+    },
+    "generating": {
+      "badge": "Bezig met maken...",
+      "scriptSubtitle": "Het perfecte script wordt geschreven...",
+      "imagesSubtitle": "Visuals worden voorbereid...",
+      "scriptLabel": "Script",
+      "imagesLabel": "Beelden"
+    },
+    "header": {
+      "title": "Snelle brief",
+      "subtitle": "Beschrijf je aanbod zodat de AI het beste script maakt"
+    },
+    "import": {
+      "titleExtracted": "✨ Brief vooraf ingevuld vanaf je site!",
+      "titleDefault": "Heb je een website of landing page?",
+      "subtitleExtracted": "Je kunt de velden hieronder aanpassen indien nodig",
+      "subtitleDefault": "Plak de URL en we halen automatisch de info op",
+      "placeholder": "https://jouw-site.com/product",
+      "action": "Extraheren",
+      "loading": "Analyseren...",
+      "error": "Fout bij extractie"
+    },
+    "manualDivider": "of vul handmatig in",
+    "fields": {
+      "whatSelling": {
+        "label": "Wat verkoop je?",
+        "placeholder": "Bijv: Een online cursus om in 30 dagen Python te leren, ideaal voor beginners die naar tech willen overstappen...",
+        "helper": "Hoe preciezer je bent, hoe beter het script"
+      },
+      "painPoint": {
+        "label": "Welk probleem lost het op?",
+        "placeholder": "Bijv: Mensen willen naar tech overstappen maar zijn bang het niet te kunnen, denken dat het te complex is en dat ze te oud zijn om te leren programmeren...",
+        "helper": "💡 De frustratie van je doelgroep maakt het script krachtig"
+      },
+      "targetAudience": {
+        "label": "Doelgroep",
+        "placeholder": "Freelancers, ondernemers..."
+      },
+      "keyBenefits": {
+        "label": "Belangrijkste voordelen",
+        "placeholder": "Tijdbesparing, eenvoud..."
+      }
+    },
+    "duration": {
+      "label": "Duur",
+      "options": {
+        "s15": {
+          "label": "15s",
+          "clips": "2-3 clips"
+        },
+        "s30": {
+          "label": "30s",
+          "clips": "4-5 clips"
+        },
+        "s45": {
+          "label": "45s",
+          "clips": "5-6 clips"
+        },
+        "s60": {
+          "label": "60s",
+          "clips": "6-8 clips"
+        }
+      }
+    },
+    "language": {
+      "label": "Scripttaal",
+      "more": "+ Meer talen"
+    },
+    "plan": {
+      "loading": "Script wordt gegenereerd...",
+      "submit": "Plan genereren"
+    },
+    "errors": {
+      "generation": "Fout bij generatie"
+    }
+  },
+  "step5": {
+    "visualPrompt": {
+      "label": "Visuele prompt",
+      "edit": "Bewerken",
+      "placeholder": "Visuele prompt...",
+      "saveAndRegenerate": "Opslaan & regenereren"
+    },
+    "cta": {
+      "generatingImages": "Bezig met afbeeldingen genereren...",
+      "continueWithoutImages": "Doorgaan zonder afbeeldingen",
+      "imagesProgress": "Afbeeldingen {done}/{total}",
+      "generateVideos": "Video's genereren"
+    }
+  },
+  "step6": {
+    "actions": {
+      "cancel": "✕ Annuleren",
+      "backToPlan": "← Terug naar het plan",
+      "generateRemaining": "{count, plural, one {🚀 # clip genereren} other {🚀 # clips genereren}}",
+      "assemblingInProgress": "Samenstellen bezig (≈30s)...",
+      "assembleFinal": "Eindvideo samenstellen"
+    },
+    "beats": {
+      "hook": "Hook",
+      "problem": "Probleem",
+      "agitation": "Agitatie",
+      "solution": "Oplossing",
+      "proof": "Bewijs",
+      "cta": "CTA"
+    },
+    "status": {
+      "video": "Video",
+      "voice": "Stem",
+      "ambient": "Ambiance"
+    },
+    "errors": {
+      "credits": {
+        "title": "Onvoldoende credits",
+        "description": "Je hebt meer credits nodig om deze video te genereren.",
+        "missing": "Ontbrekend: {amount}€",
+        "cta": "Credits opladen"
+      },
+      "generic": {
+        "title": "Generatie mislukt",
+        "description": "Er is een fout opgetreden tijdens de generatie.",
+        "retry": "Opnieuw proberen"
+      }
+    },
+    "assembly": {
+      "title": "🎬 Bezig met samenstellen...",
+      "messages": {
+        "upload": "Clips uploaden naar de cloud...",
+        "adjust": "Trim-/snelheidsaanpassingen toepassen...",
+        "merge": "Videotracks samenvoegen...",
+        "optimize": "Kwaliteit optimaliseren...",
+        "finish": "Samenstellen afronden..."
+      },
+      "clipCount": "{count} clip{count > 1 ? 's' : ''}",
+      "withAdjustments": "Met aanpassingen",
+      "hint": "Dit kan tot 30 seconden duren..."
+    },
+    "confirmRegen": {
+      "title": "{label} opnieuw genereren?",
+      "messageWithWarning": "{warning} — Deze actie genereert {label} van de clip opnieuw.",
+      "message": "Deze actie genereert {label} van de clip opnieuw.",
+      "confirm": "Opnieuw genereren"
+    }
+  },
+  "campaign": {},
+  "billing": {},
+  "admin": {},
+  "adminDashboard": {
+    "header": {
+      "title": "Admin dashboard",
+      "subtitle": "Beheer acteurs, presets en prompts"
+    },
+    "fal": {
+      "title": "Fal.ai-saldo",
+      "balanceDescription": "Credits beschikbaar voor AI-generaties"
+    },
+    "stats": {
+      "configure": "Configureren",
+      "actors": {
+        "title": "Acteurs",
+        "description": "Beheer AI-acteurs"
+      },
+      "presets": {
+        "title": "Presets",
+        "description": "Intentie-templates"
+      },
+      "prompts": {
+        "title": "Prompts",
+        "description": "Systeem-prompts"
+      },
+      "campaigns": {
+        "title": "Campagnes",
+        "description": "Totaal gebruikers"
+      },
+      "billing": {
+        "title": "Billing",
+        "description": "Prijzen en plannen beheren"
+      },
+      "logs": {
+        "title": "Logs",
+        "description": "Fal.ai generatielogs"
+      }
+    },
+    "quickActions": {
+      "title": "Snelle acties",
+      "addActor": {
+        "title": "Acteur toevoegen",
+        "description": "Maak een nieuwe AI-acteur met SOUL",
+        "cta": "Nieuwe acteur"
+      },
+      "prompts": {
+        "title": "Prompts bewerken",
+        "description": "Bewerk de Claude- of NanoBanana-megaprompt",
+        "cta": "Prompts bewerken"
+      },
+      "presets": {
+        "title": "Presets beheren",
+        "description": "Intentie-templates toevoegen of bewerken",
+        "cta": "Presets beheren"
+      }
+    }
+  }
+}

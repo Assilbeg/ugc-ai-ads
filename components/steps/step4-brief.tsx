@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useTranslations } from 'next-intl'
 import { CampaignBrief, CampaignClip, Actor, IntentionPreset, ProductConfig, ScriptLanguage } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,19 +12,24 @@ import { ArrowLeft, Sparkles, Check, Clock, Target, Gift, ShoppingBag, AlertCirc
 
 // Configuration des beats pour l'animation
 const BEAT_STEPS = [
-  { beat: 'hook', label: 'HOOK', emoji: '🎣', color: 'bg-amber-500' },
-  { beat: 'problem', label: 'PROBLÈME', emoji: '😰', color: 'bg-red-500' },
-  { beat: 'solution', label: 'SOLUTION', emoji: '✨', color: 'bg-emerald-500' },
-  { beat: 'proof', label: 'PREUVE', emoji: '📊', color: 'bg-blue-500' },
-  { beat: 'cta', label: 'CTA', emoji: '🚀', color: 'bg-violet-500' },
+  { beat: 'hook', emoji: '🎣', color: 'bg-amber-500' },
+  { beat: 'problem', emoji: '😰', color: 'bg-red-500' },
+  { beat: 'solution', emoji: '✨', color: 'bg-emerald-500' },
+  { beat: 'proof', emoji: '📊', color: 'bg-blue-500' },
+  { beat: 'cta', emoji: '🚀', color: 'bg-violet-500' },
 ]
 
 // Animation de chargement pendant la génération
 function GeneratingAnimation({ phase }: { phase: 'script' | 'images' }) {
+  const t = useTranslations('step4')
   const [progress, setProgress] = useState(0)
   const [scriptDone, setScriptDone] = useState(false)
   const [beatProgress, setBeatProgress] = useState<Record<string, number>>({})
   const [completedBeats, setCompletedBeats] = useState<Set<string>>(new Set())
+  const beatSteps = BEAT_STEPS.map((step) => ({
+    ...step,
+    label: t(`beats.${step.beat}` as const),
+  }))
 
   useEffect(() => {
     if (phase === 'images' && !scriptDone) {
@@ -106,10 +112,10 @@ function GeneratingAnimation({ phase }: { phase: 'script' | 'images' }) {
         <div className="text-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-foreground text-background rounded-full text-sm font-medium mb-2">
             <Sparkles className="w-4 h-4 animate-pulse" />
-            Création en cours...
+            {t('generating.badge')}
           </div>
           <p className="text-sm text-muted-foreground">
-            {phase === 'script' ? 'Écriture du script parfait...' : 'Préparation des visuels...'}
+            {phase === 'script' ? t('generating.scriptSubtitle') : t('generating.imagesSubtitle')}
           </p>
         </div>
 
@@ -125,7 +131,7 @@ function GeneratingAnimation({ phase }: { phase: 'script' | 'images' }) {
 
         {/* Beat tiles grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {BEAT_STEPS.map((item, index) => {
+          {beatSteps.map((item, index) => {
             const isCompleted = completedBeats.has(item.beat)
             const stepProgress = beatProgress[item.beat] || 0
             const isActive = stepProgress > 0 && !isCompleted
@@ -209,7 +215,7 @@ function GeneratingAnimation({ phase }: { phase: 'script' | 'images' }) {
             </div>
             <div className="flex-1 min-w-0">
               <p className={`font-medium text-sm ${scriptDone ? 'text-green-700 dark:text-green-400' : ''}`}>
-                Script
+                {t('generating.scriptLabel')}
               </p>
             </div>
             {phase === 'script' && !scriptDone && (
@@ -227,7 +233,7 @@ function GeneratingAnimation({ phase }: { phase: 'script' | 'images' }) {
               <ImageIcon className={`w-4 h-4 ${phase === 'images' ? 'animate-pulse' : ''}`} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-medium text-sm">Images</p>
+              <p className="font-medium text-sm">{t('generating.imagesLabel')}</p>
             </div>
             {phase === 'images' && (
               <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
@@ -253,10 +259,10 @@ interface Step4BriefProps {
 }
 
 const DURATION_OPTIONS = [
-  { value: 15, label: '15s', clips: '2-3 clips' },
-  { value: 30, label: '30s', clips: '4-5 clips' },
-  { value: 45, label: '45s', clips: '5-6 clips' },
-  { value: 60, label: '60s', clips: '6-8 clips' },
+  { value: 15, labelKey: 'duration.options.s15.label', clipsKey: 'duration.options.s15.clips' },
+  { value: 30, labelKey: 'duration.options.s30.label', clipsKey: 'duration.options.s30.clips' },
+  { value: 45, labelKey: 'duration.options.s45.label', clipsKey: 'duration.options.s45.clips' },
+  { value: 60, labelKey: 'duration.options.s60.label', clipsKey: 'duration.options.s60.clips' },
 ]
 
 const LANGUAGE_OPTIONS: { value: ScriptLanguage; label: string; flag: string }[] = [
@@ -280,6 +286,8 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
   const [generatingPlan, setGeneratingPlan] = useState(false)
   const [generationPhase, setGenerationPhase] = useState<'script' | 'images'>('script')
   const [planError, setPlanError] = useState<string | null>(null)
+  const t = useTranslations('step4')
+  const tCommon = useTranslations('common')
 
   const handleExtractFromUrl = async () => {
     if (!url.trim()) return
@@ -297,7 +305,7 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erreur d\'extraction')
+        throw new Error(data.error || t('import.error'))
       }
 
       onChange({
@@ -310,7 +318,7 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
 
       setExtracted(true)
     } catch (err) {
-      setExtractError(err instanceof Error ? err.message : 'Erreur d\'extraction')
+      setExtractError(err instanceof Error ? err.message : t('import.error'))
     } finally {
       setExtracting(false)
     }
@@ -343,7 +351,7 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
 
         if (!response.ok) {
           const data = await response.json()
-          throw new Error(data.error || 'Erreur de génération')
+          throw new Error(data.error || t('errors.generation'))
         }
 
         const data = await response.json()
@@ -422,7 +430,7 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
         // 5. Passer à l'étape suivante
         onNext()
       } catch (err) {
-        setPlanError(err instanceof Error ? err.message : 'Erreur de génération')
+        setPlanError(err instanceof Error ? err.message : t('errors.generation'))
         setGeneratingPlan(false)
       }
     } else {
@@ -440,9 +448,9 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
 
       {/* Header */}
       <div className="text-center max-w-lg mx-auto">
-        <h2 className="text-2xl font-semibold tracking-tight">Brief rapide</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">{t('header.title')}</h2>
         <p className="text-muted-foreground mt-2">
-          Décris ton offre pour que l'IA génère le meilleur script
+          {t('header.subtitle')}
         </p>
       </div>
 
@@ -461,12 +469,12 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
             <div className="flex-1 space-y-3">
               <div>
                 <h3 className="font-medium text-sm">
-                  {extracted ? '✨ Brief pré-rempli depuis ton site !' : 'Tu as un site ou une landing page ?'}
+                  {extracted ? t('import.titleExtracted') : t('import.titleDefault')}
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {extracted 
-                    ? 'Tu peux éditer les champs ci-dessous si besoin'
-                    : 'Colle l\'URL et on extrait les infos automatiquement'
+                    ? t('import.subtitleExtracted')
+                    : t('import.subtitleDefault')
                   }
                 </p>
               </div>
@@ -475,7 +483,7 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
                   <div className="relative flex-1">
                     <Link className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
-                      placeholder="https://ton-site.com/produit"
+                      placeholder={t('import.placeholder')}
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
                       className="pl-9 h-10 rounded-xl border-border bg-background focus:border-foreground text-sm"
@@ -490,10 +498,10 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
                     {extracting ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Analyse...
+                        {t('import.loading')}
                       </>
                     ) : (
-                      'Extraire'
+                      t('import.action')
                     )}
                   </Button>
                 </div>
@@ -508,7 +516,7 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
         {/* Separator */}
         <div className="flex items-center gap-4">
           <div className="flex-1 h-px bg-border" />
-          <span className="text-xs text-muted-foreground">ou remplis manuellement</span>
+          <span className="text-xs text-muted-foreground">{t('manualDivider')}</span>
           <div className="flex-1 h-px bg-border" />
         </div>
 
@@ -519,17 +527,17 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
               <ShoppingBag className="w-4 h-4 text-foreground/70" />
             </div>
             <Label className="text-base font-medium">
-              Qu'est-ce que tu vends ? <span className="text-destructive">*</span>
+              {t('fields.whatSelling.label')} <span className="text-destructive">*</span>
             </Label>
           </div>
           <Textarea
-            placeholder="Ex: Une formation en ligne pour apprendre à coder en Python en 30 jours, idéale pour les débutants qui veulent se reconvertir dans la tech..."
+            placeholder={t('fields.whatSelling.placeholder')}
             value={brief.what_selling || ''}
             onChange={(e) => onChange({ ...brief, what_selling: e.target.value })}
             className="min-h-[120px] rounded-xl border-border bg-background focus:border-foreground focus:ring-1 focus:ring-foreground/20 resize-none text-base"
           />
           <p className="text-xs text-muted-foreground">
-            Plus tu es précis, meilleur sera le script généré
+            {t('fields.whatSelling.helper')}
           </p>
         </div>
 
@@ -540,17 +548,17 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
               <AlertCircle className="w-4 h-4 text-amber-600" />
             </div>
             <Label className="text-base font-medium">
-              Quel problème ça résout ? <span className="text-destructive">*</span>
+              {t('fields.painPoint.label')} <span className="text-destructive">*</span>
             </Label>
           </div>
           <Textarea
-            placeholder="Ex: Les gens veulent se reconvertir dans la tech mais ils ont peur de ne pas y arriver, ils pensent que c'est trop compliqué et qu'ils sont trop vieux pour apprendre à coder..."
+            placeholder={t('fields.painPoint.placeholder')}
             value={brief.pain_point || ''}
             onChange={(e) => onChange({ ...brief, pain_point: e.target.value })}
             className="min-h-[120px] rounded-xl border-border bg-background focus:border-foreground focus:ring-1 focus:ring-foreground/20 resize-none text-base"
           />
           <p className="text-xs text-muted-foreground">
-            💡 La frustration de ton audience — c'est ce qui rendra le script percutant
+            {t('fields.painPoint.helper')}
           </p>
         </div>
 
@@ -562,10 +570,10 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
               <div className="w-8 h-8 rounded-lg bg-foreground/5 flex items-center justify-center">
                 <Target className="w-4 h-4 text-foreground/70" />
               </div>
-              <Label className="text-base font-medium">Audience cible</Label>
+            <Label className="text-base font-medium">{t('fields.targetAudience.label')}</Label>
             </div>
             <Input
-              placeholder="Freelances, entrepreneurs..."
+            placeholder={t('fields.targetAudience.placeholder')}
               value={brief.target_audience || ''}
               onChange={(e) => onChange({ ...brief, target_audience: e.target.value })}
               className="h-12 rounded-xl border-border bg-background focus:border-foreground focus:ring-1 focus:ring-foreground/20 text-base"
@@ -578,10 +586,10 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
               <div className="w-8 h-8 rounded-lg bg-foreground/5 flex items-center justify-center">
                 <Gift className="w-4 h-4 text-foreground/70" />
               </div>
-              <Label className="text-base font-medium">Bénéfices clés</Label>
+            <Label className="text-base font-medium">{t('fields.keyBenefits.label')}</Label>
             </div>
             <Input
-              placeholder="Gain de temps, simplicité..."
+            placeholder={t('fields.keyBenefits.placeholder')}
               value={brief.key_benefits?.[0] || ''}
               onChange={(e) => onChange({ ...brief, key_benefits: e.target.value ? [e.target.value] : [] })}
               className="h-12 rounded-xl border-border bg-background focus:border-foreground focus:ring-1 focus:ring-foreground/20 text-base"
@@ -598,7 +606,7 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
                 <Clock className="w-4 h-4 text-foreground/70" />
               </div>
               <Label className="text-base font-medium">
-                Durée <span className="text-destructive">*</span>
+                {t('duration.label')} <span className="text-destructive">*</span>
               </Label>
             </div>
             <div className="grid grid-cols-4 gap-2">
@@ -617,9 +625,9 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
                     onClick={() => onChange({ ...brief, target_duration: option.value as 15 | 30 | 45 | 60 })}
                   >
                     <div className="p-3 text-center relative">
-                      <div className="text-lg font-bold">{option.label}</div>
+                      <div className="text-lg font-bold">{t(option.labelKey as any)}</div>
                       <div className={`text-[10px] mt-0.5 ${isSelected ? 'text-background/70' : 'text-muted-foreground'}`}>
-                        {option.clips}
+                        {t(option.clipsKey as any)}
                       </div>
                       {isSelected && (
                         <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-background rounded-full flex items-center justify-center">
@@ -639,7 +647,7 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
               <div className="w-8 h-8 rounded-lg bg-foreground/5 flex items-center justify-center">
                 <Globe className="w-4 h-4 text-foreground/70" />
               </div>
-              <Label className="text-base font-medium">Langue du script</Label>
+              <Label className="text-base font-medium">{t('language.label')}</Label>
             </div>
             <div className="grid grid-cols-2 gap-2">
               {LANGUAGE_OPTIONS.slice(0, 4).map((option) => {
@@ -674,7 +682,7 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
             {/* More languages dropdown hint */}
             <details className="group">
               <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
-                + Autres langues
+                {t('language.more')}
               </summary>
               <div className="grid grid-cols-2 gap-2 mt-2">
                 {LANGUAGE_OPTIONS.slice(4).map((option) => {
@@ -724,7 +732,7 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
       <div className="flex justify-between max-w-2xl mx-auto pt-4">
         <Button variant="ghost" onClick={onBack} disabled={generatingPlan} className="h-11 px-5 rounded-xl">
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Retour
+          {tCommon('back')}
         </Button>
         <Button
           onClick={handleGenerateAndContinue}
@@ -734,12 +742,12 @@ export function Step4Brief({ brief, onChange, onNext, onBack, actor, preset, pro
           {generatingPlan ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Génération du script...
+              {t('plan.loading')}
             </>
           ) : (
             <>
               <Sparkles className="w-4 h-4 mr-2" />
-              Générer le plan
+              {t('plan.submit')}
             </>
           )}
         </Button>

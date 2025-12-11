@@ -3,48 +3,32 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useLocale, useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowRight, Sparkles, Check } from 'lucide-react'
+import { ArrowRight, Sparkles } from 'lucide-react'
 
-export default function RegisterPage() {
+export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
   const router = useRouter()
+  const locale = useLocale()
+  const t = useTranslations('auth')
+  const tl = useTranslations('loginPage')
   const supabase = createClient()
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
-    if (password !== confirmPassword) {
-      setError('Les mots de passe ne correspondent pas')
-      setLoading(false)
-      return
-    }
-
-    if (password.length < 6) {
-      setError('Le mot de passe doit contenir au moins 6 caractères')
-      setLoading(false)
-      return
-    }
-
-    // Utiliser l'URL de prod pour les emails (évite localhost en dev)
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
-    
-    const { error } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
-      options: {
-        emailRedirectTo: `${siteUrl}/dashboard`,
-      },
     })
 
     if (error) {
@@ -53,29 +37,8 @@ export default function RegisterPage() {
       return
     }
 
-    setSuccess(true)
-    setLoading(false)
-  }
-
-  if (success) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-6">
-        <div className="w-full max-w-sm text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-green-500 mb-6">
-            <Check className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight">Email envoyé !</h1>
-          <p className="text-muted-foreground mt-3 mb-8">
-            Vérifie ta boîte mail pour confirmer ton compte et commencer à créer.
-          </p>
-          <Link href="/login">
-            <Button variant="outline" className="rounded-xl h-11 px-6">
-              Retour à la connexion
-            </Button>
-          </Link>
-        </div>
-      </div>
-    )
+    router.push(`/${locale}/dashboard`)
+    router.refresh()
   }
 
   return (
@@ -99,30 +62,17 @@ export default function RegisterPage() {
         </div>
         
         <div className="relative z-10 space-y-6">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full text-sm backdrop-blur-sm">
-            <Sparkles className="w-4 h-4" />
-            <span>Propulsé par l'IA</span>
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full text-sm backdrop-blur-sm">
+              <Sparkles className="w-4 h-4" />
+              <span>{tl('aiPowered')}</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-semibold leading-tight tracking-tight">
-            Rejoins la révolution<br />
-            <span className="text-white/60">de la pub UGC</span>
+              {tl('heroTitle')}<br />
+              <span className="text-white/60">{tl('heroSubtitle')}</span>
           </h1>
           <p className="text-white/60 text-lg max-w-md">
-            Des milliers de créateurs utilisent déjà UGC AI pour générer 
-            des publicités authentiques et performantes.
+              {tl('heroBody')}
           </p>
-          
-          {/* Features */}
-          <div className="space-y-3 pt-4">
-            {['Génération en quelques minutes', 'Acteurs virtuels réalistes', 'Export multi-plateformes'].map((feature) => (
-              <div key={feature} className="flex items-center gap-3 text-white/80">
-                <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
-                  <Check className="w-3 h-3" />
-                </div>
-                <span>{feature}</span>
-              </div>
-            ))}
-          </div>
         </div>
         
         <div className="relative z-10 flex items-center gap-6 text-sm text-white/40">
@@ -144,13 +94,13 @@ export default function RegisterPage() {
           </div>
 
           <div className="mb-8">
-            <h2 className="text-2xl font-semibold tracking-tight">Créer un compte</h2>
+            <h2 className="text-2xl font-semibold tracking-tight">{t('login')}</h2>
             <p className="text-muted-foreground mt-2">
-              Commence à générer tes pubs UGC en quelques minutes
+              {t('subheadingLogin')}
             </p>
           </div>
 
-          <form onSubmit={handleRegister} className="space-y-5">
+          <form onSubmit={handleLogin} className="space-y-5">
             {error && (
               <div className="p-4 text-sm text-destructive bg-destructive/5 border border-destructive/10 rounded-xl flex items-start gap-3">
                 <div className="w-5 h-5 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -161,7 +111,7 @@ export default function RegisterPage() {
             )}
             
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+              <Label htmlFor="email" className="text-sm font-medium">{t('email')}</Label>
               <Input
                 id="email"
                 type="email"
@@ -174,26 +124,13 @@ export default function RegisterPage() {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium">Mot de passe</Label>
+              <Label htmlFor="password" className="text-sm font-medium">{t('password')}</Label>
               <Input
                 id="password"
                 type="password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                required
-                className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-foreground focus:bg-background transition-all"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-sm font-medium">Confirmer le mot de passe</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 className="h-12 rounded-xl bg-muted/50 border-transparent focus:border-foreground focus:bg-background transition-all"
               />
@@ -210,11 +147,11 @@ export default function RegisterPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  Création...
+                  {t('loading')}
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
-                  Créer mon compte
+                  {t('loginCta')}
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </span>
               )}
@@ -223,9 +160,9 @@ export default function RegisterPage() {
           
           <div className="mt-8 pt-6 border-t border-border">
             <p className="text-sm text-muted-foreground text-center">
-              Déjà un compte ?{' '}
-              <Link href="/login" className="text-foreground font-medium hover:underline underline-offset-4">
-                Se connecter
+              {t('noAccount')}{' '}
+              <Link href={`/${locale}/register`} className="text-foreground font-medium hover:underline underline-offset-4">
+                {t('registerCta')}
               </Link>
             </p>
           </div>

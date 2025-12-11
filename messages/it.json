@@ -1,0 +1,348 @@
+{
+  "common": {
+    "loading": "Caricamento...",
+    "error": "Si è verificato un errore",
+    "save": "Salva",
+    "cancel": "Annulla",
+    "continue": "Continua",
+    "back": "Indietro",
+    "delete": "Elimina",
+    "language": "Lingua",
+    "negativeBalanceHint": "Saldo negativo - ricarica i tuoi crediti"
+  },
+  "auth": {
+    "login": "Accedi",
+    "register": "Registrati",
+    "logout": "Disconnetti",
+    "email": "Email",
+    "password": "Password",
+    "forgotPassword": "Password dimenticata?",
+    "noAccount": "Non hai ancora un account?",
+    "hasAccount": "Hai già un account?",
+    "loginCta": "Accedi",
+    "registerCta": "Crea account",
+    "subheadingLogin": "Inserisci le tue credenziali per accedere",
+    "subheadingRegister": "Crea il tuo account per iniziare",
+    "successEmailSent": "Email inviata!",
+    "successCheckMail": "Controlla la tua casella per confermare l'account e iniziare a creare.",
+    "backToLogin": "Torna al login",
+    "passwordsMismatch": "Le password non coincidono",
+    "passwordTooShort": "La password deve contenere almeno 6 caratteri",
+    "ctaNewCampaign": "Nuova campagna"
+  },
+  "dashboard": {
+    "title": "Le mie campagne",
+    "newCampaign": "Nuova campagna",
+    "noCampaigns": "Nessuna campagna",
+    "credits": "crediti"
+  },
+  "dashboardPage": {
+    "heroBadge": "Potenziato dall'IA",
+    "heroTitle": "Le mie campagne",
+    "heroSubtitle": "Crea e gestisci i tuoi annunci UGC generati dall'IA. Ogni campagna può contenere diversi clip ottimizzati per i social.",
+    "newCampaign": "Nuova campagna",
+    "emptyTitle": "Nessuna campagna",
+    "emptySubtitle": "Inizia creando la tua prima campagna UGC. I nostri attori virtuali daranno vita ai tuoi annunci in pochi clic.",
+    "emptyCta": "Crea la mia prima campagna",
+    "statsCampaigns": "Campagne",
+    "statsCompleted": "Completate",
+    "completionRate": "Tasso di completamento"
+  },
+  "campaignPage": {
+    "defaultTitle": "Campagna UGC",
+    "subtitlesProcessingTitle": "Sottotitoli in elaborazione...",
+    "subtitlesProcessingEta": "Ancora 1-5 minuti",
+    "templateLabel": "Template: {name}",
+    "download": "Scarica",
+    "downloadWithSubtitles": "Con sottotitoli",
+    "presetBadgePrefix": "🎬 {name}",
+    "targetDuration": "Obiettivo {duration}s",
+    "withProduct": "📦 Con prodotto",
+    "withoutProduct": "💬 Senza prodotto",
+    "clipsGenerated": "Clip generati",
+    "finalDuration": "Durata finale",
+    "createdAt": "Creato il {date}",
+    "editVideo": "Modifica video"
+  },
+  "campaignCard": {
+    "untitled": "Senza titolo",
+    "editTitle": "Modifica titolo",
+    "delete": "Elimina",
+    "deleteTitle": "Elimina campagna",
+    "deleteMessage": "Sei sicuro di voler eliminare questa campagna? Questa azione è irreversibile.",
+    "confirm": "Elimina",
+    "confirming": "Eliminazione...",
+    "cancel": "Annulla",
+    "clips": "{count, plural, one {# clip} other {# clip}}"
+  },
+  "nav": {
+    "dashboard": "Campagne",
+    "billing": "Fatturazione",
+    "admin": "Admin",
+    "newCampaign": "Nuova campagna",
+    "backToApp": "← Torna all'app",
+    "adminActors": "Attori",
+    "adminPresets": "Preset",
+    "adminPrompts": "Prompt"
+  },
+  "status": {
+    "draft": "Bozza",
+    "generating": "In corso",
+    "assembling": "Assemblaggio...",
+    "completed": "Completato",
+    "failed": "Fallito"
+  },
+  "steps": {
+    "actor": "Attore",
+    "product": "Prodotto",
+    "preset": "Stile",
+    "brief": "Brief",
+    "plan": "Piano",
+    "generate": "Generazione"
+  },
+  "stepDescriptions": {
+    "actor": "Scegli il tuo creator IA",
+    "product": "Con o senza prodotto",
+    "preset": "Stile del video",
+    "brief": "Descrivi la tua offerta",
+    "plan": "Valida lo script",
+    "generate": "Crea i video"
+  },
+  "loginPage": {
+    "heroTitle": "Crea annunci UGC",
+    "heroSubtitle": "in pochi clic",
+    "heroBody": "Genera video pubblicitari autentici con attori virtuali, ottimizzati per TikTok, Instagram e YouTube.",
+    "aiPowered": "Potenziato dall'IA"
+  },
+  "registerPage": {
+    "heroTitle": "Unisciti alla rivoluzione",
+    "heroSubtitle": "della pubblicità UGC",
+    "heroBody": "Migliaia di creator usano già UGC AI per generare annunci autentici e performanti.",
+    "features": {
+      "fast": "Generazione in pochi minuti",
+      "actors": "Attori virtuali realistici",
+      "export": "Esportazione multipiattaforma"
+    }
+  },
+  "stepsTitle": {
+    "actor": "Scegli il tuo creator IA"
+  },
+  "step1": {},
+  "step2": {},
+  "step3": {},
+  "step4": {
+    "beats": {
+      "hook": "Gancio",
+      "problem": "Problema",
+      "solution": "Soluzione",
+      "proof": "Prova",
+      "cta": "CTA"
+    },
+    "generating": {
+      "badge": "Creazione in corso...",
+      "scriptSubtitle": "Scrittura dello script perfetto...",
+      "imagesSubtitle": "Preparazione dei visual...",
+      "scriptLabel": "Script",
+      "imagesLabel": "Immagini"
+    },
+    "header": {
+      "title": "Brief rapido",
+      "subtitle": "Descrivi la tua offerta così l'IA genera il miglior script"
+    },
+    "import": {
+      "titleExtracted": "✨ Brief precompilato dal tuo sito!",
+      "titleDefault": "Hai un sito o una landing page?",
+      "subtitleExtracted": "Puoi modificare i campi qui sotto se serve",
+      "subtitleDefault": "Incolla l'URL e estraiamo le info automaticamente",
+      "placeholder": "https://tuo-sito.com/prodotto",
+      "action": "Estrarre",
+      "loading": "Analisi...",
+      "error": "Errore di estrazione"
+    },
+    "manualDivider": "oppure compila manualmente",
+    "fields": {
+      "whatSelling": {
+        "label": "Cosa vendi?",
+        "placeholder": "Es: Un corso online per imparare Python in 30 giorni, ideale per principianti che vogliono passare al tech...",
+        "helper": "Più sei preciso, migliore sarà lo script generato"
+      },
+      "painPoint": {
+        "label": "Che problema risolve?",
+        "placeholder": "Es: Le persone vogliono passare al tech ma temono di non farcela, pensano sia troppo complesso e di essere troppo grandi per imparare a programmare...",
+        "helper": "💡 La frustrazione del tuo pubblico rende lo script incisivo"
+      },
+      "targetAudience": {
+        "label": "Pubblico di riferimento",
+        "placeholder": "Freelance, imprenditori..."
+      },
+      "keyBenefits": {
+        "label": "Benefici chiave",
+        "placeholder": "Risparmio di tempo, semplicità..."
+      }
+    },
+    "duration": {
+      "label": "Durata",
+      "options": {
+        "s15": {
+          "label": "15s",
+          "clips": "2-3 clip"
+        },
+        "s30": {
+          "label": "30s",
+          "clips": "4-5 clip"
+        },
+        "s45": {
+          "label": "45s",
+          "clips": "5-6 clip"
+        },
+        "s60": {
+          "label": "60s",
+          "clips": "6-8 clip"
+        }
+      }
+    },
+    "language": {
+      "label": "Lingua dello script",
+      "more": "+ Altre lingue"
+    },
+    "plan": {
+      "loading": "Generazione dello script...",
+      "submit": "Genera il piano"
+    },
+    "errors": {
+      "generation": "Errore di generazione"
+    }
+  },
+  "step5": {
+    "visualPrompt": {
+      "label": "Prompt visivo",
+      "edit": "Modifica",
+      "placeholder": "Prompt visivo...",
+      "saveAndRegenerate": "Salva e rigenera"
+    },
+    "cta": {
+      "generatingImages": "Generazione delle immagini...",
+      "continueWithoutImages": "Continua senza immagini",
+      "imagesProgress": "Immagini {done}/{total}",
+      "generateVideos": "Genera i video"
+    }
+  },
+  "step6": {
+    "actions": {
+      "cancel": "✕ Annulla",
+      "backToPlan": "← Torna al piano",
+      "generateRemaining": "{count, plural, one {🚀 Genera # clip rimanente} other {🚀 Genera # clip rimanenti}}",
+      "assemblingInProgress": "Assemblaggio in corso (≈30s)...",
+      "assembleFinal": "Assembla il video finale"
+    },
+    "beats": {
+      "hook": "Hook",
+      "problem": "Problema",
+      "agitation": "Agitazione",
+      "solution": "Soluzione",
+      "proof": "Prova",
+      "cta": "CTA"
+    },
+    "status": {
+      "video": "Video",
+      "voice": "Voce",
+      "ambient": "Ambiente"
+    },
+    "errors": {
+      "credits": {
+        "title": "Crediti insufficienti",
+        "description": "Ti mancano crediti per generare questo video.",
+        "missing": "Mancano: {amount}€",
+        "cta": "Ricarica i crediti"
+      },
+      "generic": {
+        "title": "Generazione fallita",
+        "description": "Si è verificato un errore durante la generazione.",
+        "retry": "Riprova"
+      },
+      "assembly": {
+        "default": "Errore di assemblaggio",
+        "unknown": "Errore sconosciuto",
+        "invalidClips": "{count} clip con problemi:\n{details}",
+        "alert": "❌ Errore di assemblaggio\n\n{message}\n\nPuoi riprovare o rigenerare i clip problematici."
+      }
+    },
+    "assembly": {
+      "title": "🎬 Assemblaggio in corso...",
+      "messages": {
+        "upload": "Caricamento dei clip sul cloud...",
+        "adjust": "Applicazione dei tagli/velocità...",
+        "merge": "Unione delle tracce video...",
+        "optimize": "Ottimizzazione della qualità...",
+        "finish": "Finalizzazione dell'assemblaggio..."
+      },
+      "clipCount": "{count} clip{count > 1 ? 's' : ''}",
+      "withAdjustments": "Con aggiustamenti",
+      "hint": "Può richiedere fino a 30 secondi..."
+    },
+    "confirmRegen": {
+      "title": "Rigenerare {label}?",
+      "messageWithWarning": "{warning} — Questa azione rigenererà {label} del clip.",
+      "message": "Questa azione rigenererà {label} del clip.",
+      "confirm": "Rigenera"
+    }
+  },
+  "campaign": {},
+  "billing": {},
+  "admin": {},
+  "adminDashboard": {
+    "header": {
+      "title": "Dashboard admin",
+      "subtitle": "Gestisci attori, preset e prompt"
+    },
+    "fal": {
+      "title": "Saldo Fal.ai",
+      "balanceDescription": "Crediti disponibili per le generazioni IA"
+    },
+    "stats": {
+      "configure": "Configurare",
+      "actors": {
+        "title": "Attori",
+        "description": "Gestisci attori IA"
+      },
+      "presets": {
+        "title": "Preset",
+        "description": "Template di intenzione"
+      },
+      "prompts": {
+        "title": "Prompt",
+        "description": "Prompt di sistema"
+      },
+      "campaigns": {
+        "title": "Campagne",
+        "description": "Utenti totali"
+      },
+      "billing": {
+        "title": "Billing",
+        "description": "Gestisci prezzi e piani"
+      },
+      "logs": {
+        "title": "Log",
+        "description": "Log di generazione Fal.ai"
+      }
+    },
+    "quickActions": {
+      "title": "Azioni rapide",
+      "addActor": {
+        "title": "Aggiungi attore",
+        "description": "Crea un nuovo attore IA con SOUL",
+        "cta": "Nuovo attore"
+      },
+      "prompts": {
+        "title": "Modifica prompt",
+        "description": "Modifica il mega prompt di Claude o NanoBanana",
+        "cta": "Modifica prompt"
+      },
+      "presets": {
+        "title": "Gestisci preset",
+        "description": "Aggiungi o modifica template di intenzione",
+        "cta": "Gestisci preset"
+      }
+    }
+  }
+}

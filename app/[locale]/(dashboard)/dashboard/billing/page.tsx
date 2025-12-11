@@ -20,14 +20,18 @@ import { BillingActions } from './billing-actions'
 import { formatCredits, formatAsCredits, getRemainingGenerations, getAllGenerationCosts, CreditTransaction } from '@/lib/credits'
 import { isAdmin } from '@/lib/admin'
 
-export default async function BillingPage() {
+export default async function BillingPage({
+  params,
+}: {
+  params: { locale: string }
+}) {
   const supabase = await createClient()
   
   // Get authenticated user
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   
   if (authError || !user) {
-    redirect('/login')
+    redirect(`/${params.locale}/login`)
   }
 
   const userIsAdmin = isAdmin(user.email)

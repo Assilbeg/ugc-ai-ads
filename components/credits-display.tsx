@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
+import { useLocale, useTranslations } from 'next-intl'
 import { formatAsCredits } from '@/lib/credits-client'
 
 interface CreditsDisplayProps {
@@ -12,6 +13,8 @@ interface CreditsDisplayProps {
 export function CreditsDisplay({ isAdmin = false, initialBalance = 0 }: CreditsDisplayProps) {
   const [balance, setBalance] = useState(initialBalance)
   const [isLoading, setIsLoading] = useState(false)
+  const locale = useLocale()
+  const t = useTranslations('common')
 
   const isNegative = balance < 0
 
@@ -94,9 +97,9 @@ export function CreditsDisplay({ isAdmin = false, initialBalance = 0 }: CreditsD
 
   return (
     <Link 
-      href="/dashboard/billing"
+      href={`/${locale}/dashboard/billing`}
       className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors ${getContainerStyles()}`}
-      title={isNegative ? 'Solde négatif - Rechargez vos crédits' : undefined}
+      title={isNegative ? t('negativeBalanceHint') : undefined}
     >
       {isNegative ? (
         // Warning icon for negative balance
