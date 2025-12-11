@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { SubmagicModal } from '@/components/modals/submagic-modal'
 import { Subtitles, Loader2 } from 'lucide-react'
@@ -22,6 +23,7 @@ export function SubmagicActions({
   campaignTitle,
   submagicStatus = 'none',
 }: SubmagicActionsProps) {
+  const t = useTranslations('campaignPage.subtitles')
   const [showModal, setShowModal] = useState(false)
   const [credits, setCredits] = useState(0)
 
@@ -59,7 +61,7 @@ export function SubmagicActions({
         className="w-full rounded-xl h-11 gap-2"
       >
         <Loader2 className="w-4 h-4 animate-spin" />
-        Sous-titres en cours...
+        {t('processing')}
       </Button>
     )
   }
@@ -68,9 +70,9 @@ export function SubmagicActions({
   const hasSubtitles = submagicStatus === 'completed'
   const hasFailed = submagicStatus === 'failed'
   
-  let buttonLabel = '🔤 Ajouter sous-titres'
-  if (hasSubtitles) buttonLabel = '🔤 Modifier sous-titres'
-  if (hasFailed) buttonLabel = '🔤 Réessayer sous-titres'
+  let buttonLabel = t('add')
+  if (hasSubtitles) buttonLabel = t('edit')
+  if (hasFailed) buttonLabel = t('retry')
 
   return (
     <>

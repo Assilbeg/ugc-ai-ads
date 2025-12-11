@@ -466,7 +466,7 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
                           variant={isCurrentVersion ? 'default' : 'ghost'}
                           className={`h-8 text-xs ${isCurrentVersion ? 'bg-violet-600 hover:bg-violet-700 text-white' : ''}`}
                         >
-                          📥 Télécharger
+                          {tCampaign('downloadIcon')}
                         </Button>
                       </a>
                     </div>
@@ -499,7 +499,7 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
                           </span>
                         )}
                         {isCurrentVersion && (
-                          <Badge className="bg-emerald-500 text-white text-xs">Actuelle</Badge>
+                          <Badge className="bg-emerald-500 text-white text-xs">{tCampaign('currentVersion')}</Badge>
                         )}
                       </div>
                       <a 
@@ -509,7 +509,7 @@ export default async function CampaignPage({ params, searchParams }: CampaignPag
                         rel="noopener noreferrer"
                       >
                         <Button size="sm" variant={isCurrentVersion ? 'default' : 'ghost'} className="h-8 text-xs">
-                          📥 Télécharger
+                          {tCampaign('downloadIcon')}
                         </Button>
                       </a>
                     </div>
