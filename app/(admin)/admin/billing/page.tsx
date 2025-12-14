@@ -10,10 +10,12 @@ import {
   Video,
   Mic,
   Music,
-  DollarSign
+  DollarSign,
+  Globe
 } from 'lucide-react'
 import { GenerationCostsForm } from './generation-costs-form'
 import { SubscriptionPlansForm } from './subscription-plans-form'
+import { CurrencyConfigForm } from './currency-config-form'
 
 export default async function AdminBillingPage() {
   const supabase = await createClient()
@@ -29,6 +31,12 @@ export default async function AdminBillingPage() {
     .from('subscription_plans')
     .select('*')
     .order('display_order')
+
+  // Get currency configs
+  const { data: currencyConfigs } = await supabase
+    .from('currency_config')
+    .select('*')
+    .order('language_code')
 
   // Get some stats
   const { count: totalUsers } = await supabase
@@ -157,6 +165,26 @@ export default async function AdminBillingPage() {
         </CardHeader>
         <CardContent>
           <SubscriptionPlansForm plans={plans || []} />
+        </CardContent>
+      </Card>
+
+      {/* Currency Configuration */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
+              <Globe className="w-5 h-5" />
+            </div>
+            <div>
+              <CardTitle>Configuration des devises</CardTitle>
+              <CardDescription>
+                Configurer les devises affichées selon la langue du navigateur et les taux de change
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <CurrencyConfigForm configs={currencyConfigs || []} />
         </CardContent>
       </Card>
 
