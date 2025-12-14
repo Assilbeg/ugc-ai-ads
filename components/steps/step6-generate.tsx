@@ -5,6 +5,7 @@ import { NewCampaignState, CampaignClip, ClipStatus, ClipAdjustments } from '@/t
 import { useVideoGeneration, RegenerateWhat, VideoQuality, GenerationProgress } from '@/hooks/use-video-generation'
 import { useCredits } from '@/hooks/use-credits'
 import { triggerCreditsRefresh } from '@/components/credits-display'
+import { formatCredits } from '@/lib/credits-client'
 import { useActors } from '@/hooks/use-actors'
 import { useCampaignCreation } from '@/hooks/use-campaign-creation'
 import { getPresetById } from '@/lib/presets'
@@ -237,6 +238,40 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   
   // Qualité vidéo sélectionnée
   const [videoQuality, setVideoQuality] = useState<VideoQuality>('standard')
+
+  // ═══════════════════════════════════════════════════════════════
+  // CALCUL DYNAMIQUE DES COÛTS
+  // ═══════════════════════════════════════════════════════════════
+  
+  // Durée standard d'un clip (en secondes)
+  const DEFAULT_CLIP_DURATION = 6
+  
+  // Coût d'un clip en mode Fast (vidéo fast × 6s + voix + ambiance)
+  const getCostPerClipFast = (): number => {
+    if (!credits?.costs) return 0
+    const videoCost = (credits.costs.video_veo31_fast || 0) * DEFAULT_CLIP_DURATION
+    const voiceCost = credits.costs.voice_chatterbox || 0
+    const ambientCost = credits.costs.ambient_elevenlabs || 0
+    return videoCost + voiceCost + ambientCost
+  }
+  
+  // Coût d'un clip en mode Standard (vidéo standard × 6s + voix + ambiance)
+  const getCostPerClipStandard = (): number => {
+    if (!credits?.costs) return 0
+    const videoCost = (credits.costs.video_veo31_standard || 0) * DEFAULT_CLIP_DURATION
+    const voiceCost = credits.costs.voice_chatterbox || 0
+    const ambientCost = credits.costs.ambient_elevenlabs || 0
+    return videoCost + voiceCost + ambientCost
+  }
+  
+  // Coût de régénération vidéo (durée standard × prix par seconde)
+  const getVideoCostForQuality = (quality: VideoQuality): number => {
+    if (!credits?.costs) return 0
+    const costPerSecond = quality === 'fast' 
+      ? (credits.costs.video_veo31_fast || 0)
+      : (credits.costs.video_veo31_standard || 0)
+    return costPerSecond * DEFAULT_CLIP_DURATION
+  }
   
   // Analyse de clips (transcription + auto-trim)
   const [analyzingClips, setAnalyzingClips] = useState<Set<number>>(new Set())
@@ -964,11 +999,16 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       all: 'tout',
     }
     
+    // Calcul du coût de régénération vidéo avec la qualité actuelle
+    const videoCost = getVideoCostForQuality(videoQuality)
+    
     setConfirmRegen({
       clipIndex,
       what,
       label: labels[what],
-      warning: what === 'video' ? '⚠️ Coûteux (~1-2€)' : undefined
+      warning: what === 'video' && videoCost > 0 
+        ? `⚠️ Coûte ${formatCredits(videoCost)}` 
+        : undefined
     })
   }
 
@@ -1080,9 +1120,13 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                       <Check className="w-4 h-4 text-green-500 ml-auto" />
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">Économique • ~1.55€/clip</p>
+                  <p className="text-xs text-muted-foreground">
+                    Économique • {getCostPerClipFast() > 0 ? formatCredits(getCostPerClipFast()) : '...'}/clip
+                  </p>
                   <div className="mt-2 text-xs text-green-600 font-medium">
-                    -54% vs Standard
+                    {getCostPerClipStandard() > 0 && getCostPerClipFast() > 0 
+                      ? `-${Math.round((1 - getCostPerClipFast() / getCostPerClipStandard()) * 100)}% vs Standard`
+                      : '-54% vs Standard'}
                   </div>
                 </button>
                 
@@ -1101,7 +1145,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                       <Check className="w-4 h-4 text-violet-500 ml-auto" />
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">Qualité max • ~3.35€/clip</p>
+                  <p className="text-xs text-muted-foreground">
+                    Qualité max • {getCostPerClipStandard() > 0 ? formatCredits(getCostPerClipStandard()) : '...'}/clip
+                  </p>
                   <div className="mt-2 text-xs text-violet-600 font-medium">
                     Meilleure qualité
                   </div>
@@ -1151,7 +1197,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                 >
                   <Gauge className="w-4 h-4" />
                   Fast
-                  <span className="text-xs opacity-75">1.55€</span>
+                  <span className="text-xs opacity-75">{getCostPerClipFast() > 0 ? formatCredits(getCostPerClipFast()) : '...'}</span>
                 </button>
                 <button
                   onClick={() => setVideoQuality('standard')}
@@ -1163,7 +1209,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                 >
                   <Sparkles className="w-4 h-4" />
                   Standard
-                  <span className="text-xs opacity-75">3.35€</span>
+                  <span className="text-xs opacity-75">{getCostPerClipStandard() > 0 ? formatCredits(getCostPerClipStandard()) : '...'}</span>
                 </button>
               </div>
             </div>
@@ -1377,7 +1423,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                     Il vous manque des crédits pour générer cette vidéo.
                                     {errorInfo.errorDetails?.missing && (
                                       <span className="block mt-1 font-medium text-amber-600">
-                                        Manquant : {(errorInfo.errorDetails.missing / 100).toFixed(2)}€
+                                        Manquant : {formatCredits(errorInfo.errorDetails.missing)}
                                       </span>
                                     )}
                                   </p>
@@ -1556,7 +1602,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                             <div className="flex items-center gap-2 mb-2">
                               <RefreshCw className="w-4 h-4 text-orange-500" />
                               <span className="text-sm font-medium text-orange-600">Régénérer</span>
-                              <Badge variant="outline" className="text-xs ml-auto border-orange-500/50 text-orange-600">~1-2€</Badge>
+                              <Badge variant="outline" className="text-xs ml-auto border-orange-500/50 text-orange-600">
+                                {getVideoCostForQuality(videoQuality) > 0 ? formatCredits(getVideoCostForQuality(videoQuality)) : '...'}
+                              </Badge>
                             </div>
                             <div className="flex items-center gap-2">
                               <Button 
