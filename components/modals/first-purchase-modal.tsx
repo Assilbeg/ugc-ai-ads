@@ -16,6 +16,7 @@ import {
   ArrowRight,
   Star
 } from 'lucide-react'
+import { formatCredits as formatCreditsWithCurrency, getCurrentCurrency, CurrencyInfo } from '@/lib/currency-client'
 
 interface Plan {
   id: string
@@ -51,6 +52,7 @@ export function FirstPurchaseModal({
   const [isEarlyBirdEligible, setIsEarlyBirdEligible] = useState(false)
   const [earlyBirdTimeRemaining, setEarlyBirdTimeRemaining] = useState(0)
   const [processingPlanId, setProcessingPlanId] = useState<string | null>(null)
+  const [currency] = useState<CurrencyInfo>(getCurrentCurrency())
 
   // Fetch plans
   useEffect(() => {
@@ -135,15 +137,12 @@ export function FirstPurchaseModal({
     return `${minutes}m ${seconds}s`
   }
 
-  const formatPrice = (cents: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(cents / 100)
+  const formatPrice = (centsEur: number) => {
+    return formatCreditsWithCurrency(centsEur)
   }
 
-  const formatCredits = (cents: number) => {
-    return formatPrice(cents)
+  const formatCredits = (centsEur: number) => {
+    return formatCreditsWithCurrency(centsEur)
   }
 
   // Bloquer le scroll

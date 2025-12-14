@@ -19,6 +19,7 @@ import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { Loader2, Play, X, Video, Mic, Music, Maximize2, Clock, Scissors, Gauge, Eye, Check, RefreshCw, Film, Sparkles, Zap, AlertCircle } from 'lucide-react'
 import { UpgradeModal } from '@/components/modals/upgrade-modal'
 import { FirstPurchaseModal } from '@/components/modals/first-purchase-modal'
+import { formatPriceSimple, getCurrentCurrency, CurrencyInfo } from '@/lib/currency-client'
 
 // Messages rotatifs pour l'assemblage
 const ASSEMBLY_MESSAGES = [
@@ -226,6 +227,9 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
   const [adjustments, setAdjustments] = useState<Record<number, ClipAdjustments>>({})
   const [previewingClip, setPreviewingClip] = useState<number | null>(null)
   const [assembling, setAssembling] = useState(false)
+  
+  // Devise de l'utilisateur (détectée depuis le navigateur)
+  const [currency, setCurrency] = useState<CurrencyInfo>(getCurrentCurrency())
   
   // Modal de confirmation pour régénération
   const [confirmRegen, setConfirmRegen] = useState<{
@@ -968,7 +972,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
       clipIndex,
       what,
       label: labels[what],
-      warning: what === 'video' ? '⚠️ Coûteux (~1-2€)' : undefined
+      warning: what === 'video' ? `⚠️ Coûteux (~${formatPriceSimple(100, currency)}-${formatPriceSimple(200, currency)})` : undefined
     })
   }
 
@@ -1080,7 +1084,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                       <Check className="w-4 h-4 text-green-500 ml-auto" />
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">Économique • ~1.55€/clip</p>
+                  <p className="text-xs text-muted-foreground">Économique • ~{formatPriceSimple(155, currency)}/clip</p>
                   <div className="mt-2 text-xs text-green-600 font-medium">
                     -54% vs Standard
                   </div>
@@ -1101,7 +1105,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                       <Check className="w-4 h-4 text-violet-500 ml-auto" />
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">Qualité max • ~3.35€/clip</p>
+                  <p className="text-xs text-muted-foreground">Qualité max • ~{formatPriceSimple(335, currency)}/clip</p>
                   <div className="mt-2 text-xs text-violet-600 font-medium">
                     Meilleure qualité
                   </div>
@@ -1151,7 +1155,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                 >
                   <Gauge className="w-4 h-4" />
                   Fast
-                  <span className="text-xs opacity-75">1.55€</span>
+                  <span className="text-xs opacity-75">{formatPriceSimple(155, currency)}</span>
                 </button>
                 <button
                   onClick={() => setVideoQuality('standard')}
@@ -1163,7 +1167,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                 >
                   <Sparkles className="w-4 h-4" />
                   Standard
-                  <span className="text-xs opacity-75">3.35€</span>
+                  <span className="text-xs opacity-75">{formatPriceSimple(335, currency)}</span>
                 </button>
               </div>
             </div>
@@ -1377,7 +1381,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                                     Il vous manque des crédits pour générer cette vidéo.
                                     {errorInfo.errorDetails?.missing && (
                                       <span className="block mt-1 font-medium text-amber-600">
-                                        Manquant : {(errorInfo.errorDetails.missing / 100).toFixed(2)}€
+                                        Manquant : {formatPriceSimple(errorInfo.errorDetails.missing, currency)}
                                       </span>
                                     )}
                                   </p>
@@ -1556,7 +1560,7 @@ export function Step6Generate({ state, onClipsUpdate, onComplete, onBack }: Step
                             <div className="flex items-center gap-2 mb-2">
                               <RefreshCw className="w-4 h-4 text-orange-500" />
                               <span className="text-sm font-medium text-orange-600">Régénérer</span>
-                              <Badge variant="outline" className="text-xs ml-auto border-orange-500/50 text-orange-600">~1-2€</Badge>
+                              <Badge variant="outline" className="text-xs ml-auto border-orange-500/50 text-orange-600">~{formatPriceSimple(100, currency)}-{formatPriceSimple(200, currency)}</Badge>
                             </div>
                             <div className="flex items-center gap-2">
                               <Button 

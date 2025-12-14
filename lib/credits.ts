@@ -456,11 +456,33 @@ export async function updateSubscription(
 // HELPER: Format credits for display
 // ─────────────────────────────────────────────────────────────────
 
+import { 
+  formatFromEur, 
+  getCurrencyForLanguageSync, 
+  DEFAULT_CURRENCY,
+  type CurrencyInfo 
+} from '@/lib/currency'
+
+// Re-export currency utilities for convenience
+export { getCurrencyForLanguageSync, DEFAULT_CURRENCY, type CurrencyInfo } from '@/lib/currency'
+
+/**
+ * Formate un montant en centimes EUR (utilise EUR par défaut côté serveur)
+ * Pour le formatage adapté à la langue, utiliser formatCreditsWithLanguage
+ */
 export function formatCredits(cents: number): string {
   return new Intl.NumberFormat('fr-FR', {
     style: 'currency',
     currency: 'EUR',
   }).format(cents / 100)
+}
+
+/**
+ * Formate un montant en centimes EUR dans la devise correspondant à une langue
+ */
+export function formatCreditsWithLanguage(centsEur: number, languageCode: string): string {
+  const currency = getCurrencyForLanguageSync(languageCode)
+  return formatFromEur(centsEur, currency)
 }
 
 // ─────────────────────────────────────────────────────────────────
